@@ -1,0 +1,2337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f16">
+<title>Escape From the School on HTML</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0f16;color:#e8eef7;
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  user-select:none;-webkit-user-select:none;touch-action:none}
+#app{position:fixed;inset:0;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+#hud{position:absolute;left:0;right:0;top:0;padding:8px 10px;display:flex;flex-direction:column;gap:6px;
+  pointer-events:none;z-index:5}
+.rowline{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{background:rgba(18,26,40,.82);border:1px solid rgba(120,160,220,.28);border-radius:999px;
+  padding:3px 9px;font-size:12px;line-height:1.4;white-space:nowrap}
+.chip b{color:#8fd0ff}
+#seeWrap{position:relative;height:16px;border-radius:999px;background:rgba(18,26,40,.82);
+  border:1px solid rgba(120,160,220,.22);overflow:hidden;display:flex;align-items:center;
+  opacity:0;transition:opacity .12s linear;pointer-events:none}
+#seeWrap.on{opacity:1}
+#seeBar{position:absolute;left:0;top:0;bottom:0;width:0%;
+  background:linear-gradient(90deg,rgba(255,190,60,.85),rgba(255,70,70,.95));transition:width .06s linear}
+#seeTxt{position:relative;width:100%;text-align:center;font-size:10.5px;font-weight:700;
+  color:#0a1220;letter-spacing:.4px}
+#floorName{font-size:13px;font-weight:700;color:#9fe6ff;background:rgba(15,40,60,.85);
+  border-color:rgba(90,200,255,.4)}
+.hint{font-size:11.5px;color:#b9c9dd;background:rgba(12,18,28,.78);border:1px solid rgba(120,160,220,.2);
+  border-radius:8px;padding:4px 8px;line-height:1.5;max-width:100%}
+#toast{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);background:rgba(8,12,20,.93);
+  border:1px solid rgba(120,200,255,.45);color:#dff1ff;padding:10px 16px;border-radius:12px;
+  font-size:13.5px;z-index:20;opacity:0;transition:opacity .18s;pointer-events:none;max-width:82%;text-align:center}
+#toast.show{opacity:1}
+
+#pad{position:absolute;left:0;right:0;bottom:0;height:200px;z-index:8;pointer-events:none}
+#dpad{position:absolute;left:14px;bottom:14px;width:140px;height:140px;pointer-events:auto;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+#stickBase{position:absolute;inset:0;border-radius:50%;background:rgba(26,38,56,.78);
+  border:1px solid rgba(120,170,235,.34);box-shadow:inset 0 0 22px rgba(0,0,0,.45)}
+#stickKnob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;
+  border-radius:50%;background:radial-gradient(circle at 38% 32%,#6fb4ff,#2b5f9e);
+  border:1px solid rgba(160,210,255,.6);box-shadow:0 3px 12px rgba(0,0,0,.45);
+  transition:transform .07s ease-out}
+#stickBase::after{content:'';position:absolute;left:50%;top:50%;width:120px;height:120px;
+  margin:-60px 0 0 -60px;border-radius:50%;border:1px dashed rgba(140,190,240,.16)}
+#actions{position:absolute;right:12px;bottom:16px;display:flex;flex-direction:column;gap:10px;
+  align-items:flex-end;pointer-events:auto}
+.abtn{width:64px;height:64px;border-radius:50%;background:rgba(30,44,66,.92);
+  border:1px solid rgba(120,170,235,.45);color:#dceaff;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-size:11px;line-height:1.15;font-weight:600}
+.abtn span{font-size:17px}
+.abtn.on{background:rgba(70,140,230,.9);transform:scale(.94)}
+.abtn.skip{width:56px;height:56px;background:rgba(92,62,30,.92);border-color:rgba(255,190,90,.45)}
+.abtn.skip.on{background:rgba(200,140,40,.92)}
+
+.overlay{position:absolute;inset:0;z-index:30;background:radial-gradient(circle at 50% 22%,#132033,#06090f 72%);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:20px 18px 24px;
+  gap:10px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.overlay.hidden{display:none}
+h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 0 18px rgba(80,190,255,.45)}
+.sub{font-size:12.5px;color:#93a6bd;text-align:center;line-height:1.7;margin:0}
+.diffs{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:340px;margin-top:4px}
+.dbtn{padding:12px 6px;border-radius:14px;background:rgba(28,40,60,.92);border:1px solid rgba(120,170,235,.35);
+  color:#e2eefc;font-size:15px;font-weight:700;text-align:center;line-height:1.45}
+.dbtn small{display:block;font-size:11px;color:#8ea6c2;font-weight:400;margin-top:2px}
+.dbtn.on{background:rgba(60,130,220,.9);border-color:rgba(150,220,255,.6)}
+.dbtn.hell{background:rgba(70,18,26,.92);border:1px solid rgba(244,63,94,.5)}
+.dbtn.hell.on{background:rgba(190,36,60,.92);border-color:rgba(255,120,140,.8)}
+#achPop{position:absolute;left:50%;top:16px;transform:translate(-50%,-8px);opacity:0;pointer-events:none;
+  background:rgba(12,18,28,.96);border:1px solid rgba(120,160,220,.4);border-radius:14px;
+  padding:10px 16px;text-align:center;font-size:13px;line-height:1.5;color:#e8f2ff;
+  box-shadow:0 8px 26px rgba(0,0,0,.55);transition:opacity .3s ease,transform .3s ease;z-index:60}
+.credits{margin-top:14px;font-size:10.5px;line-height:1.75;color:#6f8298;text-align:center;max-width:360px}
+.credits .cl{color:#9fb6cd}
+.credits a{color:#5fa8e8;text-decoration:none;word-break:break-all}
+.card{background:rgba(16,24,36,.86);border:1px solid rgba(120,170,235,.25);border-radius:14px;
+  padding:11px 13px;font-size:12px;color:#b8c9de;line-height:1.8;max-width:360px;width:100%}
+.card b{color:#8fd0ff}
+#endTitle{font-size:24px;font-weight:800;letter-spacing:1px;margin-top:20px}
+#endDesc{font-size:13px;color:#c3d3e6;text-align:center;line-height:1.9;max-width:340px;margin-top:6px}
+.bigbtn{padding:12px 34px;border-radius:12px;border:1px solid rgba(120,200,255,.5);
+  background:linear-gradient(180deg,rgba(60,130,220,.95),rgba(35,85,160,.95));color:#fff;font-size:15px;
+  font-weight:700;letter-spacing:1px;margin-top:14px}
+.ghostbtn{padding:9px 20px;border-radius:10px;border:1px solid rgba(140,170,210,.35);
+  background:rgba(24,34,50,.9);color:#c9d8ea;font-size:13px;margin-top:6px}
+.bigbtn:active,.ghostbtn:active{transform:scale(.96)}
+
+#panel{position:absolute;inset:0;z-index:45;background:rgba(4,8,14,.72);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+#panel.hidden{display:none}
+.pbox{width:100%;max-width:320px;background:rgba(18,26,40,.98);border:1px solid rgba(120,180,240,.4);
+  border-radius:16px;padding:15px;display:flex;flex-direction:column;gap:9px}
+.pbox h3{margin:0 0 2px;font-size:15px;color:#9fe6ff;text-align:center}
+.pitem{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  background:rgba(30,44,66,.8);border:1px solid rgba(120,170,235,.25);border-radius:10px;padding:9px 11px;
+  font-size:12.5px}
+.pitem button{padding:6px 12px;border-radius:8px;border:1px solid rgba(120,200,255,.45);
+  background:rgba(50,110,190,.9);color:#fff;font-size:12px;font-weight:600}
+.pitem button:disabled{opacity:.38}
+#panelClose{padding:9px;border-radius:10px;border:1px solid rgba(140,170,210,.3);
+  background:rgba(32,44,62,.9);color:#c9d8ea;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+
+  <div id="hud">
+    <div class="rowline">
+      <div class="chip" id="floorName">一层</div>
+      <div class="chip">被抓 <b id="catchN">0</b>/2</div>
+      <div class="chip" id="lifeChip">❤ <b id="lifeN">2</b></div>
+      <div class="chip" id="swChip" style="display:none">电闸 <b id="swN">0</b>/3</div>
+      <div class="chip" id="achChip">🏆 0/11</div>
+    </div>
+    <div class="rowline" id="invRow"></div>
+    <div id="seeWrap"><div id="seeBar"></div><span id="seeTxt">被发现 0.0s / 3s</span></div>
+    <div class="hint" id="hintText">WASD / 方向键移动</div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="achPop"></div>
+
+  <div id="pad">
+    <div id="dpad">
+      <div id="stickBase"><div id="stickKnob"></div></div>
+    </div>
+    <div id="actions">
+      <div class="abtn" id="btnE"><span>✋</span>行动</div>
+      <div class="abtn skip" id="btnV"><span>⏭</span>跳过</div>
+    </div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="pbox">
+      <h3 id="panelTitle">小卖部</h3>
+      <div id="panelBody"></div>
+      <button id="panelClose">关闭</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="startScr">
+    <h1>Escape From the School on HTML</h1><p class="sub" style="margin:2px 0 0">逃离学校 · HTML版</p>
+    <p class="sub">五种结局 · 被抓两次就失败</p>
+    <div class="card">
+      <b>操作</b>：WASD / 方向键 移动（手机用左下摇杆拖动）<br>
+      <b>E</b> / 「行动」键：商店、制作台、门、树<br>
+      <b>V</b> / 「跳过」键：在 <b>教室</b> 或 <b>厕所</b> 跳过一回合（只有老师/保安走动）<br>
+      <b>被抓</b>：在老师 / 保安 / 监控的视线里待满指定秒数就会被抓（简单 5 秒 / 普通 3 秒 / 困难 1 秒），被抓会 <b>丢失全部道具</b> 并送回教室<br>
+      <b>地狱</b>：<b>看见就死</b>、只有 <b>1 条命</b>，而且大门和侧门全被封死，<b>只能走路线四或五</b>。通关地狱会拿到红色成就<br>
+      <b>小卖部</b>：全部<b>免费</b>，但<b>每局只能选一个</b>：隐身针 / 黄色钥匙 / 可乐 / 小刀<br>
+      <b>可乐</b>喝 3 秒（不能动）→ 加速 45%，持续 10 秒；<b>隐身针</b>打 3 秒 → 30 秒内监控看不见、被发现要 5 秒<br>
+      <b>小刀</b>：按 E 捅身边敌人，25% 概率直接解决掉他<br>
+      <b>手电筒</b>：在三层 / 四层 / 地下室任一地下层点物品栏使用，整层照亮，<b>整局只能用一次</b>（地狱没有）
+    </div>
+    <p class="sub" style="margin-top:8px">选择难度</p>
+    <div class="diffs">
+      <div class="dbtn" data-diff="easy">简 单<small>5 秒被发现</small></div>
+      <div class="dbtn on" data-diff="normal">普 通<small>3 秒被发现</small></div>
+      <div class="dbtn" data-diff="hard">困 难<small>1 秒被发现</small></div>
+      <div class="dbtn hell" data-diff="hell">地 狱<small>看见就死 · 1 命</small></div>
+    </div>
+    <button class="bigbtn" id="startBtn" style="margin-top:14px">开始游戏</button>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ghostbtn" id="boardBtn">🏆 排行榜</button>
+      <button class="ghostbtn" id="nameBtn">✏️ 改昵称</button>
+      <button class="ghostbtn" id="expBtn">⬇️ 导出</button>
+    </div>
+    <div class="card" style="margin-top:12px;font-size:11px;line-height:1.7">
+      <b>五条逃走路线</b><br>
+      ① 被老师抓到两次 → 失败<br>
+      ② 老师办公室拿工作牌 → 刷开校长办公室拿红钥匙 → 打开大门<br>
+      ③ 小卖部选黄色钥匙 → 打开一层的侧门<br>
+      ④ 关掉 2F / 3F(B1) / 4F(B2) 三个电闸 → 打开三层电子门 → 用锤子砸开后墙<br>
+      ⑤ 工具房拿锤子 → 砸校长的车得木头 → 选小刀 → 主任办公室拿制作图 → 制作室做黑钥匙 → 开地下室门 → 走到通到校外的楼梯<br>
+      <b>注意</b>：老师和保安会自己上下楼，别以为躲到别的楼层就安全了
+    </div>
+    <div class="credits">
+      原版纸上77所做<br>
+      纸上设计，逻辑77,ZYN所做<br>
+      纸上地图77所做<br>
+      HTML版思路，地图ZYN所做<br>
+      HTML版Deepseek v4.1 flash所做<br>
+      <span class="cl">Copyleft ZYNGame🄯 2023-2026</span><br>
+      No rights Reserved.<br>
+      OpenSource Link: <a href="https://github.com/thisisunusername/EFSHTML" target="_blank" rel="noopener">https://github.com/thisisunusername/EFSHTML</a>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="endScr">
+    <div id="endTitle">结局</div>
+    <div id="endDesc"></div>
+    <button class="bigbtn" id="againBtn">再来一次</button>
+    <button class="ghostbtn" id="backMenuBtn">回主菜单</button>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+'use strict';
+/* ================= 常量 ================= */
+var PW = 35, PH = 18;
+var PLAYER_SPEED = 4.6;
+var CATCH_RANGE = 0.62;      /* 距离小于此值即被抓 */
+var SIGHT_STEP = 3;          /* 视线采样密度 */
+
+/* 坐标约定：格子(ix,iy)的中心 = (ix+0.5, iy+0.5) */
+
+var DIFF = {
+  easy:   {name:'简单',   guards:0, tspeed:1.7, gspeed:1.5, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
+  normal: {name:'普通',   guards:1, tspeed:1.95, gspeed:1.7, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
+  hard:   {name:'困难',   guards:2, tspeed:2.25, gspeed:1.95, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
+  hell:   {name:'地狱',   guards:3, tspeed:2.55, gspeed:2.2, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
+};
+
+var ITEM = {
+  flag:      {name:'老师工作牌',   icon:'🪪', color:'#ffd166'},
+  redkey:    {name:'红钥匙',       icon:'🔴', color:'#ef4444'},
+  yellowkey: {name:'黄色钥匙',     icon:'🟡', color:'#eab308'},
+  saw:       {name:'锯子',         icon:'🪚', color:'#9fb3c8'},
+  hammer:    {name:'锤子',         icon:'🔨', color:'#a78bfa'},
+  wood:      {name:'木头',         icon:'🪵', color:'#b98b5a'},
+  knife:     {name:'小刀',         icon:'🔪', color:'#cbd5e1'},
+  blueprint: {name:'黑钥匙制作图', icon:'📜', color:'#f472b6'},
+  blackkey:  {name:'黑钥匙',       icon:'⚫', color:'#94a3b8'},
+  stealth:   {name:'隐身针',       icon:'💉', color:'#22d3ee'},
+  cola:      {name:'可乐',         icon:'🥤', color:'#f87171'},
+  torch:     {name:'手电筒',       icon:'🔦', color:'#fde047'}
+};
+var INV_ORDER = ['flag','redkey','yellowkey','saw','hammer','wood','knife','blueprint','blackkey','stealth','cola','torch'];
+
+/* ================= 工具 ================= */
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function clampi(v,a,b){ return v<a?a:(v>b?b:v); }
+function gnew(w,h){
+  var g=[];
+  for(var y=0;y<h;y++){ var r=[]; for(var x=0;x<w;x++) r.push(1); g.push(r); }
+  return g;
+}
+function carve(g,x0,y0,x1,y1){
+  for(var y=y0;y<=y1;y++){
+    if(!g[y]) continue;
+    for(var x=x0;x<=x1;x++){ if(g[y][x]!==undefined) g[y][x]=0; }
+  }
+}
+function wallr(g,x0,y0,x1,y1){
+  for(var y=y0;y<=y1;y++){
+    if(!g[y]) continue;
+    for(var x=x0;x<=x1;x++){ if(g[y][x]!==undefined) g[y][x]=1; }
+  }
+}
+/* ================= 世界构建 ================= */
+var W = {};
+
+/* ================= 楼层链条（NPC 判断该往上还是往下走） ================= */
+var FLOOR_CHAIN = ['2F','1F','B1','B2','B3'];
+
+function patrolOf(fl){
+  var f=W[fl];
+  if(!f || !f.patrol || !f.patrol.length) return null;
+  return f.patrol;
+}
+function stairsOf(fl){
+  var f=W[fl]; var out=[];
+  if(!f) return out;
+  for(var i=0;i<f.objs.length;i++){ if(f.objs[i].t==='stairs') out.push(f.objs[i]); }
+  return out;
+}
+function chainIdx(fl){
+  for(var i=0;i<FLOOR_CHAIN.length;i++){ if(FLOOR_CHAIN[i]===fl) return i; }
+  return -1;
+}
+
+function buildWorld(){
+  W = {};
+
+  /* ========== 2F 教室层：教室 / 老师办公室 / 厕所 / 电闸室 / 大门（旁有监控） ========== */
+  (function(){
+    var w=32,h=18,g=gnew(w,h);
+    carve(g,1,1,7,5);     carve(g,4,6,4,6);      /* 教室 */
+    carve(g,9,1,14,5);    carve(g,11,6,11,6);    /* 老师办公室 */
+    carve(g,16,1,20,5);   carve(g,18,6,18,6);    /* 厕所 */
+    carve(g,22,1,27,5);   carve(g,24,6,24,6);    /* 电闸室 */
+    carve(g,1,7,30,8);                            /* 走廊 */
+    carve(g,1,10,8,16);   carve(g,4,9,4,9);      /* 大门厅 */
+    carve(g,11,10,16,16); carve(g,13,9,13,9);    /* 楼梯间 */
+    carve(g,19,10,24,16); carve(g,21,9,21,9);    /* 空教室 */
+    carve(g,26,10,30,16); carve(g,28,9,28,9);    /* 图书角 */
+
+    W['2F'] = {
+      key:'2F', name:'二层（教室层）', w:w, h:h, g:g, dark:false,
+      rooms:[
+        {name:'教室',       x0:1, y0:1,  x1:7,  y1:5,  safe:'class'},
+        {name:'老师办公室', x0:9, y0:1,  x1:14, y1:5},
+        {name:'厕所',       x0:16,y0:1,  x1:20, y1:5,  safe:'toilet'},
+        {name:'电闸室',     x0:22,y0:1,  x1:27, y1:5},
+        {name:'走廊',       x0:1, y0:7,  x1:30, y1:8},
+        {name:'大门厅',     x0:1, y0:10, x1:8,  y1:16},
+        {name:'楼梯间',     x0:11,y0:10, x1:16, y1:16},
+        {name:'空教室',     x0:19,y0:10, x1:24, y1:16, safe:'class'},
+        {name:'图书角',     x0:26,y0:10, x1:30, y1:16}
+      ],
+      patrol:[{x:4.5,y:7.5},{x:18.5,y:8.5},{x:29.5,y:7.5},{x:13.5,y:12.5},{x:21.5,y:7.5}],
+      objs:[
+        {t:'item', x:12.5, y:2.5, id:'flag'},                                      /* 老师工作牌 */
+        {t:'switch', x:25.5, y:2.5, id:'sw1', label:'二层电闸'},
+        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:5.0},                    /* 大门旁的监控 */
+        {t:'gate', x:4.5, y:16.5, kind:'main', label:'大门'},
+        {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:'下楼'}
+      ]
+    };
+  })();
+
+  /* ========== 1F 小卖部层：小卖部(旁有监控) / 校长办公室(权限锁) / 厕所×2 / 侧门 ========== */
+  (function(){
+    var w=32,h=18,g=gnew(w,h);
+    carve(g,1,1,7,5);     carve(g,4,6,4,6);      /* 小卖部 */
+    carve(g,9,1,15,5);                            /* 校长办公室（门洞不打通，要靠工作牌刷开） */
+    carve(g,17,1,20,5);   carve(g,18,6,18,6);    /* 厕所 */
+    carve(g,22,1,25,5);   carve(g,23,6,23,6);    /* 厕所 2 */
+    carve(g,1,7,30,8);                            /* 走廊 */
+    carve(g,1,10,7,16);   carve(g,3,9,3,9);      /* 楼梯间 */
+    carve(g,9,10,15,16);  carve(g,12,9,12,9);    /* 侧门区 */
+    carve(g,17,10,22,16); carve(g,19,9,19,9);    /* 门厅 */
+    carve(g,24,10,30,16); carve(g,27,9,27,9);    /* 杂物间 */
+
+    W['1F'] = {
+      key:'1F', name:'一层（小卖部层）', w:w, h:h, g:g, dark:false,
+      rooms:[
+        {name:'小卖部',     x0:1, y0:1,  x1:7,  y1:5},
+        {name:'校长办公室', x0:9, y0:1,  x1:15, y1:5},
+        {name:'厕所',       x0:17,y0:1,  x1:20, y1:5, safe:'toilet'},
+        {name:'厕所',       x0:22,y0:1,  x1:25, y1:5, safe:'toilet'},
+        {name:'走廊',       x0:1, y0:7,  x1:30, y1:8},
+        {name:'楼梯间',     x0:1, y0:10, x1:7,  y1:16},
+        {name:'侧门区',     x0:9, y0:10, x1:15, y1:16},
+        {name:'门厅',       x0:17,y0:10, x1:22, y1:16},
+        {name:'杂物间',     x0:24,y0:10, x1:30, y1:16}
+      ],
+      patrol:[{x:4.5,y:7.5},{x:12.5,y:8.5},{x:19.5,y:7.5},{x:28.5,y:8.5},{x:3.5,y:13.5},{x:19.5,y:12.5}],
+      objs:[
+        {t:'shop', x:4.5, y:3.5},
+        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:5.5},               /* 小卖部旁的监控 */
+        {t:'gate', x:12.5, y:6.5, kind:'office', label:'校长办公室门（权限锁）'},
+        {t:'item', x:12.5, y:3.5, id:'redkey'},                                       /* 红钥匙 */
+        {t:'gate', x:12.5, y:16.5, kind:'side', label:'侧门'},
+        {t:'stairs', x:3.5, y:12.5, to:'2F', tx:13.5, ty:12.5, label:'上楼'},
+        {t:'stairs', x:6.5, y:15.5, to:'B1', tx:3.5,  ty:5.5,  label:'下地下车库'}
+      ]
+    };
+  })();
+
+  /* ========== B1 地下车库层：电闸 / 有监控的路 / 校长的车 / 厕所 / 保安室 / 电子门 ========== */
+  (function(){
+    var w=30,h=18,g=gnew(w,h);
+    carve(g,1,1,6,6);     carve(g,3,7,4,7);      /* 楼梯间 */
+    carve(g,8,1,12,5);    carve(g,10,6,11,7);    /* 保安室 */
+    carve(g,14,1,18,5);   carve(g,16,6,17,7);    /* 厕所 */
+    carve(g,20,1,25,5);   carve(g,22,6,23,7);    /* 电闸室 */
+    carve(g,1,8,28,9);                            /* 走廊（有监控） */
+    carve(g,1,11,14,16);  carve(g,4,10,5,10);    /* 车库（门洞 2 格宽） */
+    carve(g,17,11,19,16); carve(g,15,13,16,13);  /* 电子门前通道，与车库横向连通 */
+    carve(g,21,11,24,16);                         /* 电子门后通道 */
+    carve(g,26,11,28,16);                         /* 砖墙后的小隔间 */
+
+    W['B1'] = {
+      key:'B1', name:'三层（地下车库）', w:w, h:h, g:g, dark:true,
+      rooms:[
+        {name:'楼梯间',   x0:1,  y0:1,  x1:6,  y1:6},
+        {name:'保安室',   x0:8,  y0:1,  x1:12, y1:5},
+        {name:'厕所',     x0:14, y0:1,  x1:18, y1:5, safe:'toilet'},
+        {name:'电闸室',   x0:20, y0:1,  x1:25, y1:5},
+        {name:'走廊',     x0:1,  y0:8,  x1:28, y1:9},
+        {name:'车库',     x0:1,  y0:11, x1:14, y1:16},
+        {name:'电子门通道',x0:17, y0:11, x1:19, y1:16},
+        {name:'墙后通道', x0:21, y0:11, x1:24, y1:16}
+      ],
+      patrol:[{x:2.5,y:8.5},{x:10.5,y:8.5},{x:20.5,y:8.5},{x:27.5,y:8.5},{x:7.5,y:13.5}],
+      objs:[
+        {t:'stairs', x:3.5, y:3.5, to:'1F', tx:6.5, ty:16.5, label:'上一层'},
+        {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:'下四层'},
+        {t:'cctv', x:10.5, y:2.5, label:'监控总闸'},
+        {t:'switch', x:22.5, y:2.5, id:'sw2', label:'三层电闸'},
+        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.45, range:5.5},
+        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.45, range:5.5},
+        {t:'car', x:7.5, y:13.5, label:'校长的车'},
+        {t:'gate', x:20.5, y:13.5, kind:'elec', label:'电子门'},
+        {t:'gate', x:25.5, y:13.5, kind:'wall', label:'电子门后的砖墙'}
+      ]
+    };
+  })();
+
+  /* ========== B2 第四层：工具房 / 厕所×2 / 制作室 / 主任办公室(监控) / 电闸 / 地下室门 ========== */
+  (function(){
+    var w=30,h=18,g=gnew(w,h);
+    carve(g,1,1,6,6);     carve(g,3,7,4,7);      /* 楼梯间 */
+    carve(g,8,1,12,5);    carve(g,10,6,11,7);    /* 工具房 */
+    carve(g,14,1,19,5);   carve(g,16,6,17,7);    /* 主任办公室 */
+    carve(g,21,1,24,5);   carve(g,22,6,23,7);    /* 厕所 */
+    carve(g,26,1,28,5);   carve(g,27,6,28,7);    /* 厕所 2 */
+    carve(g,1,8,28,9);
+    carve(g,1,11,7,16);    carve(g,4,10,4,10);   /* 制作室 */
+    carve(g,9,11,13,16);   carve(g,11,10,11,10); /* 电闸室 */
+    carve(g,15,11,20,16);  carve(g,17,10,17,10); /* 地下室门厅 */
+    carve(g,22,11,27,16);  carve(g,24,10,24,10); /* 库房 */
+
+    W['B2'] = {
+      key:'B2', name:'四层（地下二层）', w:w, h:h, g:g, dark:true,
+      rooms:[
+        {name:'楼梯间',     x0:1,  y0:1,  x1:6,  y1:6},
+        {name:'工具房',     x0:8,  y0:1,  x1:12, y1:5},
+        {name:'主任办公室', x0:14, y0:1,  x1:19, y1:5},
+        {name:'厕所',       x0:21, y0:1,  x1:24, y1:5, safe:'toilet'},
+        {name:'厕所',       x0:26, y0:1,  x1:28, y1:5, safe:'toilet'},
+        {name:'走廊',       x0:1,  y0:8,  x1:28, y1:9},
+        {name:'制作室',     x0:1,  y0:11, x1:7,  y1:16},
+        {name:'电闸室',     x0:9,  y0:11, x1:13, y1:16},
+        {name:'地下室门厅', x0:15, y0:11, x1:20, y1:16},
+        {name:'库房',       x0:22, y0:11, x1:27, y1:16}
+      ],
+      patrol:[{x:2.5,y:8.5},{x:10.5,y:8.5},{x:18.5,y:8.5},{x:27.5,y:8.5},{x:4.5,y:13.5},{x:17.5,y:15.5}],
+      objs:[
+        {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
+        {t:'item', x:9.5,  y:2.5, id:'hammer'},
+        {t:'item', x:11.5, y:4.5, id:'wood'},
+        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:4.5},           /* 主任办公室里的监控 */
+        {t:'item', x:17.5, y:4.5, id:'blueprint'},
+        {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},
+        {t:'craft', x:4.5, y:13.5},
+        {t:'gate', x:17.5, y:13.5, kind:'basement', label:'地下室门'}
+      ]
+    };
+  })();
+
+  /* ========== B3 地下室：两段楼梯（一段回四层，一段通到学校外面） ========== */
+  (function(){
+    var w=26,h=16,g=gnew(w,h);
+    carve(g,1,1,23,13);
+    wallr(g,9,5,11,7);
+    wallr(g,15,5,17,7);
+    wallr(g,9,10,11,11);
+
+    W['B3'] = {
+      key:'B3', name:'地下室', w:w, h:h, g:g, dark:true,
+      rooms:[ {name:'地下室', x0:1, y0:1, x1:23, y1:13} ],
+      objs:[
+        {t:'stairs', x:3.5, y:3.5, to:'B2', tx:19.5, ty:13.5, label:'回四层'},
+        {t:'stairWin', x:21.5, y:2.5, label:'通往学校外面的楼梯'}
+      ]
+    };
+  })();
+}/* ================= 地图查询 ================= */
+function fl(){ return W[S.floor]; }
+function isWall(f,x,y){
+  var ix=Math.floor(x), iy=Math.floor(y);
+  if(ix<0||iy<0||ix>=f.w||iy>=f.h) return true;
+  return f.g[iy][ix]===1;
+}
+function tileBlocked(f,ix,iy){
+  if(ix<0||iy<0||ix>=f.w||iy>=f.h) return true;
+  return f.g[iy][ix]===1;
+}
+
+/* ================= BFS 寻路 ================= */
+function findPath(f,sx,sy,gx,gy){
+  sx=clampi(Math.floor(sx),0,f.w-1); sy=clampi(Math.floor(sy),0,f.h-1);
+  gx=clampi(Math.floor(gx),0,f.w-1); gy=clampi(Math.floor(gy),0,f.h-1);
+  if(sx===gx&&sy===gy) return [];
+  if(tileBlocked(f,gx,gy)) return null;
+  var w2=f.w, h2=f.h, sz=w2*h2;
+  var prev=new Int32Array(sz); prev.fill(-1);
+  var q=new Int32Array(sz), qs=0, qe=0;
+  var start=sy*w2+sx;
+  q[qe++]=start; prev[start]=-2;
+  var dxs=[1,-1,0,0], dys=[0,0,1,-1];
+  var goal=gy*w2+gx;
+  var found=false;
+  while(qs<qe){
+    var cur=q[qs++];
+    if(cur===goal){ found=true; break; }
+    var cx=cur%w2, cy=(cur-cx)/w2;
+    for(var k=0;k<4;k++){
+      var nx=cx+dxs[k], ny=cy+dys[k];
+      if(nx<0||ny<0||nx>=w2||ny>=h2) continue;
+      var ni=ny*w2+nx;
+      if(prev[ni]!==-1) continue;
+      if(tileBlocked(f,nx,ny)) continue;
+      prev[ni]=cur; q[qe++]=ni;
+    }
+  }
+  if(!found) return null;
+  var path=[], n=goal, guard=0;
+  while(n>=0 && prev[n]!==-2){
+    path.push({x:n%w2, y:(n-(n%w2))/w2});
+    n=prev[n];
+    if(++guard>4000) break;
+  }
+  path.reverse();
+  return path;
+}
+
+/* ================= 视线 ================= */
+function losClear(f,x0,y0,x1,y1){
+  var dx=x1-x0, dy=y1-y0;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  var steps=Math.ceil(dist*SIGHT_STEP);
+  for(var i=1;i<steps;i++){
+    var t=i/steps;
+    if(isWall(f, x0+dx*t, y0+dy*t)) return false;
+  }
+  return true;
+}
+
+/* ================= 抓人规则常量 ================= */
+/* 规则：贴身（<CATCH_RANGE）立刻被抓；在任何敌人的视野范围内持续待满 SEE_LIMIT 秒也被抓 */
+var SEE_LIMIT = 3.0;
+var SAFE_SHIELD = 2.5;   /* 被抓送回后的无敌保护秒数 */
+
+/* ================= 状态 ================= */
+var S = {
+  mode:'menu',
+  diff:'normal',
+  floor:'1F',
+  px:4.5, py:3.5,
+  faceDir:'down',
+  walkPhase:0,
+  inv:{},
+
+  catches:0,
+  sw:{},
+  npcs:[],
+  msgT:0,
+  time:0,
+  stairLock:0,     /* 刚下楼的冷却，防止立刻触发对侧楼梯 */
+  tookFlag:false,
+  gogglesT:0,      /* 旧字段：保留兼容 */
+  shopPick:'',     /* 本局在小卖部选的东西（每局只能买一个） */
+  seeLimit:3.0,    /* 被发现所需的秒数（隐身针会把它变成 5 秒） */
+  useT:0,          /* 正在使用道具的剩余秒数（可乐/隐身针要 3 秒，期间不能动） */
+  useItem:'',      /* 正在使用的道具 id */
+  colaT:0,         /* 可乐加速剩余秒数（10 秒） */
+  stealthT:0,      /* 隐身针剩余秒数（30 秒，期间监控看不见） */
+  speedMul:1,      /* 移动速度倍率 */
+  flashLike:false,  /* 是否已经拿了手电筒（只能在一个地下室用） */
+  flashFloor:'',    /* 手电筒绑定的那一个地下室楼层 */
+  flashOn:false,    /* 手电筒是否点亮 */
+  usedFlashPick:false, /* 手电筒是通过商店拿的（本局唯一） */
+  moving:false,    /* 本帧是否真的产生了位移（撞墙时为 false） */
+  eyeX:0, eyeY:0,  /* 眼睛偏移的平滑插值，避免朝向切换时抖动 */
+  bobCur:0,        /* 走路上下浮动的平滑插值 */
+  seeT:0,          /* 当前被某个敌人盯住的累计秒数（用于 HUD 警戒条） */
+  seenBy:'',       /* 正在盯着玩家的敌人名字 */
+  safeT:0,         /* 被抓送回后的短暂无敌保护（秒） */
+  camsOff:false,   /* 保安室的监控总闸是否已关 */
+  carBroken:false, /* 校长的车是否已被锤子砸烂（会发出巨大响声） */
+  elecOpen:false,  /* 电子门是否已通电打开（需要三个电闸） */
+  wallBroken:false,/* 电子门后的砖墙是否已被锤子砸开 */
+  lives:2,         /* 剩余命数（地狱模式只有 1 条） */
+  everSpotted:false,/* 本局是否曾经被发现过（成就用） */
+  knifeKills:0,    /* 用小刀解决掉的敌人数（成就用） */
+  _scale:30
+};
+
+/* ================= 成就（只存在内存里，重启/重开就没了） ================= */
+/* tier: gold 金 / red 红 / blue 蓝 */
+var ACH = {
+  clear_any:  {name:'逃出去了',        desc:'任意难度通关一次',              tier:'blue'},
+  clear_hard: {name:'硬骨头',          desc:'在困难难度通关',                tier:'gold'},
+  clear_hell: {name:'地狱归来',        desc:'在地狱难度通关',                tier:'red'},
+  car_any:    {name:'砸车的人',        desc:'砸烂校长的车',                  tier:'gold'},
+  car_hell:   {name:'地狱砸车',        desc:'在地狱难度砸烂校长的车',        tier:'red'},
+  no_alert:   {name:'隐身人',          desc:'一次都没有被发现就通关',        tier:'gold'},
+  swift:      {name:'闪电逃学',        desc:'3 分钟内通关',                  tier:'blue'},
+  knife_win:  {name:'以小博大',        desc:'用小刀解决过一个敌人后通关',    tier:'gold'},
+  survivor:   {name:'命大',            desc:'被抓住一次之后仍然通关',        tier:'blue'},
+  cctv_off:   {name:'保安之友',        desc:'关掉全楼监控并通关',            tier:'blue'},
+  all_gates:  {name:'开锁匠',          desc:'通关时同时拿到了工作牌和黑钥匙',tier:'gold'}
+};
+var ACH_ORDER = ['clear_any','clear_hard','clear_hell','car_any','car_hell',
+                 'no_alert','swift','knife_win','survivor','cctv_off','all_gates'];
+/* 成就在本地持久保存：localStorage + cookie 双写，刷新/重开都还在 */
+var ACH_KEY='efs_ach_v1';
+var ACH_OWNED = {};
+function achLoad(){
+  var raw=null;
+  try{ raw=localStorage.getItem(ACH_KEY); }catch(e){}
+  if(!raw){ raw=readCookie(ACH_KEY); }
+  if(raw){
+    try{
+      var arr=JSON.parse(raw);
+      for(var i=0;i<arr.length;i++){ if(ACH[arr[i]]) ACH_OWNED[arr[i]]=true; }
+    }catch(e){}
+  }
+  return ACH_OWNED;
+}
+function achSave(){
+  var arr=[];
+  for(var k in ACH_OWNED) if(ACH_OWNED[k] && ACH[k]) arr.push(k);
+  var raw=JSON.stringify(arr);
+  try{ localStorage.setItem(ACH_KEY, raw); }catch(e){}
+  writeCookie(ACH_KEY, raw, 3650);      /* 10 年 */
+}
+function readCookie(name){
+  var all='';
+  try{ all=document.cookie||''; }catch(e){ return null; }
+  if(!all) return null;
+  var m=all.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
+  return m? decodeURIComponent(m[1]) : null;
+}
+function writeCookie(name,val,days){
+  var d=new Date(); d.setTime(d.getTime()+days*86400000);
+  try{
+    document.cookie=name+'='+encodeURIComponent(val)+';expires='+d.toUTCString()+';path=/;SameSite=Lax';
+  }catch(e){}
+}
+
+function unlockAch(id){
+  if(!ACH[id] || ACH_OWNED[id]) return false;
+  ACH_OWNED[id]=true;
+  achSave();                 /* 立刻写入 localStorage + cookie */
+  var t=ACH[id];
+  var col = t.tier==='gold'?'#fbbf24':(t.tier==='red'?'#f43f5e':'#38bdf8');
+  toast('🏆 成就解锁：'+t.name+'（'+t.desc+'）');
+  showAchPopup(id, col);
+  renderAchChip();
+  return true;
+}
+function achCount(){
+  var n=0; for(var k in ACH_OWNED) if(ACH_OWNED[k]) n++;
+  return n;
+}
+function renderAchChip(){
+  var el=document.getElementById('achChip');
+  if(!el) return;
+  el.textContent='🏆 '+achCount()+'/'+ACH_ORDER.length;
+}
+/* 成就弹窗：跟 toast 不同，它会停 3 秒并高亮 */
+function showAchPopup(id, col){
+  var box=document.getElementById('achPop');
+  if(!box) return;
+  var t=ACH[id];
+  box.innerHTML='<span style="font-size:20px">🏆</span> <b style="color:'+col+'">'+t.name+'</b><br>'+
+    '<span style="font-size:11px;color:#b6c9dd">'+t.desc+'</span>';
+  box.style.borderColor=col;
+  box.style.opacity='1';
+  box.style.transform='translateY(0)';
+  clearTimeout(box._tm);
+  box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
+}
+/* 通关时统一结算成就 */
+function settleAch(endingN){
+  if(!(endingN>=2 && endingN<=5)) return;
+  var d=DIFF[S.diff]||DIFF.normal;
+  unlockAch('clear_any');
+  if(S.diff==='hard') unlockAch('clear_hard');
+  if(S.diff==='hell') unlockAch('clear_hell');
+  if(!S.everSpotted) unlockAch('no_alert');
+  if(S.time<=180) unlockAch('swift');
+  if(S.knifeKills>0) unlockAch('knife_win');
+  if(S.catches>0) unlockAch('survivor');
+  if(S.camsOff) unlockAch('cctv_off');
+  if(S.inv.flag && S.inv.blackkey) unlockAch('all_gates');
+}
+/* 砸车成就：砸的当下就给 */
+function settleCarAch(){
+  unlockAch('car_any');
+  if(S.diff==='hell') unlockAch('car_hell');
+}
+
+var input = {up:false,down:false,left:false,right:false};
+
+function toast(txt){
+  var el=document.getElementById('toast');
+  if(!el) return;
+  el.textContent=txt;
+  el.classList.add('show');
+  S.msgT=1.9;
+}
+
+function updateHUD(){
+  var f=fl();
+  var fe=document.getElementById('floorName');
+  if(fe) fe.textContent = f? f.name : '';
+  var cn=document.getElementById('catchN'); if(cn) cn.textContent=S.catches;
+  var ln=document.getElementById('lifeN'); if(ln) ln.textContent=(S.lives>0?S.lives:0);
+  var lc=document.getElementById('lifeChip');
+  if(lc) lc.style.color = (S.lives<=1)? '#ff8095':'';
+  renderAchChip();
+
+  var swN=0; for(var k in S.sw) if(S.sw[k]) swN++;
+  var chip=document.getElementById('swChip');
+  if(chip) chip.style.display = (swN>0 || S.inv.hammer) ? '' : 'none';
+  var sn=document.getElementById('swN'); if(sn) sn.textContent=swN;
+
+  var row=document.getElementById('invRow'), html='';
+  if(row){
+    for(var i=0;i<INV_ORDER.length;i++){
+      var id=INV_ORDER[i];
+      if(!S.inv[id]) continue;
+      var usable = (id==='cola'||id==='stealth'||id==='torch');
+      html += '<div class="chip'+(usable?' use':'')+'" data-use="'+id+'"'+
+        ' style="border-color:'+ITEM[id].color+'66'+(usable?';cursor:pointer':'')+'">'+
+        ITEM[id].icon+' '+ITEM[id].name+(usable?' ·点':'')+'</div>';
+    }
+    row.innerHTML = html;
+    var chips=row.querySelectorAll('.chip.use');
+    for(var c=0;c<chips.length;c++){
+      (function(el){
+        var id=el.getAttribute('data-use');
+        el.onclick=function(){ startUse(id); };
+        el.addEventListener('touchstart',function(ev){ ev.preventDefault(); startUse(id); },{passive:false});
+      })(chips[c]);
+    }
+  }
+  var ht=document.getElementById('hintText');
+  if(ht) ht.textContent = hintFor();
+  updateSeeHUD();
+}
+
+/* 被发现进度条：只要有人看着你，就把 3 秒倒计时显示出来 */
+function updateSeeHUD(){
+  var wrap=document.getElementById('seeWrap');
+  var bar=document.getElementById('seeBar');
+  var txt=document.getElementById('seeTxt');
+  if(!wrap) return;
+  var lim = (typeof S.seeLimit==="number"? S.seeLimit : SEE_LIMIT);
+  var pct = Math.max(0, Math.min(1, (S.seeT||0)/lim));
+  if(pct>0.001){ wrap.classList.add('on'); } else { wrap.classList.remove('on'); }
+  if(bar) bar.style.width = Math.round(pct*100)+'%';
+  if(txt && pct>0.001){
+    txt.textContent = (S.seenBy?('⚠ '+S.seenBy+' 盯着你 '):'⚠ 被发现 ')
+      + Math.max(0,lim-S.seeT).toFixed(1) + 's';
+  }
+}
+
+function hintFor(){
+  var f=fl(); if(!f) return '';
+  var r=roomAt(f,S.px,S.py);
+  if(r && r.safe) return '当前在 '+r.name+'（安全区）· 按 V 跳过一回合';
+  var o=nearObj(1.15);
+  if(o){
+    if(o.t==='shop')   return '按 E 打开小卖部';
+    if(o.t==='craft')  return '按 E 使用制作台';
+    if(o.t==='stairs') return '按 E 前往 '+W[o.to].name;
+    if(o.t==='stairWin')return '走近这里就能逃出去';
+    if(o.t==='gate')   return '按 E 尝试打开'+o.label;
+    if(o.t==='tree')   return '按 E 锯树（需要锯子）';
+    if(o.t==='switch') return '按 E 拉闸';
+    if(o.t==='cctv')   return '按 E 拉下监控总闸（全楼监控停摆）';
+    if(o.t==='car')    return S.inv.hammer?'按 E 用锤子砸校长的车':'校长的车（需要锤子，砸了会掉木头）';
+    if(o.t==='camera') return '这是监控，别在它视野里停留';
+    if(o.t==='item')   return '按 E 拾取 '+ITEM[o.id].name;
+  }
+  if(S.useT>0) return '正在用 '+ITEM[S.useItem].name+'…别动';
+  if(S.inv.knife && nearestNpc(1.4)) return '按 E 用小刀捅他（25% 概率）';
+  return 'WASD / 方向键移动，别被老师看见';
+}
+
+function roomAt(f,x,y){
+  if(!f) return null;
+  for(var i=0;i<f.rooms.length;i++){
+    var r=f.rooms[i];
+    if(x>=r.x0-0.5 && x<=r.x1+1.5 && y>=r.y0-0.5 && y<=r.y1+1.5) return r;
+  }
+  return null;
+}
+
+/* 返回距离玩家最近、且在半径内的对象 */
+function nearObj(rad){
+  var f=fl(); if(!f) return null;
+  var best=null, bd=1e9;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    var d=Math.sqrt(Math.pow(o.x-S.px,2)+Math.pow(o.y-S.py,2));
+    if(d<=rad && d<bd){ bd=d; best=o; }
+  }
+  return best;
+}
+
+/* ================= 初始化 ================= */
+function startGame(diff){
+  buildWorld();
+  S.diff=diff||S.diff;
+  S.mode='play';
+  S.floor='2F';
+  S.px=4.5; S.py=3.5;          /* 教室中央（二层教室层） */
+  S.faceDir='down'; S.walkPhase=0;
+  S.inv={}; S.catches=0; S.sw={};
+  S.msgT=0; S.time=0; S.stairLock=0; S.tookFlag=false; S.gogglesT=0;
+  S.shopPick=''; S.seeLimit=(DIFF[S.diff]||DIFF.normal).see; S.speedMul=1;
+  S.lives=(DIFF[S.diff]||DIFF.normal).lives; S.everSpotted=false; S.knifeKills=0;
+  S.useT=0; S.useItem=''; S.colaT=0; S.stealthT=0;
+  S.flashLike=false; S.flashFloor=''; S.flashOn=false; S.usedFlashPick=false;
+  S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
+  S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
+  S.seeT=0; S.seenBy=''; S.safeT=0;
+  S.npcs=spawnNpcs(S.diff);
+  S._noCam=true;
+  for(var k in input) input[k]=false;
+
+  var ss=document.getElementById('startScr'); if(ss) ss.classList.add('hidden');
+  var es=document.getElementById('endScr');   if(es) es.classList.add('hidden');
+  hidePanel();
+  updateHUD();
+  toast('任务：找一条路逃出学校');
+}
+
+/* 找同层最近的敌人 */
+function nearestNpc(rad){
+  var best=null, bd=rad;
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.floor!==S.floor) continue;
+    var d=Math.sqrt(Math.pow(n.x-S.px,2)+Math.pow(n.y-S.py,2));
+    if(d<bd){ bd=d; best=n; }
+  }
+  return best;
+}
+/* ================= 跨楼层巡逻：NPC 会自己上下楼 ================= */
+/* 思路：
+   1) 每个 NPC 记一个 n.plan（他打算去哪个楼层）。plan 与当前楼层不同时，
+      就按 FLOOR_CHAIN 的层级顺序，选择「往目标方向走的那一段楼梯」作为下一站，
+      走到楼梯格再换层。这样上下楼是有目的的，不会来回乱跳。
+   2) 每层楼梯都有 to/tx/ty，换层后坐标直接落在对侧楼梯口。
+   3) 难度越高，NPC 换楼的欲望越强（rollPlan 的间隔与概率）。
+*/
+/* 该楼层通往「更上」或「更下」的楼梯 */
+function stairToward(fl, targetIdx){
+  var f=W[fl]; if(!f) return null;
+  var cur=chainIdx(fl);
+  var best=null, bestScore=-99;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t!=='stairs') continue;
+    var ti=chainIdx(o.to);
+    if(ti<0) continue;
+    /* 是否朝目标方向：按「离目标更近」打分 */
+    var score = Math.abs(ti-targetIdx)-Math.abs(cur-targetIdx);   /* <0 表示更靠近目标 */
+    score = -score;
+    if(ti===cur) continue;
+    if(score>bestScore){ bestScore=score; best=o; }
+  }
+  return best;
+}
+
+/* 给 NPC 挑下一个想去的楼层 */
+function rollPlan(n){
+  var cur=chainIdx(n.floor);
+  var lo=0, hi=FLOOR_CHAIN.length-1;
+  var d=DIFF[S.diff] || DIFF.normal;
+  /* 难度越高，越爱跨层（1F/2F 是玩家主要活动层，更容易被盯上） */
+  var span = d.roam || 2;
+  var pick=cur+(Math.random()<0.5?-1:1)*Math.ceil(Math.random()*span);
+  pick=clampi(pick, lo, hi);
+  if(pick===cur) pick=clampi(cur+(Math.random()<0.5?-1:1), lo, hi);
+  n.plan=FLOOR_CHAIN[pick];
+  n.planT = (d.replan || 9) + Math.random()*6;
+}
+
+function sameFloorObj(f,x,y,t){
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t===t && Math.abs(o.x-x)<0.6 && Math.abs(o.y-y)<0.6) return o;
+  }
+  return null;
+}
+function spawnNpcs(diff){
+  var d=DIFF[diff] || DIFF.normal;
+  var out=[];
+  /* 班主任：从二层教室层出发，复活点在老师办公室 */
+  out.push({
+    kind:'teacher', name:'班主任', floor:'2F',
+    home:{x:11.5, y:2.5},
+    sight:d.sight, cone:0.66, speed:d.tspeed
+  });
+  /* 副班主任：从一层小卖部层出发，复活点在二层老师办公室 */
+  out.push({
+    kind:'teacher', name:'副班主任', floor:'1F',
+    home:{x:3.5, y:13.5},
+    sight:d.sight, cone:0.66, speed:d.tspeed
+  });
+  /* 保安从各层楼梯口开始巡逻 */
+  var gset=[
+    {floor:'1F', home:{x:3.5,y:13.5}},
+    {floor:'B1', home:{x:2.5,y:8.5}},
+    {floor:'B2', home:{x:2.5,y:8.5}}
+  ];
+  for(var i=0;i<d.guards;i++){
+    var gs=gset[i%gset.length];
+    out.push({
+      kind:'guard', name:'保安'+(i+1), floor:gs.floor,
+      home:{x:gs.home.x, y:gs.home.y},
+      sight:d.sight+0.6, cone:0.58, speed:d.gspeed
+    });
+  }
+
+  for(var j=0;j<out.length;j++){
+    var n=out[j];
+    n.x=n.home.x; n.y=n.home.y;
+    n.dir=Math.PI/2;
+    n.state='patrol';
+    n.ri=0; n.path=null; n.pathT=0;
+    n.flash=0; n.alertT=0; n.stuckT=0; n.lastX=n.x; n.lastY=n.y;
+    n.plan=n.floor; n.planT=4+Math.random()*8;   /* 想去的楼层 + 换计划的倒计时 */
+    n.idleT=0; n.stairGo=null;                     /* 正在赶往的楼梯 */
+    n.offFloor=true;                               /* 是否在后台层（非玩家所在层） */
+  }
+  return out;
+}/* ================= 玩家移动 ================= */
+function canStand(f,x,y){
+  if(!f) return false;
+  var r=0.20;                      /* 碰撞箱从 0.30 缩到 0.20，窄门才过得去 */
+  if(isWall(f,x-r,y-r)) return false;
+  if(isWall(f,x+r,y-r)) return false;
+  if(isWall(f,x-r,y+r)) return false;
+  if(isWall(f,x+r,y+r)) return false;
+  return true;
+}
+
+function movePlayer(dt){
+  var f=fl(); if(!f) return;
+  var mx=0,my=0;
+  if(input.left)  mx-=1;
+  if(input.right) mx+=1;
+  if(input.up)    my-=1;
+  if(input.down)  my+=1;
+  if(mx===0&&my===0){ S.moving=false; return; }
+
+  /* 正在喝可乐 / 打隐身针：3 秒内不能移动 */
+  if(S.useT>0){ S.moving=false; return; }
+
+  var len=Math.sqrt(mx*mx+my*my);
+  mx/=len; my/=len;
+  var sp=PLAYER_SPEED*(S.speedMul||1)*dt;
+
+  var ox=S.px, oy=S.py;
+
+  /* 分轴移动 + 贴墙滑动 */
+  var nx=S.px+mx*sp;
+  if(canStand(f,nx,S.py)) S.px=nx;
+
+  var ny=S.py+my*sp;
+  if(canStand(f,S.px,ny)) S.py=ny;
+
+  /* 只有真的动了才算行走：撞墙时避免走路动画和镜头抖动 */
+  var dx=S.px-ox, dy=S.py-oy;
+  S.moving = (Math.abs(dx)+Math.abs(dy))>0.0005;
+  if(mx!==0 || my!==0){
+    S.faceDir = my>0?'down':(my<0?'up':(mx>0?'right':'left'));
+  }
+  if(S.moving) S.walkPhase += sp*3.4;
+}
+
+/* ================= NPC ================= */
+function npcSees(n){
+  if(n.floor!==S.floor) return false;
+  if(S.gogglesT>0) return false;   /* 护目镜：暂时不被发现 */
+  var f=W[n.floor];
+  if(!f) return false;
+  var dx=S.px-n.x, dy=S.py-n.y;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist>n.sight) return false;
+  if(dist<0.9) return true;                 /* 贴身必被发现 */
+  var ang=Math.atan2(dy,dx);
+  if(angDiff(ang,n.dir) > n.cone) return false;   /* 不在视野锥内 */
+  return losClear(f,n.x,n.y,S.px,S.py);
+}
+
+function angDiff(a,b){
+  var d=a-b;
+  while(d>Math.PI) d-=Math.PI*2;
+  while(d<-Math.PI) d+=Math.PI*2;
+  return Math.abs(d);
+}
+
+function setPath(n,f,tx,ty){
+  n.path=findPath(f,n.x,n.y,tx,ty);
+  n.pathT=0;
+}
+
+function moveNpc(n,dt){
+  var f=W[n.floor];
+  if(!f || !n.path || n.path.length===0) return;
+  var t=n.path[0];
+  var gx=t.x+0.5, gy=t.y+0.5;
+  var dx=gx-n.x, dy=gy-n.y;
+  var d=Math.sqrt(dx*dx+dy*dy);
+  if(d<0.07){ n.path.shift(); return; }
+  var sp=n.speed*dt;
+  if(sp>d) sp=d;
+  n.x+=dx/d*sp;
+  n.y+=dy/d*sp;
+  n.dir=Math.atan2(dy,dx);
+}
+
+function updateNpcs(dt){
+  var d=DIFF[S.diff] || DIFF.normal;
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.flash>0) n.flash-=dt;
+    if(n.alertT>0) n.alertT-=dt;
+    if(n.stuckT>0) n.stuckT-=dt;
+
+    var onPlayerFloor = (n.floor===S.floor);
+    var f=W[n.floor];
+
+    /* ---------- 1) 换层计划倒计时：到时间就重新想一个楼层 ---------- */
+    if(n.planT===undefined){ n.plan=n.floor; n.planT=6+Math.random()*6; }
+    n.planT-=dt;
+    if(n.planT<=0 && n.state!=='chase') rollPlan(n);
+
+    /* ---------- 2) 老师在教室看到玩家 → 自己回办公室（不跨层追击） ---------- */
+    if(onPlayerFloor && n.kind==='teacher' && n.alertT<=0 && npcSees(n)){
+      var r=roomAt(fl(),S.px,S.py);
+      if(r && r.safe==='class'){
+        n.alertT=1.2;
+        n.floor='2F'; n.x=n.home.x; n.y=n.home.y;
+        n.path=null; n.state='patrol'; n.ri=0; n.plan='2F'; n.planT=8;
+        toast('老师看到你在教室，自己回办公室去了');
+        continue;
+      }
+    }
+
+    /* ---------- 3) 当前层：追 / 巡逻 ---------- */
+    if(onPlayerFloor){
+      if(n.state==='chase' || npcSees(n)){
+        n.state='chase';
+        setPath(n, f, S.px, S.py);
+        if(!n.path || !n.path.length) n.state='patrol';
+      } else n.state='patrol';
+    } else {
+      n.state='patrol';        /* 后台层只巡逻，不追 */
+    }
+
+    /* ---------- 4) 决定这一帧往哪走 ---------- */
+    var goal=null;
+    if(n.state==='chase'){
+      moveNpc(n,dt);
+      /* 追的时候也可能顺手跨层（玩家刚下楼）——由 plan 逻辑接管，这里不处理 */
+    } else {
+      /* 想去别的楼层：先走到对应楼梯 */
+      var curIdx=chainIdx(n.floor), wantIdx=chainIdx(n.plan);
+      if(wantIdx<0) wantIdx=curIdx;
+      if(n.plan!==n.floor && curIdx>=0 && wantIdx!==curIdx){
+        var st=stairToward(n.floor, wantIdx);
+        if(st){
+          n.stairGo=st;
+          goal={x:st.x, y:st.y};
+        }
+      }
+      /* 已经站在楼梯格上：直接换层 */
+      if(n.stairGo){
+        var dxs=Math.abs(n.x-n.stairGo.x), dys=Math.abs(n.y-n.stairGo.y);
+        if(dxs<0.45 && dys<0.45){
+          var stg=n.stairGo;
+          n.floor=stg.to;
+          n.x=stg.tx; n.y=stg.ty;
+          n.path=null; n.pathT=0; n.stuckT=0;
+          n.lastX=n.x; n.lastY=n.y;
+          n.stairGo=null;
+          n.ri=0; n.idleT=0;
+          /* 换层后重新给个目标，避免刚上来又原路返回 */
+          n.plan=n.floor;
+          n.planT=(d.replan||9)+Math.random()*6;
+          continue;
+        }
+      }
+      /* 没有跨层目标就用当前层的巡逻路线 */
+      if(!goal){
+        var route=patrolOf(n.floor);
+        if(route && route.length){
+          var wp=route[n.ri % route.length];
+          var dd=Math.sqrt(Math.pow(wp.x-n.x,2)+Math.pow(wp.y-n.y,2));
+          if(dd<0.75){ n.ri=(n.ri+1)%route.length; wp=route[n.ri]; }
+          goal={x:wp.x, y:wp.y};
+        }
+      }
+      if(goal){
+        n.pathT-=dt;
+        if(!n.path || !n.path.length || n.pathT<=0){
+          setPath(n, W[n.floor], goal.x, goal.y);
+          n.pathT=1.0;
+          if(!n.path || !n.path.length) n.idleT+=dt;
+        }
+      } else {
+        n.idleT+=dt;
+      }
+      moveNpc(n,dt);
+    }
+
+    /* ---------- 5) 卡住检测 ---------- */
+    if(n.stuckT<=0){
+      var moved=Math.abs(n.x-n.lastX)+Math.abs(n.y-n.lastY);
+      if(moved<0.02){
+        n.path=null; n.stairGo=null;
+        if(patrolOf(n.floor)) n.ri=(n.ri+1)%patrolOf(n.floor).length;
+        /* 后台层卡住太久 → 强制换个楼层，别原地打转 */
+        if(n.floor!==S.floor && n.idleT>1.2){ rollPlan(n); n.idleT=0; }
+      }
+      n.lastX=n.x; n.lastY=n.y;
+      n.stuckT=0.7;
+    }
+  }
+}
+/* 规则说明见文件顶部 SEE_LIMIT */
+function checkCatch(dt){
+  if(S.mode!=='play') return;
+  dt = dt || 0;
+
+  /* 刚被送回来的短暂保护，避免同一个敌人立刻再抓一次 */
+  if(S.safeT>0) S.safeT = Math.max(0, S.safeT-dt);
+
+  /* 1) 贴身必抓 */
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.floor!==S.floor) continue;
+    var d=Math.sqrt(Math.pow(n.x-S.px,2)+Math.pow(n.y-S.py,2));
+    if(d<CATCH_RANGE){ if(S.safeT>0) continue; caughtBy(n); return; }
+  }
+
+  if(S.safeT>0){ S.seeT=0; return; }
+
+  /* 2) 被任何敌人看到就累计计时，满 3 秒被抓 */
+  var watcher=null, watchers=0;
+  for(var j=0;j<S.npcs.length;j++){
+    var m=S.npcs[j];
+    if(m.floor!==S.floor) continue;
+    if(npcSees(m)){ watchers++; if(!watcher) watcher=m; }
+  }
+  /* 2b) 监控也算「被看见」：站在有监控的路上，同样会累计 */
+  if(watchers===0){
+    var cam=camerasWatcher();
+    if(cam){ watchers=1; watcher={name:cam.label||'监控'}; }
+  }
+  if(watchers>0){
+    S.seenBy = watcher ? watcher.name : '';
+    S.everSpotted = true;
+    /* 地狱：被看见的第一眼就死（seeLimit 为 0.001） */
+    S.seeT += dt;
+    var lim=(typeof S.seeLimit==="number"? S.seeLimit : SEE_LIMIT);
+    if(S.seeT>=lim){ caughtBy(watcher || {name:'老师',home:{x:S.px,y:S.py}}); return; }
+  } else {
+    S.seeT = Math.max(0, S.seeT - dt*2.0);   /* 脱离视野后快速回落 */
+    if(S.seeT<=0) S.seenBy='';
+  }
+}
+
+function caughtBy(n){
+  S.catches++;
+  if(n && n.home && typeof n.x==='number'){
+    n.x=n.home.x; n.y=n.home.y; n.path=null; n.state='patrol'; n.ri=0;
+  }
+  /* 地狱模式下把抓到玩家的那名敌人就是"看见就死"的凶手 */
+  S.seeT=0; S.seenBy='';
+  S.lives--;                        /* 命数递减：地狱只有 1 命，碰到就结束 */
+  var maxLives=(DIFF[S.diff]||DIFF.normal).lives;
+  if(S.catches>=maxLives || S.lives<=0){
+    /* 结局一：命用完了，清空所有道具再结算 */
+    S.inv={};
+    updateHUD();
+    ending(1);
+    return;
+  }
+  /* 丢了东西：所有道具全部丢失，电闸状态也复位 */
+  var lost = [];
+  for(var id in S.inv){ if(S.inv[id]) lost.push(ITEM[id]?ITEM[id].name:id); }
+  S.inv = {};
+  S.sw = {};
+  S.tookFlag = false;
+  S.gogglesT = 0;
+  /* 手电筒也一起失效（道具全丢，得重新拿） */
+  S.flashLike = false; S.flashFloor = ''; S.flashOn = false;
+  /* 世界也要复位：砸过的车、开过的门、关掉的监控都回到初始状态 */
+  S.carBroken = false;
+  S.camsOff = false;
+  S.elecOpen = false;
+  S.wallBroken = false;
+  S.doorOpen = false;
+  /* 道具丢失后要能重新拿到：重建世界，把已被拾取/锯过的东西放回原位 */
+  buildWorld();
+  S.npcs = spawnNpcs(S.diff);
+
+  /* 送回教室（学生复活点＝原位） */
+  S.floor='2F'; S.px=4.5; S.py=3.5; S.stairLock=0.8; S._noCam=true;
+  S.safeT = SAFE_SHIELD;          /* 保护期，不要在教室被立刻再抓 */
+  S.moving=false; S.bobCur=0;
+  S.eyeX=0; S.eyeY=0;
+  for(var i=0;i<S.npcs.length;i++){
+    var t=S.npcs[i];
+    if(t.kind==='teacher'){ t.x=t.home.x; t.y=t.home.y; t.path=null; t.state='patrol'; t.ri=0; }
+  }
+  toast('被'+n.name+'抓住！'+(lost.length?('丢失：'+lost.join('、')+'。'):'')+'已送回教室（命 '+(S.lives>0?S.lives:0)+'/'+((DIFF[S.diff]||DIFF.normal).lives)+'）');
+  updateHUD();
+}
+
+/* ================= 跳回合 ================= */
+function skipTurn(){
+  if(S.mode!=='play') return;
+  var r=roomAt(fl(),S.px,S.py);
+  if(!r || !r.safe){ toast('只有在教室或厕所才能跳过回合'); return; }
+  var dt=1/60;
+  for(var k=0;k<45;k++){
+    updateNpcs(dt);
+    if(S.mode!=='play') return;
+    /* 跳回合时玩家不动，只判定贴身抓人 / 视野计时 */
+    checkCatch(dt);
+    if(S.mode!=='play') return;
+  }
+  toast('跳过一回合，老师 / 保安移动了');
+}
+
+/* ================= 楼层 ================= */
+function goFloor(to,tx,ty){
+  if(!W[to]) return;
+  S.floor=to;
+  S.px=tx; S.py=ty;
+  S.stairLock=1.0;      /* 1 秒内不触发楼梯，避免来回传送 */
+  S._noCam=true;
+  updateHUD();
+  toast('来到 '+W[to].name);
+}
+
+function stairCheck(){
+  /* 只负责「走到另一段楼梯即胜利」；普通楼梯改由按 E 显式触发，
+     避免玩家一踩到楼梯就被自动传送、来回弹跳 */
+  if(S.stairLock>0){ S.stairLock -= 1/60; return; }
+  var f=fl(); if(!f) return;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t!=='stairWin') continue;
+    var dx=Math.abs(o.x-S.px), dy=Math.abs(o.y-S.py);
+    if(dx<0.6 && dy<0.6){ ending(5); return; }
+  }
+}
+/* 兼容旧函数名 */
+/* ================= 监控（玩家动，不动的摄像头会转过来） ================= */
+/* 监控规则：在监控的视野锥内持续待满 SEE_LIMIT 秒 → 被抓（算作被抓一次）。
+   监控范围比人眼小，但视野宽；保安室里的「监控总闸」可以关掉全部监控。 */
+function cameraSees(cam){
+  if(S.camsOff) return false;
+  if(S.stealthT>0) return false;      /* 隐身针：监控看不见你 */
+  var dx=S.px-cam.x, dy=S.py-cam.y;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist>cam.range) return false;
+  var ang=Math.atan2(dy,dx);
+  if(angDiff(ang, cam.dir) > (cam.cone||0.5)) return false;
+  return losClear(fl(), cam.x, cam.y, S.px, S.py);
+}
+function camerasWatcher(){
+  if(S.camsOff) return null;
+  var f=fl(); if(!f) return null;
+  for(var i=0;i<f.objs.length;i++){
+    var c=f.objs[i];
+    if(c.t!=='camera') continue;
+    if(cameraSees(c)) return c;
+  }
+  return null;
+}
+/* 监控会缓慢转向玩家（跟踪），这样"有监控的路"确实有压力 */
+function updateCameras(dt){
+  if(S.camsOff) return;
+  var f=fl(); if(!f) return;
+  for(var i=0;i<f.objs.length;i++){
+    var c=f.objs[i];
+    if(c.t!=='camera') continue;
+    c.sweep=(c.sweep||0)+dt;
+    var base=(c.baseDir!==undefined? c.baseDir : c.dir);
+    var dx=S.px-c.x, dy=S.py-c.y;
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<c.range*1.2){
+      var want=Math.atan2(dy,dx);
+      var diff=want-c.dir;
+      while(diff>Math.PI) diff-=Math.PI*2;
+      while(diff<-Math.PI) diff+=Math.PI*2;
+      c.dir += diff*0.55*dt;        /* 慢慢转：太快像抽搐，看不清也没法躲 */
+    } else {
+      c.dir = base + Math.sin(c.sweep*0.35)*0.5;   /* 没人就慢慢左右扫 */
+    }
+  }
+}
+
+/* ================= 排行榜（只存本地 cookie） =================
+   没有数据库、没有服务器：成绩存在玩家自己的 cookie 里。
+   换设备/清 cookie 就没了，但完全离线可用、无需联网。
+*/
+var LB_KEY='efs_board_v1';
+var NAME_KEY='efs_name';
+
+function boardLoad(){
+  var raw=readCookie(LB_KEY);
+  if(!raw) return [];
+  try{
+    var a=JSON.parse(decodeURIComponent(raw));
+    if(a && a.length) return a.map(function(r){
+      return {name:r[0], diff:r[1], time:r[2], ending:r[3], catches:r[4], ach:r[5]};
+    });
+  }catch(e){}
+  return [];
+}
+function boardSave(list){
+  /* 压缩存储，避免 cookie 超过 4KB */
+  var arr=list.slice(0,15).map(function(r){
+    return [r.name, r.diff, r.time, r.ending, r.catches, r.ach||0];
+  });
+  writeCookie(LB_KEY, JSON.stringify(arr), 3650);
+}
+/* 记录一次通关成绩 */
+function reportClear(endingN){
+  if(!(endingN>=2 && endingN<=5)) return;
+  var list=boardLoad();
+  var name=readCookie(NAME_KEY)||'无名同学';
+  var rec={name:name, diff:S.diff, time:Math.round(S.time*100)/100,
+           ending:endingN, catches:S.catches, ach:achCount()};
+  /* 同一难度只保留最好（用时最短）的一条 */
+  var hit=false;
+  for(var i=0;i<list.length;i++){
+    if(list[i].diff===rec.diff){
+      hit=true;
+      if(rec.time<list[i].time) list[i]=rec;
+    }
+  }
+  if(!hit) list.push(rec);
+  list.sort(function(a,b){ return a.time-b.time; });
+  boardSave(list);
+}
+function boardBest(){ return boardLoad().slice(0,20); }
+
+/* 排行榜面板 */
+function openBoard(){
+  showPanel('排行榜（本机记录）', renderBoardHtml());
+}
+function renderBoardHtml(){
+  var list=boardBest();
+  var head='<div style="font-size:11.5px;line-height:1.8;color:#8ea6c2;margin-bottom:6px">'+
+    '成绩只存在这台设备的 cookie 里，不上传服务器。</div>';
+  if(!list.length){
+    return head+'<div style="font-size:12px;color:#8ea6c2;line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
+  }
+  var html=head+'<div style="font-size:11.5px;line-height:1.95">';
+  for(var i=0;i<list.length;i++){
+    var r=list[i];
+    var dn=DIFF[r.diff]?DIFF[r.diff].name:r.diff;
+    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(120,160,220,.12)">'
+      +'<b style="width:22px;color:#8fd0ff">'+(i+1)+'</b>'
+      +'<span style="flex:1">'+(r.name||'无名')+'</span>'
+      +'<span style="color:#8ea6c2">'+dn+'</span>'
+      +'<span style="color:#fbbf24">'+(Number(r.time)||0).toFixed(2)+'s</span>'
+      +'</div>';
+  }
+  return html+'</div>';
+}
+
+/* 玩家昵称：存 cookie，改一次一直有效 */
+function askName(){
+  var cur=readCookie(NAME_KEY)||'';
+  var v=prompt('输入你的昵称（存在本机 cookie）', cur);
+  if(v===null) return;
+  v=String(v).trim().slice(0,12);
+  if(!v) return;
+  writeCookie(NAME_KEY, v, 3650);
+  toast('昵称已保存：'+v);
+}
+
+/* 把本机 cookie 里的成绩导出成 scores.json 下载下来 */
+function exportScores(){
+  var data={
+    game:'Escape From the School on HTML',
+    exportedAt:new Date().toISOString(),
+    player:readCookie(NAME_KEY)||'无名同学',
+    achievements:(function(){
+      var a=[]; for(var k in ACH_OWNED) if(ACH_OWNED[k]) a.push(k); return a;
+    })(),
+    scores:boardLoad()
+  };
+  var txt=JSON.stringify(data,null,2);
+  try{
+    var blob=new Blob([txt],{type:'application/json;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='scores.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },400);
+    toast('已导出 scores.json');
+  }catch(e){
+    toast('导出失败：'+e.message);
+  }
+}
+/* ================= 商店 / 制作 / 门 ================= */
+function hidePanel(){ document.getElementById('panel').classList.add('hidden'); }
+function showPanel(title, bodyHtml){
+  document.getElementById('panelTitle').textContent=title;
+  document.getElementById('panelBody').innerHTML=bodyHtml;
+  document.getElementById('panel').classList.remove('hidden');
+}
+
+function openShop(){
+  var items=[
+    {id:'stealth',   desc:'打一针：监控看不见你，被发现所需的 3 秒延长到 5 秒'},
+    {id:'yellowkey', desc:'能打开一层的侧门（结局三）'},
+    {id:'cola',      desc:'喝下去：移动速度提升 45%'},
+    {id:'knife',     desc:'可以雕刻，也能按 E 捅人（25% 概率解决一名敌人）'},
+    {id:'torch',     desc:'手电筒：在任意地下室点亮（三层/四层/地下室），整局只能用一次'}
+  ];
+  /* 地狱难度没有手电筒 */
+  if(DIFF[S.diff] && DIFF[S.diff].instant){
+    items=items.filter(function(it){ return it.id!=='torch'; });
+  }
+  var html='';
+  if(S.shopPick){
+    var it0=null;
+    for(var q=0;q<items.length;q++) if(items[q].id===S.shopPick) it0=items[q];
+    html='<div class="pitem"><div>✅ <b>本局已经选过了</b><br>'+
+      '<span style="font-size:10.5px;color:#8ea6c2">你选的是 '+(it0?ITEM[it0.id].name:'道具')+
+      '。每局只能从小卖部带走一样东西。</span></div></div>';
+    showPanel('小卖部 · 每局只能选一个', html);
+    return;
+  }
+  var can = true;
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    var owned = !!S.inv[it.id];
+    html += '<div class="pitem"><div>'+
+      ITEM[it.id].icon+' <b>'+ITEM[it.id].name+'</b><br>'+
+      '<span style="font-size:10.5px;color:#8ea6c2">'+it.desc+'</span></div>'+
+      '<button data-buy="'+it.id+'" '+(owned||!can?'':'')+'>'+
+      (owned?'已拥有':'免 费')+'</button></div>';
+  }
+  showPanel('小卖部 · 全部免费，但每局只能选一个', html);
+  var bs=document.querySelectorAll('#panelBody button');
+  for(var j=0;j<bs.length;j++){
+    bs[j].onclick=function(){
+      var id=this.getAttribute('data-buy');
+      if(S.shopPick) return;
+      applyShopPick(id);
+    };
+  }
+}
+
+/* 免费领取，但一局只能领一个；领到的是「道具」，要用时在物品栏点一下 */
+function applyShopPick(id){
+  if(S.shopPick) return false;
+  S.shopPick=id;
+  S.inv[id]=true;
+  if(id==='stealth')      toast('拿到隐身针：点物品栏使用（要 3 秒，期间别动）');
+  else if(id==='cola')    toast('拿到可乐：点物品栏喝（要 3 秒，期间别动）');
+  else if(id==='yellowkey') toast('拿到黄色钥匙：可以去开一层的侧门了');
+else if(id==='knife')   toast('拿到小刀：可以雕刻，也能按 E 捅人（25% 概率）');
+  else if(id==='torch'){
+    S.inv.torch=true; S.flashLike=true; S.flashFloor=''; S.flashOn=false;
+    toast('拿到手电筒：在地下室点物品栏点亮，整局只能用一次');
+  }
+  updateHUD();
+  openShop();
+}
+
+/* 手电筒只在玩家主动点击时点亮（见 startUse） */
+/* ================= 道具使用：可乐 / 隐身针 ================= */
+var USE_TIME = 3.0;          /* 可乐、隐身针都要 3 秒才能用上 */
+var COLA_TIME = 10.0;        /* 可乐加速持续 10 秒 */
+var STEALTH_TIME = 30.0;     /* 隐身针 30 秒内监控看不见 */
+
+function startUse(id){
+  if(S.mode!=='play') return;
+  if(S.useT>0){ toast('正在用 '+ITEM[S.useItem].name+'，先别动'); return; }
+  if(id==='cola'){
+    if(!S.inv.cola){ toast('没有可乐'); return; }
+    S.inv.cola=false;                    /* 用掉 */
+    S.useT=USE_TIME; S.useItem='cola';
+    toast('正在喝可乐…3 秒内不能移动');
+  } else if(id==='stealth'){
+    if(!S.inv.stealth){ toast('没有隐身针'); return; }
+    S.inv.stealth=false;
+    S.useT=USE_TIME; S.useItem='stealth';
+    toast('正在打隐身针…3 秒内不能移动');
+  } else if(id==='torch'){
+    /* 手电筒：点一下就开，整局只能用一次，必须站在地下层 */
+    if(!S.inv.torch){ toast('没有手电筒'); return; }
+    if(S.flashFloor){ toast('手电筒已经用过了，没电了'); return; }
+    var f=fl();
+    if(!f || !f.dark){ toast('手电筒要在地下室用：三层、四层或地下室'); return; }
+    S.inv.torch=false;
+    S.flashFloor=S.floor; S.flashOn=true;
+    toast('手电筒照亮了整层 '+f.name+'（只能用这一次）');
+  }
+  updateHUD();
+}
+/* 每帧推进使用进度 */
+function updateUse(dt){
+  if(S.useT<=0) return;
+  S.useT=Math.max(0, S.useT-dt);
+  if(S.useT>0) return;
+  var id=S.useItem; S.useItem='';
+  if(id==='cola'){
+    S.colaT=COLA_TIME; S.speedMul=1.45;
+    toast('喝完了：10 秒内跑得更快');
+  } else if(id==='stealth'){
+    S.stealthT=STEALTH_TIME; S.seeLimit=5.0;
+    toast('隐身针生效：30 秒内监控看不见你，被发现要 5 秒');
+  }
+  updateHUD();
+}
+function isUsing(){ return S.useT>0; }
+
+/* 每帧递减道具效果时长 */
+function tickItemTimers(dt){
+  if(S.colaT>0){
+    S.colaT=Math.max(0,S.colaT-dt);
+    if(S.colaT<=0){ S.speedMul=1; toast('可乐效果结束了'); }
+  }
+  if(S.stealthT>0){
+    S.stealthT=Math.max(0,S.stealthT-dt);
+    if(S.stealthT<=0){
+      var base=(DIFF[S.diff]||DIFF.normal).see;
+      S.seeLimit=base>0?base:0.001;      /* 地狱是看见就死（0.001 秒） */
+      toast('隐身针效果结束了');
+    }
+  }
+}
+
+/* 小刀捅人：25% 概率解决一名敌人 */
+function knifeStab(){
+  if(!S.inv.knife){ toast('需要小刀'); return; }
+  var f=fl(); if(!f) return;
+  var best=nearestNpc(1.4);
+  if(!best){ toast('附近没有人可以捅'); return; }
+  if(Math.random()<0.25){
+    /* 得手：这名敌人本局退场 */
+    S.knifeKills=(S.knifeKills||0)+1;
+    for(var k=0;k<S.npcs.length;k++){
+      if(S.npcs[k]===best){ S.npcs.splice(k,1); break; }
+    }
+    toast('一刀解决掉了'+best.name+'！');
+  } else {
+    /* 失手：对方被激怒，立刻开始追你 */
+    best.state='chase';
+    best.alertT=3;
+    setPath(best, f, S.px, S.py);
+    S.seeT=Math.max(0, Math.min((typeof S.seeLimit==='number'?S.seeLimit:SEE_LIMIT)-0.25, S.seeT+1.2));
+    toast('没捅中！'+best.name+'被激怒了');
+  }
+  updateHUD();
+}
+
+function openCraft(){
+  var hasAll = S.inv.wood && S.inv.knife && S.inv.blueprint && !S.inv.blackkey;
+  var html='<div class="pitem"><div>⚫ <b>黑钥匙</b><br><span style="font-size:10.5px;color:#8ea6c2">需要：木头 + 小刀 + 制作图</span></div>'+
+    '<button id="doCraft" '+(hasAll?'':'disabled')+'>制作</button></div>';
+  html += '<div style="font-size:11px;color:#8ea6c2;line-height:1.7">'+
+    (S.inv.wood?'✅ 木头':'❌ 木头')+' · '+
+    (S.inv.knife?'✅ 小刀':'❌ 小刀')+' · '+
+    (S.inv.blueprint?'✅ 制作图':'❌ 制作图')+'</div>';
+  showPanel('制作台', html);
+  var b=document.getElementById('doCraft');
+  if(b) b.onclick=function(){
+    if(!(S.inv.wood&&S.inv.knife&&S.inv.blueprint)) return;
+    S.inv.wood=false; S.inv.blackkey=true;
+    hidePanel(); updateHUD();
+    toast('黑钥匙制作完成！');
+  };
+}
+
+function interact(){
+  if(S.mode!=='play') return;
+  /* 手里有小刀、身边有人：按 E 直接捅 */
+  if(S.inv.knife && nearestNpc(1.4)){
+    knifeStab(); return;
+  }
+  var o=nearObj(1.15);
+  if(!o){ toast('这里没有可以互动的东西'); return; }
+  var f=fl();
+
+  if(o.t==='item'){
+    if(S.inv[o.id]){ toast('已经拿过了'); return; }
+    S.inv[o.id]=true;
+    if(o.id==='flag'){ S.tookFlag=true; }
+    removeObj(o);
+    updateHUD();
+    toast('获得 '+ITEM[o.id].name);
+    return;
+  }
+  if(o.t==='shop'){ openShop(); return; }
+  if(o.t==='craft'){ openCraft(); return; }
+  if(o.t==='tree'){
+    if(S.inv.wood){ toast('树已经被锯过了'); return; }
+    if(!S.inv.saw){ toast('需要锯子才能锯树'); return; }
+    S.inv.wood=true;
+    updateHUD();
+    toast('锯倒了校长的树，获得木头');
+    return;
+  }
+  if(o.t==='switch'){
+    if(S.sw[o.id]){ toast('这个电闸已经拉下了'); return; }
+    S.sw[o.id]=true; updateHUD();
+    var n=0; for(var k in S.sw) if(S.sw[k]) n++;
+    toast('拉下'+o.label+'（'+n+'/3）');
+    return;
+  }
+  /* ---------- 新机关 ---------- */
+  if(o.t==='cctv'){ tryCctv(o); return; }
+  if(o.t==='car'){
+    /* 砸车会掉木头（做黑钥匙要用） */
+    if(S.carBroken){ toast('车已经砸烂了'); return; }
+    if(!S.inv.hammer){ toast('需要锤子才能砸车'); return; }
+    tryCar(o);
+    if(!S.inv.wood){ S.inv.wood=true; toast('从车里翻出一根木头'); updateHUD(); }
+    return;
+  }
+  if(o.t==='stairs'){
+    goFloor(o.to,o.tx,o.ty); return;
+  }
+  if(o.t==='stairWin'){ ending(5); return; }
+  if(o.t==='gate'){
+    tryGate(o); return;
+  }
+}
+
+function removeObj(o){
+  var f=fl();
+  for(var i=0;i<f.objs.length;i++){ if(f.objs[i]===o){ f.objs.splice(i,1); return; } }
+}
+
+/* 门 */
+var GATE = {
+  main:     {need:'redkey',    endingN:2},
+  office:   {need:'flag',      endingN:null, label:'权限锁'},
+  side:     {need:'yellowkey', endingN:3},
+  elec:     {need:null,        endingN:null},
+  wall:     {need:null,        endingN:null},
+  basement: {need:'blackkey',  endingN:null}
+};
+
+function tryGate(o){
+  if(o.kind==='elec'){ tryElec(o); return; }
+  if(o.kind==='wall'){ tryWall(o); return; }
+  var g=GATE[o.kind];
+  if(!g) return;
+  /* 地狱难度只能走路线四或五：大门、侧门都被封死 */
+  if(DIFF[S.diff] && DIFF[S.diff].onlyRoute45 && (o.kind==='main'||o.kind==='side')){
+    toast('地狱难度：所有常规出口都被封死了，只能走电子门或地下室');
+    return;
+  }
+  if(o.kind==='basement'){
+    if(S.inv.blackkey){ openBasementDoor(); return; }
+    toast('地下室门锁着，需要黑钥匙'); return;
+  }
+  if(o.kind==='office'){
+    if(S.inv.flag){ openGateTile(fl(), o); toast('刷工作牌，校长办公室的门开了'); return; }
+    toast('校长办公室是权限锁，需要老师的工作牌'); return;
+  }
+  if(!S.inv[g.need]){
+    toast('打不开，需要 '+ITEM[g.need].name);
+    return;
+  }
+  ending(g.endingN);
+}
+
+function openBasementDoor(){
+  if(!S.inv.blackkey){ toast('需要黑钥匙'); return; }
+  S.doorOpen=true;
+  toast('地下室门开了，下去吧');
+  goFloor('B3',2.5,11.5);
+}
+
+/* ================= 结局 ================= */
+var ENDINGS = {
+  1:{title:'结局一 · 被抓住了', color:'#ef4444',
+     desc:'老师第二次抓住了你。你被送到办公室，作业翻倍，逃走计划彻底失败。'},
+  2:{title:'结局二 · 大门逃脱', color:'#f59e0b',
+     desc:'你借老师的工作牌进了校长办公室，拿到红钥匙，正大光明推开了大门。自由的空气真甜。'},
+  3:{title:'结局三 · 侧门逃脱', color:'#eab308',
+     desc:'你从小卖部买下黄色钥匙，侧门咔哒一声开了。没人发现你是从侧门溜走的。'},
+  4:{title:'结局四 · 地下车库逃脱', color:'#a78bfa',
+     desc:'三个电闸全部拉下，你举着锤子砸开铁门，从车库通道走了出去。'},
+  5:{title:'结局五 · 地下室逃脱', color:'#38bdf8',
+     desc:'锯树、买刀、拿到制作图，你在制作室做出黑钥匙。推开门，走过那段没人知道的楼梯——你赢了。'}
+};
+
+function ending(n){
+  if(S.mode!=='play') return;
+  S.mode='end';
+  Object.keys(input).forEach(function(k){ input[k]=false; });
+  hidePanel();
+  var e=ENDINGS[n];
+  var el=document.getElementById('endScr');
+  var t=document.getElementById('endTitle');
+  t.textContent=e.title; t.style.color=e.color;
+  t.style.textShadow='0 0 22px '+e.color+'88';
+  var extra='';
+  if(n===5) extra='<br><br><span style="color:#8ea6c2">从楼梯走到另一个楼梯，就是出口。</span>';
+  document.getElementById('endDesc').innerHTML=e.desc+extra+
+    '<br><br><span style="color:#8ea6c2;font-size:12px">难度：'+DIFF[S.diff].name+' · 被抓 '+S.catches+' 次 · 剩余命 '+(S.lives>0?S.lives:0)+'</span>'
+    +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+'</div>';
+  el.classList.remove('hidden');
+  /* 通关（结局 2~5）才结算成就；结局一不算 */
+  settleAch(n);
+  reportClear(n);            /* 把成绩记进本机 cookie 排行榜 */
+}
+
+/* ================= 输入 ================= */
+function bindInput(){
+  document.addEventListener('keydown',function(e){
+    var k=e.key.toLowerCase();
+    if(k==='w'||k==='arrowup'){ input.up=true; e.preventDefault(); }
+    else if(k==='s'||k==='arrowdown'){ input.down=true; e.preventDefault(); }
+    else if(k==='a'||k==='arrowleft'){ input.left=true; e.preventDefault(); }
+    else if(k==='d'||k==='arrowright'){ input.right=true; e.preventDefault(); }
+    else if(k==='e'){ interact(); }
+    else if(k==='v'){ skipTurn(); }
+  });
+  document.addEventListener('keyup',function(e){
+    var k=e.key.toLowerCase();
+    if(k==='w'||k==='arrowup') input.up=false;
+    else if(k==='s'||k==='arrowdown') input.down=false;
+    else if(k==='a'||k==='arrowleft') input.left=false;
+    else if(k==='d'||k==='arrowright') input.right=false;
+  });
+
+  /* 虚拟摇杆：按住拖动，按方向给 input，同时把摇杆头推出去 */
+  var baseEl=document.getElementById('stickBase');
+  var knobEl=document.getElementById('stickKnob');
+  var stickId=null, baseC=null;
+  function stickCenter(){
+    if(!baseEl || !baseEl.getBoundingClientRect) return {x:0,y:0};
+    var r=baseEl.getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2, rad:r.width/2};
+  }
+  function stickMove(cx,cy){
+    var c=baseC||stickCenter();
+    var dx=cx-c.x, dy=cy-c.y;
+    var d=Math.sqrt(dx*dx+dy*dy);
+    var maxR=(c.rad||60)*0.82;
+    if(d>maxR && d>0){ dx=dx/d*maxR; dy=dy/d*maxR; d=maxR; }
+    if(knobEl){ knobEl.style.transform='translate('+dx+'px,'+dy+'px)'; }
+    /* 死区，避免手抖：超过 18% 才算方向 */
+    var dead=(c.rad||60)*0.18;
+    if(d<dead){ input.up=input.down=input.left=input.right=false; return; }
+    var ang=Math.atan2(dy,dx);
+    /* 用向量投影判断方向更直观：X 轴控制左右、Y 轴控制上下 */
+    var nx=dx/maxR, ny=dy/maxR;
+    input.right = nx> 0.32;
+    input.left  = nx<-0.32;
+    input.down  = ny> 0.32;
+    input.up    = ny<-0.32;
+  }
+  function stickEnd(){
+    stickId=null; baseC=null;
+    input.up=input.down=input.left=input.right=false;
+    if(knobEl) knobEl.style.transform='translate(0,0)';
+  }
+  if(baseEl){
+    baseEl.addEventListener('touchstart',function(ev){
+      ev.preventDefault();
+      var t=ev.changedTouches[0]; if(!t) return;
+      stickId=t.identifier; baseC=stickCenter();
+      stickMove(t.clientX,t.clientY);
+    },{passive:false});
+    baseEl.addEventListener('touchmove',function(ev){
+      ev.preventDefault();
+      for(var i=0;i<ev.changedTouches.length;i++){
+        var t=ev.changedTouches[i];
+        if(t.identifier===stickId){ stickMove(t.clientX,t.clientY); break; }
+      }
+    },{passive:false});
+    baseEl.addEventListener('touchend',function(ev){ ev.preventDefault(); stickEnd(); },{passive:false});
+    baseEl.addEventListener('touchcancel',function(ev){ ev.preventDefault(); stickEnd(); },{passive:false});
+    /* 桌面端用鼠标也能拖 */
+    baseEl.addEventListener('mousedown',function(ev){
+      ev.preventDefault(); baseC=stickCenter();
+      stickMove(ev.clientX,ev.clientY);
+      var mv=function(e){ stickMove(e.clientX,e.clientY); };
+      var up=function(){ stickEnd(); document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+  }
+
+  var bE=document.getElementById('btnE');
+  bE.addEventListener('touchstart',function(e){ e.preventDefault(); bE.classList.add('on'); interact(); },{passive:false});
+  bE.addEventListener('touchend',function(e){ e.preventDefault(); bE.classList.remove('on'); },{passive:false});
+  bE.addEventListener('click',function(){ interact(); });
+
+  var bV=document.getElementById('btnV');
+  bV.addEventListener('touchstart',function(e){ e.preventDefault(); bV.classList.add('on'); skipTurn(); },{passive:false});
+  bV.addEventListener('touchend',function(e){ e.preventDefault(); bV.classList.remove('on'); },{passive:false});
+  bV.addEventListener('click',function(){ skipTurn(); });
+
+  document.getElementById('panelClose').addEventListener('click',hidePanel);
+
+  /* 难度选择 */
+  var ds=document.querySelectorAll('.dbtn');
+  for(var j=0;j<ds.length;j++){
+    (function(d){
+      d.addEventListener('click',function(){
+        for(var k=0;k<ds.length;k++) ds[k].classList.remove('on');
+        d.classList.add('on');
+        S.diff=d.getAttribute('data-diff');
+      });
+    })(ds[j]);
+  }
+  document.getElementById('startBtn').addEventListener('click',function(){ startGame(S.diff); });
+  var bb=document.getElementById('boardBtn');
+  if(bb) bb.addEventListener('click',function(){ openBoard(); });
+  var nb=document.getElementById('nameBtn');
+  if(nb) nb.addEventListener('click',function(){ askName(); });
+  var eb=document.getElementById('expBtn');
+  if(eb) eb.addEventListener('click',function(){ exportScores(); });
+  document.getElementById('againBtn').addEventListener('click',function(){ startGame(S.diff); });
+  document.getElementById('backMenuBtn').addEventListener('click',function(){
+    S.mode='menu';
+    document.getElementById('endScr').classList.add('hidden');
+    document.getElementById('startScr').classList.remove('hidden');
+  });
+}
+/* ================= 新机关：监控 / 保安室 / 校长的车 / 电子门 / 砖墙 ================= */
+
+/* 保安室的监控总闸：关掉后全场监控失效 */
+function tryCctv(o){
+  if(S.camsOff){ toast('监控已经关掉了'); return; }
+  S.camsOff=true;
+  updateHUD();
+  toast('拉下监控总闸：全楼的监控都黑了');
+}
+
+/* 校长的车：锤子砸烂 → 巨大响声 → 把同层敌人全招过来 */
+function tryCar(o){
+  if(S.carBroken){ toast('车已经砸烂了'); return; }
+  if(!S.inv.hammer){ toast('需要锤子才能砸车'); return; }
+  S.carBroken=true;
+  updateHUD();
+  /* 巨大响声：附近敌人直接闻声过来 */
+  var f=fl();
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.floor!==S.floor) continue;
+    var d=Math.sqrt(Math.pow(n.x-o.x,2)+Math.pow(n.y-o.y,2));
+    if(d<12){
+      n.alertT=2.5;
+      setPath(n, f, o.x, o.y);
+      n.noiseX=o.x; n.noiseY=o.y; n.noiseT=6.0;
+    }
+  }
+  toast('砰！车被砸烂了，响声把附近的老师引了过来');
+  settleCarAch();
+}
+
+/* 电子门：需要三个电闸全部拉下才通得上电 */
+function tryElec(o){
+  if(S.elecOpen){ toast('电子门已经打开了'); return; }
+  var n=0; for(var k in S.sw) if(S.sw[k]) n++;
+  if(n<3){ toast('电子门没电：三个电闸只关了 '+n+'/3'); return; }
+  S.elecOpen=true;
+  updateHUD();
+  /* 开门：把门所在格的墙打通 */
+  var f=fl();
+  openGateTile(f, o);
+  toast('电子门通电打开了，但后面那堵墙还挡着路');
+}
+
+/* 电子门后面的砖墙：用锤子砸开 */
+function tryWall(o){
+  if(S.wallBroken){ toast('砖墙已经砸开了'); return; }
+  if(!S.elecOpen){ toast('砖墙后面是活断路器，先打开电子门通上电'); return; }
+  if(!S.inv.hammer){ toast('需要锤子才能砸开砖墙'); return; }
+  S.wallBroken=true;
+  var f=fl();
+  openGateTile(f, o);
+  updateHUD();
+  ending(4);
+}
+
+/* 把门所在格打通（门就是一格墙） */
+function openGateTile(f, o){
+  if(!f) return;
+  var ix=Math.floor(o.x), iy=Math.floor(o.y);
+  for(var dy=-1;dy<=1;dy++){
+    for(var dx=-1;dx<=1;dx++){
+      var x=ix+dx, y=iy+dy;
+      if(x<0||y<0||x>=f.w||y>=f.h) continue;
+      if(!f.g[y] || f.g[y][x]===undefined) continue;
+      if(Math.abs(dx)+Math.abs(dy)>1) continue;
+      f.g[y][x]=0;
+    }
+  }
+  /* 打开后把门对象移除，别再挡互动 */
+  for(var i=0;i<f.objs.length;i++){ if(f.objs[i]===o){ f.objs.splice(i,1); break; } }
+}
+/* ================= 画布基础 ================= */
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var CW = 360, CH = 640, DPR = 1;
+
+/* 世界坐标约定：格子(ix,iy) 的中心 = (ix+0.5, iy+0.5)，全项目统一 */
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  CW = window.innerWidth || 360;
+  CH = window.innerHeight || 640;
+  cv.width = Math.floor(CW*DPR);
+  cv.height = Math.floor(CH*DPR);
+  cv.style.width = CW+'px';
+  cv.style.height = CH+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  mapCache.key='';
+}
+
+/* ================= 静态地图缓存 ================= */
+var mapCache = {key:'', cv:null, w:0, h:0};
+
+function buildMapCache(f, px){
+  var w = Math.max(1, Math.round(f.w*px));
+  var h = Math.max(1, Math.round(f.h*px));
+  var c = document.createElement('canvas');
+  c.width=w; c.height=h;
+  var g = c.getContext('2d');
+  var sx = w/f.w, sy = h/f.h;
+
+  for(var y=0;y<f.h;y++){
+    for(var x=0;x<f.w;x++){
+      if(f.g[y][x]===1) continue;
+      g.fillStyle = ((x+y)%2===0) ? '#1e2e3d' : '#1a2836';
+      g.fillRect(x*sx, y*sy, sx+0.7, sy+0.7);
+    }
+  }
+  for(var i=0;i<f.rooms.length;i++){
+    var r=f.rooms[i];
+    g.fillStyle = r.safe==='class' ? 'rgba(60,160,255,.11)'
+                 : r.safe==='toilet'? 'rgba(80,220,180,.10)'
+                 : 'rgba(120,160,220,.05)';
+    g.fillRect((r.x0-1)*sx,(r.y0-1)*sy,(r.x1-r.x0+2)*sx,(r.y1-r.y0+2)*sy);
+  }
+  for(var yy=0;yy<f.h;yy++){
+    for(var xx=0;xx<f.w;xx++){
+      if(f.g[yy][xx]!==1) continue;
+      g.fillStyle = ((xx+yy)%2===0) ? '#33506c' : '#2b4459';
+      g.fillRect(xx*sx, yy*sy, sx+0.7, sy+0.7);
+      g.strokeStyle='rgba(150,205,255,.10)';
+      g.lineWidth=1;
+      g.strokeRect(xx*sx+.5, yy*sy+.5, Math.max(1,sx-1), Math.max(1,sy-1));
+    }
+  }
+  g.textAlign='center'; g.textBaseline='middle';
+  for(var k=0;k<f.rooms.length;k++){
+    var rm=f.rooms[k];
+    var mx=(rm.x0+rm.x1)*0.5*sx, my=(rm.y0+rm.y1)*0.5*sy;
+    g.font='600 '+Math.max(9,Math.min(13,sx*0.4))+'px -apple-system,"PingFang SC",sans-serif';
+    g.fillStyle='rgba(200,225,255,.30)';
+    g.fillText(rm.name, mx, my);
+  }
+  mapCache.key=f.key+'|'+w+'|'+h;
+  mapCache.cv=c;
+  return c;
+}
+
+/* ================= 视图 ================= */
+var scale = 30;
+var camX = 0, camY = 0;          /* 视口左上角在世界像素中的位置 */
+
+/* 把坐标对齐到设备像素网格：亚像素圆心会让抗锯齿每帧重算，看起来就是抖动 */
+function snapPx(v, dpr){
+  var d = dpr || 1;
+  return Math.round(v*d)/d;
+}
+var padTop = 96, padBot = 190;
+var viewH = 400;
+
+function computeView(){
+  var f=fl(); if(!f) return;
+  padTop = 96;
+  padBot = (CH>620) ? 190 : 172;
+  viewH = Math.max(140, CH-padTop-padBot);
+
+  /* 视口大约显示 13 格，保证手机上格子够大 */
+  var tiles = 13;
+  scale = Math.min(CW/tiles, viewH/tiles);
+  scale = Math.max(16, Math.min(scale, 42));
+  S._scale = scale;
+  return f;
+}
+
+function camTarget(){
+  var f=fl(); if(!f) return;
+  var mapW=f.w*scale, mapH=f.h*scale;
+  var tx, ty;
+  var cx = S.px*scale, cy = S.py*scale;
+  if(mapW<=CW) tx = -(CW-mapW)/2;
+  else tx = clamp(cx-CW/2, 0, mapW-CW);
+  if(mapH<=viewH) ty = -(viewH-mapH)/2;
+  else ty = clamp(cy-viewH/2, 0, mapH-viewH);
+  /* 平滑跟随 */
+  if(S._noCam){ camX=tx; camY=ty; S._noCam=false; }
+  else { camX += (tx-camX)*0.25; camY += (ty-camY)*0.25; }
+  /* 对齐到设备像素：避免亚像素采样让角色眼睛/轮廓来回抖 */
+  camX = snapPx(camX, DPR);
+  camY = snapPx(camY, DPR);
+}
+
+function worldToScreen(wx,wy){
+  return { x: wx*scale-camX, y: wy*scale-camY+padTop };
+}
+
+/* ================= 主绘制 ================= */
+function drawAll(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,CW,CH);
+  var bg=ctx.createLinearGradient(0,0,0,CH);
+  bg.addColorStop(0,'#0a1119'); bg.addColorStop(1,'#05080d');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,CW,CH);
+
+  var f = computeView(); if(!f) return;
+  camTarget();
+
+  var mapW=f.w*scale, mapH=f.h*scale;
+  var need=f.key+'|'+Math.round(mapW)+'|'+Math.round(mapH);
+  if(mapCache.key!==need || !mapCache.cv) buildMapCache(f, scale);
+
+  ctx.save();
+  ctx.translate(-camX, padTop-camY);
+  if(mapCache.cv) ctx.drawImage(mapCache.cv, 0, 0, mapW, mapH);
+
+  for(var o=0;o<f.objs.length;o++) drawObj(f.objs[o]);
+  for(var n=0;n<S.npcs.length;n++){
+    if(S.npcs[n].floor===S.floor) drawNpc(S.npcs[n]);
+  }
+  drawPlayer();
+  ctx.restore();
+
+  /* 地图边界光框 */
+  ctx.strokeStyle='rgba(90,170,235,.18)'; ctx.lineWidth=1;
+  ctx.strokeRect(-camX, padTop-camY, mapW, mapH);
+
+  /* 地下层视野遮罩 */
+  if(f.dark){
+    var ps=worldToScreen(S.px,S.py);
+    if(S.flashFloor===S.floor && S.flashOn){
+      /* 手电筒：这一层地下室的黑暗被整个照亮，只留一点点氛围 */
+      var fl2=ctx.createRadialGradient(ps.x,ps.y,scale*6.0,ps.x,ps.y,scale*22.0);
+      fl2.addColorStop(0,'rgba(0,0,0,0)');
+      fl2.addColorStop(1,'rgba(0,0,0,.18)');
+      ctx.fillStyle=fl2;
+      ctx.fillRect(0,padTop-2,CW,viewH+4);
+    } else {
+      var rad=ctx.createRadialGradient(ps.x,ps.y,scale*1.4,ps.x,ps.y,scale*4.8);
+      rad.addColorStop(0,'rgba(0,0,0,0)');
+      rad.addColorStop(1,'rgba(0,0,0,.82)');
+      ctx.fillStyle=rad;
+      ctx.fillRect(0,padTop-2,CW,viewH+4);
+    }
+  } else if(S.flashFloor===S.floor && S.flashOn){
+    /* 在地上层用手电筒：额外提亮一点，不影响玩法 */
+    ctx.save();
+    ctx.fillStyle='rgba(255,240,200,.05)';
+    ctx.fillRect(0,padTop-2,CW,viewH+4);
+    ctx.restore();
+  }
+
+  drawOverlayHints(f);
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function drawObj(o){
+  var x=o.x*scale, y=o.y*scale, s=scale;
+  ctx.save();
+  if(o.t==='item'){
+    var it=ITEM[o.id];
+    var bob=Math.sin(S.time*3+(o.x+o.y))*s*0.06;
+    ctx.shadowColor=it.color; ctx.shadowBlur=14;
+    ctx.fillStyle=it.color;
+    ctx.beginPath(); ctx.arc(x,y+bob,s*0.30,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='700 '+(s*0.38)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(it.icon, x, y+bob);
+  } else if(o.t==='shop'){
+    ctx.fillStyle='#f59e0b'; ctx.shadowColor='#f59e0b'; ctx.shadowBlur=12;
+    roundRect(x-s*0.36,y-s*0.32,s*0.72,s*0.64,4); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='700 '+(s*0.4)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#1a1200'; ctx.fillText('¥', x, y);
+  } else if(o.t==='craft'){
+    ctx.fillStyle='#38bdf8'; ctx.shadowColor='#38bdf8'; ctx.shadowBlur=12;
+    roundRect(x-s*0.34,y-s*0.34,s*0.68,s*0.68,4); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='700 '+(s*0.4)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#04222e'; ctx.fillText('⚙', x, y);
+  } else if(o.t==='tree'){
+    var done=!!S.inv.wood;
+    ctx.fillStyle=done?'#4b3a28':'#2f7d4f';
+    ctx.shadowColor=done?'rgba(0,0,0,0)':'#2f7d4f'; ctx.shadowBlur=done?0:14;
+    ctx.beginPath(); ctx.arc(x,y,s*0.34,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font=(s*0.34)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(done?'🪵':'🌳', x, y);
+  } else if(o.t==='switch'){
+    var on=!!S.sw[o.id];
+    ctx.fillStyle=on?'#22c55e':'#64748b';
+    ctx.shadowColor=on?'#22c55e':'rgba(0,0,0,0)'; ctx.shadowBlur=on?16:0;
+    roundRect(x-s*0.27,y-s*0.32,s*0.54,s*0.64,3); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#0b1220'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(x,y-s*0.13); ctx.lineTo(x+(on?0:s*0.11), y+s*0.13); ctx.stroke();
+  } else if(o.t==='stairs'){
+    ctx.fillStyle='rgba(56,189,248,.20)';
+    ctx.strokeStyle='rgba(120,220,255,.8)'; ctx.lineWidth=1.6;
+    roundRect(x-s*0.42,y-s*0.42,s*0.84,s*0.84,5); ctx.fill(); ctx.stroke();
+    ctx.font='700 '+(s*0.34)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#7ee0ff'; ctx.fillText(o.to==='B1'?'▼':'↕', x, y);
+  } else if(o.t==='stairWin'){
+    var pul=0.5+0.5*Math.sin(S.time*4);
+    ctx.strokeStyle='rgba(255,230,120,'+(0.6+0.4*pul)+')';
+    ctx.lineWidth=2.4;
+    ctx.shadowColor='#ffe066'; ctx.shadowBlur=18;
+    roundRect(x-s*0.45,y-s*0.45,s*0.9,s*0.9,6); ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.font='700 '+Math.max(8,s*0.28)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#ffe066'; ctx.fillText('EXIT', x, y);
+  } else if(o.t==='gate'){
+    var col = o.kind==='main'?'#ef4444':(o.kind==='side'?'#eab308':(o.kind==='iron'?'#a78bfa':'#94a3b8'));
+    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=12;
+    var gw=(o.kind==='main'||o.kind==='side') ? s*0.94 : s*0.72;
+    ctx.fillRect(x-gw/2, y-s*0.13, gw, s*0.26);
+    ctx.shadowBlur=0;
+    ctx.font='600 '+Math.max(8,s*0.24)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillStyle='rgba(230,240,255,.85)';
+    ctx.fillText(o.label, x, y-s*0.2);
+  } else if(o.t==='camera'){
+    var camOn = !S.camsOff;
+    var ccol = camOn ? '#ff4d6d' : '#475569';
+    ctx.save();
+    if(camOn){
+      /* 监控视野锥 */
+      ctx.fillStyle='rgba(255,70,90,.10)';
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+      ctx.arc(x, y, Math.round((o.range||5)*scale), o.dir-(o.cone||0.5), o.dir+(o.cone||0.5));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,90,110,.35)'; ctx.lineWidth=1; ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle=ccol; ctx.shadowColor=ccol; ctx.shadowBlur=camOn?12:0;
+    roundRect(x-s*0.24, y-s*0.18, s*0.48, s*0.36, 3); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220';
+    ctx.beginPath(); ctx.arc(x, y, Math.max(1,s*0.07), 0, Math.PI*2); ctx.fill();
+    ctx.font='700 '+Math.max(8,s*0.3)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillStyle= camOn?'rgba(255,140,160,.9)':'rgba(120,140,160,.7)';
+    ctx.fillText(camOn?'📹':'📹✕', x, y-s*0.24);
+  } else if(o.t==='cctv'){
+    var off=!!S.camsOff;
+    ctx.fillStyle= off?'#22c55e':'#64748b';
+    ctx.shadowColor= off?'#22c55e':'rgba(0,0,0,0)'; ctx.shadowBlur=off?16:0;
+    roundRect(x-s*0.3, y-s*0.3, s*0.6, s*0.6, 4); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='700 '+Math.max(8,s*0.32)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#0b1220'; ctx.fillText(off?'OFF':'ON', x, y);
+  } else if(o.t==='car'){
+    var dead=!!S.carBroken;
+    ctx.fillStyle= dead?'#3f3a35':'#1f7ae0';
+    ctx.shadowColor= dead?'rgba(0,0,0,0)':'#1f7ae0'; ctx.shadowBlur=dead?0:14;
+    roundRect(x-s*0.42,y-s*0.26,s*0.84,s*0.52,6); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220';
+    ctx.beginPath(); ctx.arc(x-s*0.24, y+s*0.28, Math.max(1.5,s*0.1), 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.24, y+s*0.28, Math.max(1.5,s*0.1), 0, Math.PI*2); ctx.fill();
+    ctx.font='700 '+Math.max(8,s*0.28)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillStyle='rgba(220,235,255,.8)';
+    ctx.fillText(dead?'🚗💥':'🚗', x, y-s*0.28);
+  } else if(o.t==='enter'){
+    ctx.strokeStyle='rgba(120,220,255,.6)'; ctx.lineWidth=2;
+    ctx.setLineDash([4,4]);
+    roundRect(x-s*0.5,y-s*0.5,s,s,4); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawPlayer(){
+  var x=S.px*scale, y=S.py*scale, s=scale;
+
+  /* 走路浮动：先算出目标值，再用指数平滑过渡，避免帧率抖动导致上下跳 */
+  var targetBob = S.moving ? Math.sin(S.walkPhase||0)*s*0.05 : 0;
+  S.bobCur += (targetBob - S.bobCur)*0.25;
+  if(Math.abs(S.bobCur)<0.02) S.bobCur=0;
+  var bob = S.bobCur;
+
+  /* 眼睛偏移：按朝向给目标值，同样做平滑插值，切换朝向时不会瞬移跳动 */
+  var tex = S.faceDir==='left'?-0.09:(S.faceDir==='right'?0.09:0);
+  var tey = S.faceDir==='up'?-0.10:(S.faceDir==='down'?0.06:0);
+  S.eyeX += (tex - S.eyeX)*0.30;
+  S.eyeY += (tey - S.eyeY)*0.30;
+  if(Math.abs(S.eyeX)<0.002) S.eyeX=0;
+  if(Math.abs(S.eyeY)<0.002) S.eyeY=0;
+  var ex=S.eyeX, ey=S.eyeY;
+
+  /* 关键：把角色整体对齐到设备像素网格（1/DPR），
+     否则角色中心与眼睛圆心落在亚像素上，每帧四舍五入会左右上下各差 1px → 看起来就是「眼睛抖」 */
+  var bx = snapPx(x, DPR), by = snapPx(y + bob, DPR);
+  var glowX = snapPx(x, DPR), glowY = snapPx(y, DPR);
+
+  ctx.save();
+  var rad=ctx.createRadialGradient(glowX,glowY,s*0.2,glowX,glowY,s*1.7);
+  rad.addColorStop(0,'rgba(120,210,255,.22)');
+  rad.addColorStop(1,'rgba(120,210,255,0)');
+  ctx.fillStyle=rad;
+  ctx.beginPath(); ctx.arc(glowX,glowY,s*1.7,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.shadowColor='#4aa8ff'; ctx.shadowBlur=16;
+  ctx.fillStyle='#4aa8ff';
+  ctx.beginPath(); ctx.arc(bx,by,s*0.31,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle='#04101c';
+  var er=Math.max(1, Math.round(s*0.05));   /* 眼睛半径取整，避免半径抖动 */
+  var eyeGap=0.085;
+  /* 眼睛中心同样按设备像素对齐；两眼固定在同一水平线上 */
+  var e1x = snapPx(x+(ex-eyeGap)*s, DPR), e2x = snapPx(x+(ex+eyeGap)*s, DPR);
+  var eyy = snapPx(by + ey*s, DPR);
+  ctx.beginPath(); ctx.arc(e1x, eyy, er,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(e2x, eyy, er,0,Math.PI*2); ctx.fill();
+}
+
+function drawNpc(n){
+  var x=snapPx(n.x*scale, DPR), y=snapPx(n.y*scale, DPR), s=scale;
+  var chasing = n.state==='chase';
+  var col = n.kind==='teacher' ? '#ff6b6b' : '#8b93ff';
+
+  ctx.save();
+  ctx.fillStyle = chasing ? 'rgba(255,70,70,.18)'
+                : (n.kind==='teacher'?'rgba(255,120,120,.10)':'rgba(140,150,255,.10)');
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.arc(x,y, Math.round(n.sight*scale), n.dir-n.cone, n.dir+n.cone);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.shadowColor=col; ctx.shadowBlur=chasing?22:11;
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(x,y,s*0.30,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(n.dir);
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  ctx.beginPath();
+  ctx.moveTo(s*0.25,0); ctx.lineTo(s*0.06,-s*0.14); ctx.lineTo(s*0.06,s*0.14);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  ctx.font='600 '+Math.max(8,s*0.23)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillStyle = chasing ? '#ff8a8a' : 'rgba(220,235,255,.62)';
+  ctx.fillText(chasing?('! '+n.name):n.name, x, y-s*0.34);
+}
+
+function drawOverlayHints(f){
+  var r=roomAt(f,S.px,S.py);
+  if(!r || !r.safe) return;
+  ctx.save();
+  ctx.font='600 11px -apple-system,"PingFang SC",sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  var txt='安全区 · 按 V 跳过一回合';
+  var tw=ctx.measureText(txt).width;
+  var bx=CW/2, by=padTop-13;
+  ctx.fillStyle='rgba(16,38,58,.94)';
+  ctx.strokeStyle='rgba(90,200,255,.35)'; ctx.lineWidth=1;
+  roundRect(bx-tw/2-9, by-10, tw+18, 20, 10);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#9fe6ff';
+  ctx.fillText(txt, bx, by);
+  ctx.restore();
+}
+
+/* ================= 主循环 ================= */
+var lastT = 0;
+function loop(t){
+  requestAnimationFrame(loop);
+  if(!lastT) lastT=t;
+  var dt=(t-lastT)/1000;
+  if(!(dt>0)) dt=0;
+  if(dt>0.05) dt=0.05;
+  lastT=t;
+
+  if(S.mode==='play'){
+    S.time+=dt;
+    if(S.gogglesT>0) S.gogglesT=Math.max(0,S.gogglesT-dt);
+    updateUse(dt);
+    tickItemTimers(dt);
+    updateCameras(dt);
+    movePlayer(dt);
+    stairCheck();
+    updateNpcs(dt);
+    if(S.mode==='play') checkCatch(dt);
+    if(S.msgT>0){
+      S.msgT-=dt;
+      if(S.msgT<=0){
+        var te=document.getElementById('toast');
+        if(te) te.classList.remove('show');
+      }
+    }
+    if(Math.floor(S.time*2)!==Math.floor((S.time-dt)*2)) updateHUD();
+    updateSeeHUD();          /* 警戒条每帧刷新，倒计时才跟得上 */
+  }
+  drawAll();
+}
+
+/* ================= 启动 ================= */
+window.addEventListener('resize',function(){ resize(); });
+window.addEventListener('orientationchange',function(){ setTimeout(resize,150); });
+resize();
+bindInput();
+buildWorld();
+achLoad();          /* 载入本地保存的成就（localStorage / cookie） */
+renderAchChip();
+S.mode='menu';
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

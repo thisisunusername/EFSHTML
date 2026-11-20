@@ -152,9 +152,12 @@ function themeApply(){
   var body=document.body;
   var root=document.documentElement;
   var mat = (THEME.style==='material');
+  var mix = (THEME.style==='miuix');
   if(body && body.classList){
     if(mat) body.classList.add('theme-material');
     else body.classList.remove('theme-material');
+    if(mix) body.classList.add('theme-miuix');
+    else body.classList.remove('theme-miuix');
   }
   /* 生成并注入 Material 变量 */
   var hex=themeColorHex();
@@ -166,7 +169,7 @@ function themeApply(){
   /* 浏览器地址栏配色也跟着走 */
   var meta=document.querySelector? document.querySelector('meta[name="theme-color"]') : null;
   if(meta && meta.setAttribute){
-    meta.setAttribute('content', mat ? tok['--m3-surface'] : '#0b0f16');
+    meta.setAttribute('content', (mat||mix) ? tok['--m3-surface'] : '#0b0f16');
   }
   /* 同步选中态 */
   themeSyncUI();
@@ -220,10 +223,15 @@ function themeSyncUI(){
     pv.style.background=themeColorHex();
   }
   var nm=document.getElementById('themeNowName');
-  if(nm) nm.textContent = (THEME.style==='material'?'Material':'原版')+' · '+themeColorHex().toUpperCase();
+  if(nm) nm.textContent = themeStyleName()+' · '+themeColorHex().toUpperCase();
+}
+function themeStyleName(){
+  if(THEME.style==='material') return 'Material';
+  if(THEME.style==='miuix') return 'Miuix';
+  return '原版';
 }
 function themeSetStyle(s){
-  THEME.style = (s==='material')?'material':'classic';
+  THEME.style = (s==='material')?'material':((s==='miuix')?'miuix':'classic');
   themeSave();
   themeApply();
 }
@@ -330,7 +338,7 @@ function themeMapColors(){
    经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
 */
 function themeUiColors(){
-  if(typeof THEME==='undefined' || THEME.style!=='material'){
+  if(typeof THEME==='undefined' || (THEME.style!=='material' && THEME.style!=='miuix')){
     return {
       m3:false,
       title:'#9fe6ff',      /* 面板标题 */
@@ -351,6 +359,33 @@ function themeUiColors(){
   }
   var hex=themeColorHex();
   var h=themeHue(hex), s=themeSat(hex);
+  /* ===== Miuix：纯黑底 + 卡片分层，不靠饰边靠背景层次 ===== */
+  if(THEME.style==='miuix'){
+    var mxSat=Math.min(s, 0.12);
+    var mxAcc=Math.max(s, 0.38);
+    var mxr=function(hx, a){
+      var v=themeHexToRgb(hx);
+      return 'rgba('+v[0]+','+v[1]+','+v[2]+','+a+')';
+    };
+    return {
+      m3:false,
+      mx:true,
+      title:themeTone(h, Math.min(mxAcc,0.40), 94, 1),
+      text:themeTone(h, mxSat, 95, 1),
+      sub:themeTone(h, mxSat, 74, 1),
+      dim:themeTone(h, mxSat, 60, 1),
+      faint:themeTone(h, mxSat, 42, 1),
+      accent:themeTone(h, Math.min(mxAcc,0.52), 84, 1),
+      gold:themeTone(h+40, Math.min(Math.max(s,0.48),0.60), 82, 1),
+      warn:themeTone(h-150, Math.min(Math.max(s,0.44),0.58), 80, 1),
+      line:mxr(themeTone(h, mxSat, 36, 1), 0.30),
+      rowBg:mxr(themeTone(h, mxSat, 10, 1), 1),
+      rowGot:mxr(themeTone(h, mxSat, 16, 1), 1),
+      rowBorder:mxr(themeTone(h, mxSat, 40, 1), 0.14),
+      rowGotBorder:mxr(themeTone(h, Math.min(mxAcc,0.30), 66, 1), 0.34),
+      dotOff:mxr(themeTone(h, mxSat, 50, 1), 0.30)
+    };
+  }
   var ns=Math.min(s, 0.16);
   /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
   var as=Math.max(s, 0.42);

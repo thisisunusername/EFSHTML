@@ -437,6 +437,198 @@ body.theme-material .achRow.got{
   background:var(--m3-surface-2);
   box-shadow:inset 0 0 0 1px var(--m3-outline-var)}
 body.theme-material .achDesc{color:var(--m3-on-surface-var)}
+/* ================= Miuix 风格 =================
+   视觉语言：小米 HyperOS / Miuix —— 纯黑底、卡片分组、超大圆角、
+   无描边靠背景层次区分、强调色克制。
+   与 Material 平行共存：只靠 body.theme-miuix 前缀隔离，互不干扰。
+   铁律同前：底子/表面/圆角/描边/文字层级跟风，语义色一律保留。
+*/
+body.theme-miuix #startScr.overlay{
+  background:#000;
+  background-image:none;
+  padding:26px 18px 30px; gap:12px;
+  font-family:"MiSans","Noto Sans SC",-apple-system,"PingFang SC",system-ui,sans-serif;
+}
+body.theme-miuix #startScr h1{
+  font-size:27px; letter-spacing:0; color:var(--m3-on-surface);
+  text-shadow:none; font-weight:600; margin:4px 0 0; line-height:1.25;
+}
+body.theme-miuix #startScr .sub{
+  color:var(--m3-on-surface-var); font-size:13px; line-height:1.62; letter-spacing:0;
+}
+/* Miuix Card：纯填充、无描边、超大圆角 */
+body.theme-miuix #startScr .card{
+  background:var(--m3-surface-1);
+  border:none; border-radius:20px;
+  padding:18px 18px; font-size:12.5px; color:var(--m3-on-surface-var); line-height:1.85;
+  box-shadow:none;
+}
+body.theme-miuix #startScr .card b{color:var(--m3-primary); font-weight:600}
+/* 分段按钮：Miuix 分段选择器（内凹底 + 滑块） */
+body.theme-miuix #startScr .diffs{gap:6px}
+body.theme-miuix #startScr .dbtn{
+  background:var(--m3-surface-1);
+  border:none;
+  color:var(--m3-on-surface);
+  border-radius:16px;
+  font-size:14px; font-weight:500; letter-spacing:0;
+  padding:13px 8px; line-height:1.4;
+  box-shadow:none;
+}
+body.theme-miuix #startScr .dbtn small{
+  color:var(--m3-on-surface-var); font-size:11px; margin-top:3px; letter-spacing:0;
+}
+body.theme-miuix #startScr .dbtn.on{
+  background:var(--m3-primary);
+  color:var(--m3-on-primary);
+  font-weight:600;
+}
+body.theme-miuix #startScr .dbtn.on small{color:var(--m3-on-primary); opacity:.82}
+body.theme-miuix #startScr .dbtn.hell{
+  background:var(--m3-surface-1); color:var(--m3-error);
+}
+body.theme-miuix #startScr .dbtn.hell.on{
+  background:var(--m3-error); color:var(--m3-on-error);
+}
+body.theme-miuix #startScr .dbtn.hell.on small{color:var(--m3-on-error); opacity:.85}
+/* 主按钮：Miuix 胶囊主按钮 */
+body.theme-miuix #startScr .bigbtn{
+  background:var(--m3-primary); color:var(--m3-on-primary);
+  border:none; border-radius:999px; padding:15px 40px;
+  font-size:15px; font-weight:600; letter-spacing:0;
+  box-shadow:none;
+  margin-top:16px; width:100%; max-width:340px;
+}
+body.theme-miuix #startScr .bigbtn:active{transform:scale(.97); filter:brightness(.94)}
+/* 次按钮：Miuix 淡色胶囊 */
+body.theme-miuix #startScr .ghostbtn{
+  background:var(--m3-surface-2); color:var(--m3-on-surface);
+  border:none; border-radius:999px; padding:11px 18px;
+  font-size:12.5px; font-weight:500; box-shadow:none;
+}
+body.theme-miuix #startScr .ghostbtn:active{transform:scale(.96); background:var(--m3-surface-3)}
+/* 底部制作名单 */
+body.theme-miuix #startScr .credits{
+  color:var(--m3-on-surface-var); opacity:.55; font-size:10.5px; margin-top:16px;
+}
+body.theme-miuix #startScr .credits .cl{color:var(--m3-primary)}
+body.theme-miuix #startScr .credits a{color:var(--m3-primary)}
+/* 主题悬浮球：无描边圆形 */
+body.theme-miuix .themeFab{
+  background:var(--m3-surface-2); border:none; color:var(--m3-primary);
+  box-shadow:none;
+}
+/* 主题面板：大圆角浮层 */
+body.theme-miuix .tbox{
+  background:var(--m3-surface-1); border:none; border-radius:24px;
+  box-shadow:none;
+}
+body.theme-miuix .tbox h3{color:var(--m3-on-surface); font-weight:600; letter-spacing:0}
+body.theme-miuix .tlabel{color:var(--m3-on-surface-var); letter-spacing:0}
+body.theme-miuix .tsty{
+  background:var(--m3-surface-2); border:none;
+  border-radius:16px; color:var(--m3-on-surface); font-weight:500;
+}
+body.theme-miuix .tsty small{color:var(--m3-on-surface-var)}
+body.theme-miuix .tsty.on{
+  background:var(--m3-primary); border:none;
+  color:var(--m3-on-primary); font-weight:600;
+}
+body.theme-miuix .tsty.on small{color:var(--m3-on-primary); opacity:.82}
+body.theme-miuix #themeNowName{color:var(--m3-on-surface-var)}
+body.theme-miuix .tbtns button{
+  background:var(--m3-surface-2); border:none; color:var(--m3-on-surface);
+  border-radius:999px; font-weight:500;
+}
+body.theme-miuix .tbtns button.prim{
+  background:var(--m3-primary); color:var(--m3-on-primary); font-weight:600;
+}
+/* ===== GM / 作弊菜单：Miuix（作弊红色语义保留） ===== */
+body.theme-miuix #cheatPanel{
+  background:var(--m3-surface-1); border:none;
+  border-radius:24px;
+  box-shadow:none;
+}
+body.theme-miuix #cheatHead{
+  background:var(--m3-surface-1); border-bottom:none;
+  border-radius:24px 24px 0 0;
+  padding:14px 16px;
+}
+body.theme-miuix #cheatHead b{
+  color:var(--m3-error); font-weight:600; letter-spacing:0;
+}
+body.theme-miuix #cheatClose{
+  background:var(--m3-surface-2); border:none;
+  color:var(--m3-on-surface-var); border-radius:999px; font-weight:500;
+}
+body.theme-miuix #cheatClose:active{background:var(--m3-surface-3)}
+body.theme-miuix #cheatBody{padding:6px 16px 16px}
+body.theme-miuix .csec{
+  color:var(--m3-on-surface-var); font-weight:600; letter-spacing:0;
+  margin:14px 0 6px;
+}
+body.theme-miuix .crow{
+  border-bottom:none;
+  border-radius:16px;
+  padding:10px 12px; margin:2px 0;
+  background:var(--m3-surface-2);
+  color:var(--m3-on-surface);
+}
+body.theme-miuix .crow:active{background:var(--m3-surface-3)}
+body.theme-miuix .cdesc{color:var(--m3-on-surface-var)}
+body.theme-miuix .crow button{
+  background:transparent;
+  border:none;
+  color:var(--m3-error);
+  border-radius:999px; font-weight:600; padding:7px 14px;
+}
+body.theme-miuix .crow button:active{background:rgba(242,184,181,.12)}
+body.theme-miuix .crow button.on{
+  background:var(--m3-success); color:#0d2a16;
+}
+body.theme-miuix .crow button.danger{
+  background:var(--m3-error); color:var(--m3-on-error);
+}
+body.theme-miuix .crow button.danger:active{filter:brightness(1.1)}
+body.theme-miuix .ctele button{
+  background:var(--m3-surface-2); border:none;
+  color:var(--m3-on-surface); border-radius:999px;
+}
+body.theme-miuix .ctele button.on{
+  background:var(--m3-primary); color:var(--m3-on-primary); font-weight:600;
+}
+body.theme-miuix .cwarn{color:var(--m3-on-surface-var)}
+body.theme-miuix #cheatTag{
+  color:var(--m3-error); border:none;
+  border-radius:999px; padding:2px 8px; background:var(--m3-surface-2);
+}
+body.theme-miuix #gmBall{
+  background:var(--m3-error); border:none; color:var(--m3-on-error);
+  box-shadow:none; font-weight:700;
+}
+body.theme-miuix #gmBall:active{transform:scale(.92); filter:brightness(1.1)}
+/* ===== 面板 / 列表 / 成就 / 排行榜：Miuix ===== */
+body.theme-miuix .pbox{
+  background:var(--m3-surface-1);border:none;border-radius:24px;
+  padding:18px 16px;box-shadow:none}
+body.theme-miuix .pbox h3{color:var(--m3-on-surface);font-weight:600;letter-spacing:0}
+body.theme-miuix .pitem{
+  background:var(--m3-surface-2);border:none;border-radius:16px;
+  padding:11px 13px}
+body.theme-miuix .pitem button{
+  background:var(--m3-primary);color:var(--m3-on-primary);
+  border:none;border-radius:999px;font-weight:600}
+body.theme-miuix .pitem button:disabled{opacity:.35}
+body.theme-miuix #panelClose{
+  background:var(--m3-surface-2);color:var(--m3-on-surface);
+  border:none;border-radius:999px}
+body.theme-miuix .achList{gap:7px}
+body.theme-miuix .achRow{
+  background:var(--m3-surface-2);border:none;border-radius:16px;
+  padding:10px 12px}
+body.theme-miuix .achRow.got{
+  background:var(--m3-surface-1)}
+body.theme-miuix .achDesc{color:var(--m3-on-surface-var)}
 </style>
 </head>
 <body>
@@ -498,6 +690,7 @@ body.theme-material .achDesc{color:var(--m3-on-surface-var)}
       <div id="themeStyles">
         <div class="tsty on" data-ts="classic">原版<small>深蓝暗色</small></div>
         <div class="tsty" data-ts="material">Material<small>M3 设计</small></div>
+        <div class="tsty" data-ts="miuix">Miuix<small>卡片分组</small></div>
       </div>
       <div class="tlabel">颜色（256 色）</div>
       <div id="themeGrid"></div>
@@ -505,7 +698,7 @@ body.theme-material .achDesc{color:var(--m3-on-surface-var)}
         <div id="themePreview"></div>
         <div id="themeNowName">原版 · #5B8DEF</div>
       </div>
-      <div id="themeNote">颜色只在 Material 风格下生效；原版风格始终是深蓝色。风格仅作用于主菜单，游戏内界面不变。</div>
+      <div id="themeNote">风格与颜色会应用到整个游戏：主菜单、游戏内地图、GM 菜单、成就页和排行榜。原版风格用固定的深蓝配色，不受颜色影响。</div>
       <div class="tbtns">
         <button id="themeReset">恢复默认</button>
         <button id="themeClose" class="prim">完成</button>
@@ -3356,9 +3549,12 @@ function themeApply(){
   var body=document.body;
   var root=document.documentElement;
   var mat = (THEME.style==='material');
+  var mix = (THEME.style==='miuix');
   if(body && body.classList){
     if(mat) body.classList.add('theme-material');
     else body.classList.remove('theme-material');
+    if(mix) body.classList.add('theme-miuix');
+    else body.classList.remove('theme-miuix');
   }
   /* 生成并注入 Material 变量 */
   var hex=themeColorHex();
@@ -3370,7 +3566,7 @@ function themeApply(){
   /* 浏览器地址栏配色也跟着走 */
   var meta=document.querySelector? document.querySelector('meta[name="theme-color"]') : null;
   if(meta && meta.setAttribute){
-    meta.setAttribute('content', mat ? tok['--m3-surface'] : '#0b0f16');
+    meta.setAttribute('content', (mat||mix) ? tok['--m3-surface'] : '#0b0f16');
   }
   /* 同步选中态 */
   themeSyncUI();
@@ -3424,10 +3620,15 @@ function themeSyncUI(){
     pv.style.background=themeColorHex();
   }
   var nm=document.getElementById('themeNowName');
-  if(nm) nm.textContent = (THEME.style==='material'?'Material':'原版')+' · '+themeColorHex().toUpperCase();
+  if(nm) nm.textContent = themeStyleName()+' · '+themeColorHex().toUpperCase();
+}
+function themeStyleName(){
+  if(THEME.style==='material') return 'Material';
+  if(THEME.style==='miuix') return 'Miuix';
+  return '原版';
 }
 function themeSetStyle(s){
-  THEME.style = (s==='material')?'material':'classic';
+  THEME.style = (s==='material')?'material':((s==='miuix')?'miuix':'classic');
   themeSave();
   themeApply();
 }
@@ -3534,7 +3735,7 @@ function themeMapColors(){
    经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
 */
 function themeUiColors(){
-  if(typeof THEME==='undefined' || THEME.style!=='material'){
+  if(typeof THEME==='undefined' || (THEME.style!=='material' && THEME.style!=='miuix')){
     return {
       m3:false,
       title:'#9fe6ff',      /* 面板标题 */
@@ -3555,6 +3756,33 @@ function themeUiColors(){
   }
   var hex=themeColorHex();
   var h=themeHue(hex), s=themeSat(hex);
+  /* ===== Miuix：纯黑底 + 卡片分层，不靠饰边靠背景层次 ===== */
+  if(THEME.style==='miuix'){
+    var mxSat=Math.min(s, 0.12);
+    var mxAcc=Math.max(s, 0.38);
+    var mxr=function(hx, a){
+      var v=themeHexToRgb(hx);
+      return 'rgba('+v[0]+','+v[1]+','+v[2]+','+a+')';
+    };
+    return {
+      m3:false,
+      mx:true,
+      title:themeTone(h, Math.min(mxAcc,0.40), 94, 1),
+      text:themeTone(h, mxSat, 95, 1),
+      sub:themeTone(h, mxSat, 74, 1),
+      dim:themeTone(h, mxSat, 60, 1),
+      faint:themeTone(h, mxSat, 42, 1),
+      accent:themeTone(h, Math.min(mxAcc,0.52), 84, 1),
+      gold:themeTone(h+40, Math.min(Math.max(s,0.48),0.60), 82, 1),
+      warn:themeTone(h-150, Math.min(Math.max(s,0.44),0.58), 80, 1),
+      line:mxr(themeTone(h, mxSat, 36, 1), 0.30),
+      rowBg:mxr(themeTone(h, mxSat, 10, 1), 1),
+      rowGot:mxr(themeTone(h, mxSat, 16, 1), 1),
+      rowBorder:mxr(themeTone(h, mxSat, 40, 1), 0.14),
+      rowGotBorder:mxr(themeTone(h, Math.min(mxAcc,0.30), 66, 1), 0.34),
+      dotOff:mxr(themeTone(h, mxSat, 50, 1), 0.30)
+    };
+  }
   var ns=Math.min(s, 0.16);
   /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
   var as=Math.max(s, 0.42);

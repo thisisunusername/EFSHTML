@@ -73,10 +73,26 @@ var ACH = {
   knife_win:  {name:'以小博大',        desc:'用小刀解决过一个敌人后通关',    tier:'gold'},
   survivor:   {name:'命大',            desc:'被抓住一次之后仍然通关',        tier:'blue'},
   cctv_off:   {name:'保安之友',        desc:'关掉全楼监控并通关',            tier:'blue'},
-  all_gates:  {name:'开锁匠',          desc:'通关时同时拿到了工作牌和黑钥匙',tier:'gold'}
+  all_gates:  {name:'开锁匠',          desc:'通关时同时拿到了工作牌和黑钥匙',tier:'gold'},
+  phone_end:  {name:'打通了原作者的专线', desc:'用 7777777 在地下室拨通那通神秘电话（地狱限定）', tier:'rainbow'}
 };
 var ACH_ORDER = ['clear_any','clear_hard','clear_hell','car_any','car_hell',
-                 'no_alert','swift','knife_win','survivor','cctv_off','all_gates'];
+                 'no_alert','swift','knife_win','survivor','cctv_off','all_gates','phone_end'];
+/* 成就等级 → 颜色 */
+function achColor(tier){
+  if(tier==='gold') return '#fbbf24';
+  if(tier==='red') return '#f43f5e';
+  if(tier==='blue') return '#38bdf8';
+  if(tier==='rainbow') return '#ff5ec4';
+  return '#94a3b8';
+}
+function achTierName(tier){
+  if(tier==='gold') return '金';
+  if(tier==='red') return '红';
+  if(tier==='blue') return '蓝';
+  if(tier==='rainbow') return '炫彩';
+  return '—';
+}
 /* 成就在本地持久保存：localStorage + cookie 双写，刷新/重开都还在 */
 var ACH_KEY='efs_ach_v1';
 var ACH_OWNED = {};
@@ -125,7 +141,7 @@ function unlockAch(id){
   ACH_OWNED[id]=true;
   achSave();                 /* 立刻写入 localStorage + cookie */
   var t=ACH[id];
-  var col = t.tier==='gold'?'#fbbf24':(t.tier==='red'?'#f43f5e':'#38bdf8');
+  var col = achColor(t.tier);
   toast('🏆 成就解锁：'+t.name+'（'+t.desc+'）');
   showAchPopup(id, col);
   renderAchChip();
@@ -159,7 +175,7 @@ function openAchPage(){
   for(var i=0;i<ACH_ORDER.length;i++){
     var id=ACH_ORDER[i], a=ACH[id];
     var has=!!ACH_OWNED[id];
-    var col = a.tier==='gold'?'#fbbf24':(a.tier==='red'?'#f43f5e':'#38bdf8');
+    var col = achColor(a.tier);
     html+='<div class="achRow'+(has?' got':'')+'">'+
       '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
@@ -168,7 +184,7 @@ function openAchPage(){
         '<span class="achDesc">'+(has?a.desc:'尚未解锁')+'</span>'+
       '</div>'+
       '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
-        (a.tier==='gold'?'金':(a.tier==='red'?'红':'蓝'))+'</div>'+
+        achTierName(a.tier)+'</div>'+ 
     '</div>';
   }
   html+='</div>';
@@ -1058,10 +1074,49 @@ function askName(){
   var cur=readCookie(NAME_KEY)||'';
   var v=prompt('输入你的昵称（存在本机 cookie）', cur);
   if(v===null) return;
-  v=String(v).trim().slice(0,12);
+  v=String(v).trim();
+  /* DevTest 调试指令：输入后不保存成昵称 */
+  if(/^DevTest:/i.test(v)){
+    handleDevTest(v);
+    return;
+  }
+  v=v.slice(0,12);
   if(!v) return;
   writeCookie(NAME_KEY, v, 3650);
   toast('昵称已保存：'+v);
+}
+
+/* ================= DevTest 调试指令 =================
+   DevTest:BypassGMMenu=true|false    临时允许多用 GM 也给成就/记榜
+   DevTest:OpenTheGMMenu=true|false   直接打开/关闭 GM 菜单（不消耗连点次数）
+*/
+var DEV = { bypass:false, openGM:false };
+
+function handleDevTest(raw){
+  var txt=String(raw).trim();
+  var m=txt.match(/^DevTest:(BypassGMMenu|OpenTheGMMenu)\s*=\s*(true|false)$/i);
+  if(!m){
+    toast('DevTest 指令格式不对：DevTest:BypassGMMenu=true / DevTest:OpenTheGMMenu=true');
+    return;
+  }
+  var key=m[1].toLowerCase(), val=(m[2].toLowerCase()==='true');
+  if(key==='bypassgammenu' || key==='bypassgmmenu'){
+    DEV.bypass=val;
+    toast(val ? 'DevTest：已临时允许多用 GM 仍给成就与排行榜' : 'DevTest：已恢复 GM 限制');
+  } else if(key==='openthegmmenu'){
+    DEV.openGM=val;
+    if(val){
+      CHEAT.opened=true;          /* 允许这次打开 */
+      openCheatPanel();
+      toast('DevTest：GM 菜单已打开');
+    } else {
+      closeCheatPanel();
+      collapseCheat();
+      toast('DevTest：GM 菜单已关闭');
+    }
+  }
+  if(typeof updateCheatTag==='function') updateCheatTag();
+  if(typeof renderAchChip==='function') renderAchChip();
 }
 
 /* 把本机 cookie 里的成绩导出成 scores.json 下载下来 */
@@ -1295,8 +1350,11 @@ function closeCheatPanel(){
   collapseCheat();           /* 关闭 = 收成红色 GM 小球 */
 }
 
-/* 作弊是否拦截排行榜 */
-function cheatBlocksBoard(){ return CHEAT.noClip||CHEAT.god||CHEAT.fast||CHEAT.torchAll||CHEAT.banned; }
+/* 作弊是否拦截排行榜 / 成就（DevTest 可临时绕过） */
+function cheatBlocksBoard(){
+  if(typeof DEV!=='undefined' && DEV.bypass) return false;   /* DevTest 绕过 */
+  return CHEAT.noClip||CHEAT.god||CHEAT.fast||CHEAT.torchAll||CHEAT.banned;
+}
 
 /* 作弊开启时清空并锁住排行榜 */
 function cheatDisableBoard(){
@@ -1451,5 +1509,6 @@ function phoneFinish(){
   closePhone();
   PHONE.timer=0;
   S.hiddenEnding=true;
+  unlockAch('phone_end');       /* 隐藏结局专属炫彩成就 */
   ending(6);
 }

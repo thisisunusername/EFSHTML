@@ -278,3 +278,49 @@ function themeBind(){
     }
   });
 }
+
+/* ================= 地图调色板 =================
+   经典模式用原来那套深蓝灰；Material 模式下由同一个种子色派生，
+   保证地图和主菜单是同一套色相。
+   注意：物件（门/灯/监控）的颜色承载玩法语义，这里只改底子，
+   不动那些语义色，避免玩家看不懂哪扇门对应哪把钥匙。
+*/
+function themeMapColors(){
+  if(THEME.style !== 'material'){
+    return {
+      m3:false,
+      bg0:'#16222b', bg1:'#111a21', bg2:'#0b1216',
+      floorA:'#243139', floorB:'#202c34',
+      wallA:'#37505f', wallB:'#2e4553',
+      grid:'rgba(120,180,235,.13)', wallEdge:'rgba(150,200,240,.13)',
+      roomClass:'rgba(60,160,255,.11)', roomToilet:'rgba(80,220,180,.10)', roomOther:'rgba(120,160,220,.05)',
+      roomLabel:'rgba(200,225,255,.30)',
+      border:'rgba(90,170,235,.18)'
+    };
+  }
+  var seed = themeColorHex();
+  var h = themeHue(seed), s = themeSat(seed);
+  var ns = Math.min(s, 0.16);
+  var ha = h + 60;
+  function rgba(hex, a){
+    var c = themeHexToRgb(hex);
+    return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';
+  }
+  return {
+    m3:true,
+    bg0:themeTone(h, ns, 12, 1),
+    bg1:themeTone(h, ns, 8, 1),
+    bg2:themeTone(h, ns, 4, 1),
+    floorA:themeTone(ha, ns+0.05, 16, 1),
+    floorB:themeTone(ha, ns+0.05, 13, 1),
+    wallA:themeTone(h, Math.min(s,0.22), 30, 1),
+    wallB:themeTone(h, Math.min(s,0.22), 25, 1),
+    grid:rgba(themeTone(h, s, 70, 1), 0.10),
+    wallEdge:rgba(themeTone(h, s, 78, 1), 0.12),
+    roomClass:rgba(themeTone(h+200, 0.6, 70, 1), 0.10),
+    roomToilet:rgba(themeTone(h+140, 0.5, 70, 1), 0.09),
+    roomOther:rgba(themeTone(h, 0.4, 70, 1), 0.04),
+    roomLabel:rgba(themeTone(h, ns, 88, 1), 0.34),
+    border:rgba(themeTone(h, s, 70, 1), 0.18)
+  };
+}

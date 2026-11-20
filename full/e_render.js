@@ -26,16 +26,17 @@ function buildMapCache(f, px){
   c.width=w; c.height=h;
   var g = c.getContext('2d');
   var sx = w/f.w, sy = h/f.h;
+  var MC = themeMapColors();
 
 for(var y=0;y<f.h;y++){
      for(var x=0;x<f.w;x++){
        if(f.g[y][x]===1) continue;
-       g.fillStyle = ((x+y)%2===0) ? '#243139' : '#202c34';
+       g.fillStyle = ((x+y)%2===0) ? MC.floorA : MC.floorB;
        g.fillRect(x*sx, y*sy, sx+0.7, sy+0.7);
      }
    }
    /* 地面格线：把地砖一格一格分清楚（跳过一回合时按格计算才看得懂） */
-   g.strokeStyle='rgba(120,180,235,.13)';
+   g.strokeStyle=MC.grid;
    g.lineWidth=1;
    for(var gy=0;gy<=f.h;gy++){
      g.beginPath(); g.moveTo(0, Math.round(gy*sy)+.5); g.lineTo(w, Math.round(gy*sy)+.5); g.stroke();
@@ -45,17 +46,17 @@ for(var y=0;y<f.h;y++){
    }
   for(var i=0;i<f.rooms.length;i++){
     var r=f.rooms[i];
-    g.fillStyle = r.safe==='class' ? 'rgba(60,160,255,.11)'
-                 : r.safe==='toilet'? 'rgba(80,220,180,.10)'
-                 : 'rgba(120,160,220,.05)';
+    g.fillStyle = r.safe==='class' ? MC.roomClass
+                 : r.safe==='toilet'? MC.roomToilet
+                 : MC.roomOther;
     g.fillRect((r.x0-1)*sx,(r.y0-1)*sy,(r.x1-r.x0+2)*sx,(r.y1-r.y0+2)*sy);
   }
   for(var yy=0;yy<f.h;yy++){
     for(var xx=0;xx<f.w;xx++){
 if(f.g[yy][xx]!==1) continue;
-       g.fillStyle = ((xx+yy)%2===0) ? '#37505f' : '#2e4553';
+       g.fillStyle = ((xx+yy)%2===0) ? MC.wallA : MC.wallB;
        g.fillRect(xx*sx, yy*sy, sx+0.7, sy+0.7);
-       g.strokeStyle='rgba(150,200,240,.13)';
+       g.strokeStyle=MC.wallEdge;
       g.lineWidth=1;
       g.strokeRect(xx*sx+.5, yy*sy+.5, Math.max(1,sx-1), Math.max(1,sy-1));
     }
@@ -65,7 +66,7 @@ if(f.g[yy][xx]!==1) continue;
     var rm=f.rooms[k];
     var mx=(rm.x0+rm.x1)*0.5*sx, my=(rm.y0+rm.y1)*0.5*sy;
     g.font='600 '+Math.max(9,Math.min(13,sx*0.4))+'px -apple-system,"PingFang SC",sans-serif';
-    g.fillStyle='rgba(200,225,255,.30)';
+    g.fillStyle=MC.roomLabel;
     g.fillText(rm.name, mx, my);
   }
   mapCache.key=f.key+'|'+w+'|'+h;
@@ -127,17 +128,18 @@ function drawAll(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.clearRect(0,0,CW,CH);
   /* 画布外的底色：柔和的青灰，不再是死黑的洞 */
+  var MC=themeMapColors();
   var bg=ctx.createRadialGradient(CW*0.5, CH*0.42, 0, CW*0.5, CH*0.42, Math.max(CW,CH)*0.85);
-  bg.addColorStop(0,'#16222b');
-  bg.addColorStop(0.62,'#111a21');
-  bg.addColorStop(1,'#0b1216');
+  bg.addColorStop(0,MC.bg0);
+  bg.addColorStop(0.62,MC.bg1);
+  bg.addColorStop(1,MC.bg2);
   ctx.fillStyle=bg; ctx.fillRect(0,0,CW,CH);
 
   var f = computeView(); if(!f) return;
   camTarget();
 
   var mapW=f.w*scale, mapH=f.h*scale;
-  var need=f.key+'|'+Math.round(mapW)+'|'+Math.round(mapH);
+  var need=f.key+'|'+Math.round(mapW)+'|'+Math.round(mapH)+'|'+THEME.style+':'+THEME.color;
   if(mapCache.key!==need || !mapCache.cv) buildMapCache(f, scale);
 
   ctx.save();
@@ -152,7 +154,7 @@ function drawAll(){
   ctx.restore();
 
   /* 地图边界光框 */
-  ctx.strokeStyle='rgba(90,170,235,.18)'; ctx.lineWidth=1;
+  ctx.strokeStyle=MC.border; ctx.lineWidth=1;
   ctx.strokeRect(-camX, padTop-camY, mapW, mapH);
 
   /* 地下层视野遮罩 */
@@ -404,11 +406,20 @@ function drawOverlayHints(f){
   var txt='安全区 · 按 V 跳过一回合';
   var tw=ctx.measureText(txt).width;
   var bx=CW/2, by=padTop-13;
-  ctx.fillStyle='rgba(16,38,58,.94)';
-  ctx.strokeStyle='rgba(90,200,255,.35)'; ctx.lineWidth=1;
-  roundRect(bx-tw/2-9, by-10, tw+18, 20, 10);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#9fe6ff';
+  if(THEME.style==='material'){
+    var sd=themeColorHex(), sh=themeHue(sd), ss=themeSat(sd);
+    ctx.fillStyle=themeTone(sh, Math.min(ss,0.20), 22, 1);
+    ctx.strokeStyle=themeTone(sh, ss, 60, 1); ctx.lineWidth=1;
+    roundRect(bx-tw/2-9, by-10, tw+18, 20, 10);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle=themeTone(sh, Math.min(ss,0.30), 88, 1);
+  } else {
+    ctx.fillStyle='rgba(16,38,58,.94)';
+    ctx.strokeStyle='rgba(90,200,255,.35)'; ctx.lineWidth=1;
+    roundRect(bx-tw/2-9, by-10, tw+18, 20, 10);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#9fe6ff';
+  }
   ctx.fillText(txt, bx, by);
   ctx.restore();
 }

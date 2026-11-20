@@ -1,0 +1,1164 @@
+/* ================= 抓人规则常量 ================= */
+/* 规则：贴身（<CATCH_RANGE）立刻被抓；在任何敌人的视野范围内持续待满 SEE_LIMIT 秒也被抓 */
+var SEE_LIMIT = 3.0;
+var SAFE_SHIELD = 2.5;   /* 被抓送回后的无敌保护秒数 */
+
+/* ================= 状态 ================= */
+var S = {
+  mode:'menu',
+  diff:'normal',
+  floor:'1F',
+  px:4.5, py:3.5,
+  faceDir:'down',
+  walkPhase:0,
+  inv:{},
+
+  catches:0,
+  sw:{},
+  npcs:[],
+  msgT:0,
+  time:0,
+  stairLock:0,     /* 刚下楼的冷却，防止立刻触发对侧楼梯 */
+  tookFlag:false,
+  gogglesT:0,      /* 旧字段：保留兼容 */
+  shopPick:'',     /* 本局在小卖部选的东西（每局只能买一个） */
+  seeLimit:3.0,    /* 被发现所需的秒数（隐身针会把它变成 5 秒） */
+  useT:0,          /* 正在使用道具的剩余秒数（可乐/隐身针要 3 秒，期间不能动） */
+  useItem:'',      /* 正在使用的道具 id */
+  colaT:0,         /* 可乐加速剩余秒数（10 秒） */
+  stealthT:0,      /* 隐身针剩余秒数（30 秒，期间监控看不见） */
+  speedMul:1,      /* 移动速度倍率 */
+  stepT:0,         /* 当前一格移动的剩余时间（>0 表示正在滑动） */
+  stepLocked:false,/* 走完一格后锁定，必须松开按键才能再走 */
+  stepKey:'',      /* 触发这一步的按键 */
+  needEnemyTurn:false, /* 玩家走完一格 → 敌人该行动了 */
+  mode2:'turn',    /* 玩法模式：turn 回合制 / classic 摇杆+全地图 */
+  stepVel:0,
+  turnDone:false,
+  stepDur:0.14,    /* 一格移动的时长 */
+  stepFromX:0, stepFromY:0, stepToX:0, stepToY:0,
+  flashLike:false,  /* 是否已经拿了手电筒（只能在一个地下室用） */
+  flashFloor:'',    /* 手电筒绑定的那一个地下室楼层 */
+  flashOn:false,    /* 手电筒是否点亮 */
+  usedFlashPick:false, /* 手电筒是通过商店拿的（本局唯一） */
+  moving:false,    /* 本帧是否真的产生了位移（撞墙时为 false） */
+  eyeX:0, eyeY:0,  /* 眼睛偏移的平滑插值，避免朝向切换时抖动 */
+  bobCur:0,        /* 走路上下浮动的平滑插值 */
+  seeT:0,          /* 当前被某个敌人盯住的累计秒数（用于 HUD 警戒条） */
+  seenBy:'',       /* 正在盯着玩家的敌人名字 */
+  safeT:0,         /* 被抓送回后的短暂无敌保护（秒） */
+  camsOff:false,   /* 保安室的监控总闸是否已关 */
+  carBroken:false, /* 校长的车是否已被锤子砸烂（会发出巨大响声） */
+  elecOpen:false,  /* 电子门是否已通电打开（需要三个电闸） */
+  wallBroken:false,/* 电子门后的砖墙是否已被锤子砸开 */
+  lives:2,         /* 剩余命数（地狱模式只有 1 条） */
+  everSpotted:false,/* 本局是否曾经被发现过（成就用） */
+  knifeKills:0,    /* 用小刀解决掉的敌人数（成就用） */
+  _scale:30
+};
+
+/* ================= 成就（只存在内存里，重启/重开就没了） ================= */
+/* tier: gold 金 / red 红 / blue 蓝 */
+var ACH = {
+  clear_any:  {name:'逃出去了',        desc:'任意难度通关一次',              tier:'blue'},
+  clear_hard: {name:'硬骨头',          desc:'在困难难度通关',                tier:'gold'},
+  clear_hell: {name:'地狱归来',        desc:'在地狱难度通关',                tier:'red'},
+  car_any:    {name:'砸车的人',        desc:'砸烂校长的车',                  tier:'gold'},
+  car_hell:   {name:'地狱砸车',        desc:'在地狱难度砸烂校长的车',        tier:'red'},
+  no_alert:   {name:'隐身人',          desc:'一次都没有被发现就通关',        tier:'gold'},
+  swift:      {name:'闪电逃学',        desc:'3 分钟内通关',                  tier:'blue'},
+  knife_win:  {name:'以小博大',        desc:'用小刀解决过一个敌人后通关',    tier:'gold'},
+  survivor:   {name:'命大',            desc:'被抓住一次之后仍然通关',        tier:'blue'},
+  cctv_off:   {name:'保安之友',        desc:'关掉全楼监控并通关',            tier:'blue'},
+  all_gates:  {name:'开锁匠',          desc:'通关时同时拿到了工作牌和黑钥匙',tier:'gold'}
+};
+var ACH_ORDER = ['clear_any','clear_hard','clear_hell','car_any','car_hell',
+                 'no_alert','swift','knife_win','survivor','cctv_off','all_gates'];
+/* 成就在本地持久保存：localStorage + cookie 双写，刷新/重开都还在 */
+var ACH_KEY='efs_ach_v1';
+var ACH_OWNED = {};
+function achLoad(){
+  var raw=null;
+  try{ raw=localStorage.getItem(ACH_KEY); }catch(e){}
+  if(!raw){ raw=readCookie(ACH_KEY); }
+  if(raw){
+    try{
+      var arr=JSON.parse(raw);
+      for(var i=0;i<arr.length;i++){ if(ACH[arr[i]]) ACH_OWNED[arr[i]]=true; }
+    }catch(e){}
+  }
+  return ACH_OWNED;
+}
+function achSave(){
+  var arr=[];
+  for(var k in ACH_OWNED) if(ACH_OWNED[k] && ACH[k]) arr.push(k);
+  var raw=JSON.stringify(arr);
+  try{ localStorage.setItem(ACH_KEY, raw); }catch(e){}
+  writeCookie(ACH_KEY, raw, 3650);      /* 10 年 */
+}
+function readCookie(name){
+  var all='';
+  try{ all=document.cookie||''; }catch(e){ return null; }
+  if(!all) return null;
+  var m=all.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
+  return m? decodeURIComponent(m[1]) : null;
+}
+function writeCookie(name,val,days){
+  var d=new Date(); d.setTime(d.getTime()+days*86400000);
+  try{
+    document.cookie=name+'='+encodeURIComponent(val)+';expires='+d.toUTCString()+';path=/;SameSite=Lax';
+  }catch(e){}
+}
+
+function unlockAch(id){
+  if(!ACH[id] || ACH_OWNED[id]) return false;
+  ACH_OWNED[id]=true;
+  achSave();                 /* 立刻写入 localStorage + cookie */
+  var t=ACH[id];
+  var col = t.tier==='gold'?'#fbbf24':(t.tier==='red'?'#f43f5e':'#38bdf8');
+  toast('🏆 成就解锁：'+t.name+'（'+t.desc+'）');
+  showAchPopup(id, col);
+  renderAchChip();
+  return true;
+}
+function achCount(){
+  var n=0; for(var k in ACH_OWNED) if(ACH_OWNED[k]) n++;
+  return n;
+}
+function renderAchChip(){
+  var el=document.getElementById('achChip');
+  if(!el) return;
+  el.textContent='🏆 '+achCount()+'/'+ACH_ORDER.length;
+}
+/* 成就弹窗：跟 toast 不同，它会停 3 秒并高亮 */
+function showAchPopup(id, col){
+  var box=document.getElementById('achPop');
+  if(!box) return;
+  var t=ACH[id];
+  box.innerHTML='<span style="font-size:20px">🏆</span> <b style="color:'+col+'">'+t.name+'</b><br>'+
+    '<span style="font-size:11px;color:#b6c9dd">'+t.desc+'</span>';
+  box.style.borderColor=col;
+  box.style.opacity='1';
+  box.style.transform='translateY(0)';
+  clearTimeout(box._tm);
+  box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
+}
+/* 通关时统一结算成就 */
+function settleAch(endingN){
+  if(!(endingN>=2 && endingN<=5)) return;
+  if(!boardAllowed()) return;   /* 作弊：不给成就 */
+  var d=DIFF[S.diff]||DIFF.normal;
+  unlockAch('clear_any');
+  if(S.diff==='hard') unlockAch('clear_hard');
+  if(S.diff==='hell') unlockAch('clear_hell');
+  if(!S.everSpotted) unlockAch('no_alert');
+  if(S.time<=180) unlockAch('swift');
+  if(S.knifeKills>0) unlockAch('knife_win');
+  if(S.catches>0) unlockAch('survivor');
+  if(S.camsOff) unlockAch('cctv_off');
+  if(S.inv.flag && S.inv.blackkey) unlockAch('all_gates');
+}
+/* 砸车成就：砸的当下就给 */
+function settleCarAch(){
+  unlockAch('car_any');
+  if(S.diff==='hell') unlockAch('car_hell');
+}
+
+var input = {up:false,down:false,left:false,right:false};
+
+function toast(txt){
+  var el=document.getElementById('toast');
+  if(!el) return;
+  el.textContent=txt;
+  el.classList.add('show');
+  S.msgT=1.9;
+}
+
+function updateHUD(){
+  var f=fl();
+  var fe=document.getElementById('floorName');
+  if(fe) fe.textContent = f? f.name : '';
+  var cn=document.getElementById('catchN'); if(cn) cn.textContent=S.catches;
+  var ln=document.getElementById('lifeN'); if(ln) ln.textContent=(S.lives>0?S.lives:0);
+  var lc=document.getElementById('lifeChip');
+  if(lc) lc.style.color = (S.lives<=1)? '#ff8095':'';
+  var mc=document.getElementById('modeChip');
+  if(mc) mc.textContent = (S.mode2==='classic') ? '经典' : '回合';
+  renderAchChip();
+
+  var swN=0; for(var k in S.sw) if(S.sw[k]) swN++;
+  var chip=document.getElementById('swChip');
+  if(chip) chip.style.display = (swN>0 || S.inv.hammer) ? '' : 'none';
+  var sn=document.getElementById('swN'); if(sn) sn.textContent=swN;
+
+  var row=document.getElementById('invRow'), html='';
+  if(row){
+    for(var i=0;i<INV_ORDER.length;i++){
+      var id=INV_ORDER[i];
+      if(!S.inv[id]) continue;
+      var usable = (id==='cola'||id==='stealth'||id==='torch');
+      html += '<div class="chip'+(usable?' use':'')+'" data-use="'+id+'"'+
+        ' style="border-color:'+ITEM[id].color+'66'+(usable?';cursor:pointer':'')+'">'+
+        ITEM[id].icon+' '+ITEM[id].name+(usable?' ·点':'')+'</div>';
+    }
+    row.innerHTML = html;
+    var chips=row.querySelectorAll('.chip.use');
+    for(var c=0;c<chips.length;c++){
+      (function(el){
+        var id=el.getAttribute('data-use');
+        el.onclick=function(){ startUse(id); };
+        el.addEventListener('touchstart',function(ev){ ev.preventDefault(); startUse(id); },{passive:false});
+      })(chips[c]);
+    }
+  }
+  var ht=document.getElementById('hintText');
+  if(ht) ht.textContent = hintFor();
+  updateSeeHUD();
+}
+
+/* 被发现进度条：只要有人看着你，就把 3 秒倒计时显示出来 */
+function updateSeeHUD(){
+  var wrap=document.getElementById('seeWrap');
+  var bar=document.getElementById('seeBar');
+  var txt=document.getElementById('seeTxt');
+  if(!wrap) return;
+  var lim = (typeof S.seeLimit==="number"? S.seeLimit : SEE_LIMIT);
+  var pct = Math.max(0, Math.min(1, (S.seeT||0)/lim));
+  if(pct>0.001){ wrap.classList.add('on'); } else { wrap.classList.remove('on'); }
+  if(bar) bar.style.width = Math.round(pct*100)+'%';
+  if(txt && pct>0.001){
+    txt.textContent = (S.seenBy?('⚠ '+S.seenBy+' 盯着你 '):'⚠ 被发现 ')
+      + Math.max(0,lim-S.seeT).toFixed(1) + 's';
+  }
+}
+
+function hintFor(){
+  var f=fl(); if(!f) return '';
+  var r=roomAt(f,S.px,S.py);
+  if(r && r.safe) return '当前在 '+r.name+'（安全区）· 按 V 跳过一回合';
+  var o=nearObj(1.15);
+  if(o){
+    if(o.t==='shop')   return '按 E 打开小卖部';
+    if(o.t==='craft')  return '按 E 使用制作台';
+    if(o.t==='stairs') return '按 E 前往 '+W[o.to].name;
+    if(o.t==='stairWin')return '走近这里就能逃出去';
+    if(o.t==='gate')   return '按 E 尝试打开'+o.label;
+    if(o.t==='tree')   return '按 E 砍树（需要锯子 + 小刀）';
+    if(o.t==='switch') return '按 E 拉闸';
+    if(o.t==='cctv')   return '按 E 拉下监控总闸（全楼监控停摆）';
+    if(o.t==='car')    return S.inv.hammer?'按 E 用锤子砸校长的车':'校长的车（需要锤子，砸了会掉木头）';
+    if(o.t==='camera') return '这是监控，别在它视野里停留';
+    if(o.t==='item')   return '按 E 拾取 '+ITEM[o.id].name;
+  }
+  if(S.useT>0) return '正在用 '+ITEM[S.useItem].name+'…别动';
+  if(S.inv.knife && nearestNpc(1.4)) return '按 E 用小刀捅他（25% 概率）';
+  return 'WASD / 方向键移动，别被老师看见';
+}
+
+function roomAt(f,x,y){
+  if(!f) return null;
+  for(var i=0;i<f.rooms.length;i++){
+    var r=f.rooms[i];
+    if(x>=r.x0-0.5 && x<=r.x1+1.5 && y>=r.y0-0.5 && y<=r.y1+1.5) return r;
+  }
+  return null;
+}
+
+/* 返回距离玩家最近、且在半径内的对象 */
+function nearObj(rad){
+  var f=fl(); if(!f) return null;
+  var best=null, bd=1e9;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    var d=Math.sqrt(Math.pow(o.x-S.px,2)+Math.pow(o.y-S.py,2));
+    if(d<=rad && d<bd){ bd=d; best=o; }
+  }
+  return best;
+}
+
+/* ================= 初始化 ================= */
+function startGame(diff){
+  buildWorld();
+  S.diff=diff||S.diff;
+  S.mode='play';
+  S.floor='2F';
+  S.px=4.5; S.py=3.5;          /* 教室中央（二层教室层） */
+  S.faceDir='down'; S.walkPhase=0;
+  S.inv={}; S.catches=0; S.sw={};
+  S.msgT=0; S.time=0; S.stairLock=0; S.tookFlag=false; S.gogglesT=0;
+  S.shopPick=''; S.seeLimit=(DIFF[S.diff]||DIFF.normal).see; S.speedMul=1;
+  S.lives=(DIFF[S.diff]||DIFF.normal).lives; S.everSpotted=false; S.knifeKills=0;
+  S.useT=0; S.useItem=''; S.colaT=0; S.stealthT=0;
+  S.stepT=0; S.stepDur=0.14;
+  S.stepLocked=false; S.stepKey=''; S.needEnemyTurn=false; S.turnDone=false;
+  S.flashLike=false; S.flashFloor=''; S.flashOn=false; S.usedFlashPick=false;
+  S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
+  S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
+  S.seeT=0; S.seenBy=''; S.safeT=0;
+  S.npcs=spawnNpcs(S.diff);
+  S._noCam=true;
+  for(var k in input) input[k]=false;
+
+  var ss=document.getElementById('startScr'); if(ss) ss.classList.add('hidden');
+  var es=document.getElementById('endScr');   if(es) es.classList.add('hidden');
+  hidePanel();
+  if(typeof refreshPadMode==='function') refreshPadMode();
+  updateHUD();
+  toast('任务：找一条路逃出学校');
+}
+
+/* 找同层最近的敌人 */
+function nearestNpc(rad){
+  var best=null, bd=rad;
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.floor!==S.floor) continue;
+    var d=Math.sqrt(Math.pow(n.x-S.px,2)+Math.pow(n.y-S.py,2));
+    if(d<bd){ bd=d; best=n; }
+  }
+  return best;
+}
+/* ================= 跨楼层巡逻：NPC 会自己上下楼 ================= */
+/* 思路：
+   1) 每个 NPC 记一个 n.plan（他打算去哪个楼层）。plan 与当前楼层不同时，
+      就按 FLOOR_CHAIN 的层级顺序，选择「往目标方向走的那一段楼梯」作为下一站，
+      走到楼梯格再换层。这样上下楼是有目的的，不会来回乱跳。
+   2) 每层楼梯都有 to/tx/ty，换层后坐标直接落在对侧楼梯口。
+   3) 难度越高，NPC 换楼的欲望越强（rollPlan 的间隔与概率）。
+*/
+/* 该楼层通往「更上」或「更下」的楼梯 */
+function stairToward(fl, targetIdx){
+  var f=W[fl]; if(!f) return null;
+  var cur=chainIdx(fl);
+  var best=null, bestScore=-99;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t!=='stairs') continue;
+    var ti=chainIdx(o.to);
+    if(ti<0) continue;
+    /* 是否朝目标方向：按「离目标更近」打分 */
+    var score = Math.abs(ti-targetIdx)-Math.abs(cur-targetIdx);   /* <0 表示更靠近目标 */
+    score = -score;
+    if(ti===cur) continue;
+    if(score>bestScore){ bestScore=score; best=o; }
+  }
+  return best;
+}
+
+/* 给 NPC 挑下一个想去的楼层 */
+function rollPlan(n){
+  var cur=chainIdx(n.floor);
+  var lo=0, hi=FLOOR_CHAIN.length-1;
+  var d=DIFF[S.diff] || DIFF.normal;
+  /* 难度越高，越爱跨层（1F/2F 是玩家主要活动层，更容易被盯上） */
+  var span = d.roam || 2;
+  var pick=cur+(Math.random()<0.5?-1:1)*Math.ceil(Math.random()*span);
+  pick=clampi(pick, lo, hi);
+  if(pick===cur) pick=clampi(cur+(Math.random()<0.5?-1:1), lo, hi);
+  n.plan=FLOOR_CHAIN[pick];
+  n.planT = (d.replan || 9) + Math.random()*6;
+}
+
+function sameFloorObj(f,x,y,t){
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t===t && Math.abs(o.x-x)<0.6 && Math.abs(o.y-y)<0.6) return o;
+  }
+  return null;
+}
+function spawnNpcs(diff){
+  var d=DIFF[diff] || DIFF.normal;
+  var out=[];
+  /* 班主任：从二层教室层出发，复活点在老师办公室 */
+  out.push({
+    kind:'teacher', name:'班主任', floor:'2F',
+    home:{x:11.5, y:2.5},
+    sight:d.sight, cone:0.66, speed:d.tspeed
+  });
+  /* 副班主任：从一层小卖部层出发，复活点在二层老师办公室 */
+  out.push({
+    kind:'teacher', name:'副班主任', floor:'1F',
+    home:{x:3.5, y:13.5},
+    sight:d.sight, cone:0.66, speed:d.tspeed
+  });
+  /* 保安从各层楼梯口开始巡逻 */
+  var gset=[
+    {floor:'1F', home:{x:3.5,y:13.5}},
+    {floor:'B1', home:{x:2.5,y:8.5}},
+    {floor:'B2', home:{x:2.5,y:8.5}}
+  ];
+  for(var i=0;i<d.guards;i++){
+    var gs=gset[i%gset.length];
+    out.push({
+      kind:'guard', name:'保安'+(i+1), floor:gs.floor,
+      home:{x:gs.home.x, y:gs.home.y},
+      sight:d.sight+0.6, cone:0.58, speed:d.gspeed
+    });
+  }
+
+  for(var j=0;j<out.length;j++){
+    var n=out[j];
+    n.x=n.home.x; n.y=n.home.y;
+    n.dir=Math.PI/2;
+    n.state='patrol';
+    n.ri=0; n.path=null; n.pathT=0;
+    n.flash=0; n.alertT=0; n.stuckT=0; n.lastX=n.x; n.lastY=n.y;
+    n.plan=n.floor; n.planT=4+Math.random()*8;   /* 想去的楼层 + 换计划的倒计时 */
+    n.idleT=0; n.stairGo=null;                     /* 正在赶往的楼梯 */
+    n.offFloor=true;                               /* 是否在后台层（非玩家所在层） */
+  }
+  return out;
+}/* ================= 玩家移动 ================= */
+function canStand(f,x,y){
+  if(!f) return false;
+  var r=0.20;                      /* 碰撞箱从 0.30 缩到 0.20，窄门才过得去 */
+  if(isWall(f,x-r,y-r)) return false;
+  if(isWall(f,x+r,y-r)) return false;
+  if(isWall(f,x-r,y+r)) return false;
+  if(isWall(f,x+r,y+r)) return false;
+  return true;
+}
+
+function movePlayer(dt){
+  var f=fl(); if(!f) return;
+
+  /* 正在喝可乐 / 打隐身针：3 秒内不能移动 */
+  if(S.useT>0){ S.moving=false; return; }
+
+  /* ============ 经典模式：摇杆/按键连续移动，敌人也连续行动 ============ */
+  if(S.mode2==='classic'){
+    var cmx=0,cmy=0;
+    if(input.left)  cmx-=1;
+    if(input.right) cmx+=1;
+    if(input.up)    cmy-=1;
+    if(input.down)  cmy+=1;
+    if(cmx===0&&cmy===0){ S.moving=false; return; }
+    var clen=Math.sqrt(cmx*cmx+cmy*cmy);
+    cmx/=clen; cmy/=clen;
+    var csp=PLAYER_SPEED*(S.speedMul||1)*(CHEAT.fast?2:1)*dt;
+    var cox=S.px, coy=S.py;
+    var cnx=S.px+cmx*csp;
+    if(CHEAT.noClip){ S.px=cnx; } else if(canStand(f,cnx,S.py)) S.px=cnx;
+    var cny=S.py+cmy*csp;
+    if(CHEAT.noClip){ S.py=cny; } else if(canStand(f,S.px,cny)) S.py=cny;
+    var cdx=S.px-cox, cdy=S.py-coy;
+    S.moving=(Math.abs(cdx)+Math.abs(cdy))>0.0005;
+    S.faceDir = cmy>0?'down':(cmy<0?'up':(cmx>0?'right':'left'));
+    if(S.moving) S.walkPhase += csp*3.4;
+    return;
+  }
+
+  /* ============ 回合制：按一下走一格，必须松开才能再走 ============ */
+
+  /* ---------- 按格移动（一次一格，必须松开按键才能再走） ----------
+     按一下方向 → 校验目标格 → 平滑滑过去 → 停住。
+     按住不放不会连续走，必须松开再按。 */
+  if(S.stepT>0){
+    /* 正在滑向目标格 */
+    S.stepT-=dt;
+    var k=1-Math.max(0,S.stepT)/S.stepDur;      /* 0→1 进度 */
+    if(k>1) k=1;
+    S.px=S.stepFromX+(S.stepToX-S.stepFromX)*k;
+    S.py=S.stepFromY+(S.stepToY-S.stepFromY)*k;
+    S.moving=true;
+    S.walkPhase += dt*10;
+    if(S.stepT<=0){
+      S.px=S.stepToX; S.py=S.stepToY;
+      S.stepT=0;
+    }
+    return;
+  }
+
+  var mx=0,my=0;
+  if(input.left)  mx-=1;
+  else if(input.right) mx+=1;
+  else if(input.up)    my-=1;
+  else if(input.down)  my+=1;
+
+  /* 上次走完一格后，必须松开那个方向的键才能再走 */
+  if(S.stepLocked){
+    if(mx===0 && my===0){
+      S.stepLocked=false;      /* 所有方向键都松开了 → 解锁 */
+    } else {
+      S.moving=false;          /* 还按着，不许走 */
+      return;
+    }
+  }
+
+  if(mx===0&&my===0){ S.moving=false; return; }
+
+  S.faceDir = my>0?'down':(my<0?'up':(mx>0?'right':'left'));
+
+  /* 当前所在的格子（角色站在格子中心） */
+  var cx=Math.floor(S.px), cy=Math.floor(S.py);
+  var tx=cx+mx, ty=cy+my;
+  var targetX=tx+0.5, targetY=ty+0.5;
+
+  var canGo = CHEAT.noClip ? true : canStand(f, targetX, targetY);
+  if(!canGo){ S.moving=false; return; }
+
+  /* 记录这一步是哪个按键触发的，松开后才能再走 */
+  S.stepKey = (mx!==0 ? (mx>0?'right':'left') : (my>0?'down':'up'));
+
+  /* 开始一格移动 */
+  S.stepFromX=S.px;  S.stepFromY=S.py;
+  S.stepToX=targetX; S.stepToY=targetY;
+  S.stepDur=0.14/((S.speedMul||1)*(CHEAT.fast?2:1));   /* 可乐 / 作弊加速 */
+  if(S.stepDur<0.06) S.stepDur=0.06;
+  S.stepT=S.stepDur;
+  S.moving=true;
+  S.stepLocked=true;                     /* 必须松开按键才能走下一格 */
+  S.turnDone=true;                       /* 这一步结束 → 轮到敌人行动一回合 */
+  S.needEnemyTurn=true;
+}
+
+/* ================= 回合推进 =================
+   回合制：玩家每走一格算一回合，走完立刻轮到敌人动一次。
+   敌人每回合推进一个固定小步长（ENEMY_TURN），而不是跟着帧率连续跑。
+*/
+var ENEMY_TURN = 0.5;      /* 一回合里敌人推进的等效秒数 */
+
+function runEnemyTurn(){
+  if(S.mode!=='play') return;
+  S.needEnemyTurn=false;
+  /* 敌人移动一回合（被抓判定由主循环每帧处理） */
+  updateNpcs(ENEMY_TURN);
+  if(S.mode!=='play') return;
+  updateSeeHUD();
+}
+
+/* ================= NPC ================= */
+function npcSees(n){
+  if(n.floor!==S.floor) return false;
+  if(S.gogglesT>0) return false;   /* 护目镜：暂时不被发现 */
+  var f=W[n.floor];
+  if(!f) return false;
+  var dx=S.px-n.x, dy=S.py-n.y;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist>n.sight) return false;
+  if(dist<0.9) return true;                 /* 贴身必被发现 */
+  var ang=Math.atan2(dy,dx);
+  if(angDiff(ang,n.dir) > n.cone) return false;   /* 不在视野锥内 */
+  return losClear(f,n.x,n.y,S.px,S.py);
+}
+
+function angDiff(a,b){
+  var d=a-b;
+  while(d>Math.PI) d-=Math.PI*2;
+  while(d<-Math.PI) d+=Math.PI*2;
+  return Math.abs(d);
+}
+
+function setPath(n,f,tx,ty){
+  n.path=findPath(f,n.x,n.y,tx,ty);
+  n.pathT=0;
+}
+
+function moveNpc(n,dt){
+  var f=W[n.floor];
+  if(!f || !n.path || n.path.length===0) return;
+  var t=n.path[0];
+  var gx=t.x+0.5, gy=t.y+0.5;
+  var dx=gx-n.x, dy=gy-n.y;
+  var d=Math.sqrt(dx*dx+dy*dy);
+  if(d<0.07){ n.path.shift(); return; }
+  var sp=n.speed*dt;
+  if(sp>d) sp=d;
+  n.x+=dx/d*sp;
+  n.y+=dy/d*sp;
+  n.dir=Math.atan2(dy,dx);
+}
+
+function updateNpcs(dt){
+  var d=DIFF[S.diff] || DIFF.normal;
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.flash>0) n.flash-=dt;
+    if(n.alertT>0) n.alertT-=dt;
+    if(n.stuckT>0) n.stuckT-=dt;
+
+    var onPlayerFloor = (n.floor===S.floor);
+    var f=W[n.floor];
+
+    /* ---------- 1) 换层计划倒计时：到时间就重新想一个楼层 ---------- */
+    if(n.planT===undefined){ n.plan=n.floor; n.planT=6+Math.random()*6; }
+    n.planT-=dt;
+    if(n.planT<=0 && n.state!=='chase') rollPlan(n);
+
+    /* ---------- 2) 老师在教室看到玩家 → 自己回办公室（不跨层追击） ---------- */
+    if(onPlayerFloor && n.kind==='teacher' && n.alertT<=0 && npcSees(n)){
+      var r=roomAt(fl(),S.px,S.py);
+      if(r && r.safe==='class'){
+        n.alertT=1.2;
+        n.floor='2F'; n.x=n.home.x; n.y=n.home.y;
+        n.path=null; n.state='patrol'; n.ri=0; n.plan='2F'; n.planT=8;
+        toast('老师看到你在教室，自己回办公室去了');
+        continue;
+      }
+    }
+
+    /* ---------- 3) 当前层：追 / 巡逻 ---------- */
+    if(onPlayerFloor){
+      if(n.state==='chase' || npcSees(n)){
+        n.state='chase';
+        setPath(n, f, S.px, S.py);
+        if(!n.path || !n.path.length) n.state='patrol';
+      } else n.state='patrol';
+    } else {
+      n.state='patrol';        /* 后台层只巡逻，不追 */
+    }
+
+    /* ---------- 4) 决定这一帧往哪走 ---------- */
+    var goal=null;
+    if(n.state==='chase'){
+      moveNpc(n,dt);
+      /* 追的时候也可能顺手跨层（玩家刚下楼）——由 plan 逻辑接管，这里不处理 */
+    } else {
+      /* 想去别的楼层：先走到对应楼梯 */
+      var curIdx=chainIdx(n.floor), wantIdx=chainIdx(n.plan);
+      if(wantIdx<0) wantIdx=curIdx;
+      if(n.stairCd>0) n.stairCd-=dt;
+      if(n.stairCd>0){ n.stairGo=null; }        /* 冷却期内不碰楼梯 */
+      else if(n.plan!==n.floor && curIdx>=0 && wantIdx!==curIdx){
+        var st=stairToward(n.floor, wantIdx);
+        if(st){
+          n.stairGo=st;
+          goal={x:st.x, y:st.y};
+        }
+      }
+      /* 已经站在楼梯格上：直接换层 */
+      if(n.stairGo){
+        var dxs=Math.abs(n.x-n.stairGo.x), dys=Math.abs(n.y-n.stairGo.y);
+        if(dxs<0.45 && dys<0.45){
+          var stg=n.stairGo;
+          n.floor=stg.to;
+          n.x=stg.tx; n.y=stg.ty;
+          n.path=null; n.pathT=0; n.stuckT=0;
+          n.lastX=n.x; n.lastY=n.y;
+          n.stairGo=null;
+          n.ri=0; n.idleT=0;
+          /* 换层后强制冷却一段时间，避免刚上来又原路返回 / 蹲在楼梯口来回传 */
+          n.stairCd=2.5+Math.random()*2.0;
+          n.plan=n.floor;
+          n.planT=(d.replan||9)+Math.random()*6;
+          continue;
+        }
+      }
+      /* 没有跨层目标就用当前层的巡逻路线 */
+      if(!goal){
+        var route=patrolOf(n.floor);
+        if(route && route.length){
+          var wp=route[n.ri % route.length];
+          var dd=Math.sqrt(Math.pow(wp.x-n.x,2)+Math.pow(wp.y-n.y,2));
+          if(dd<0.75){ n.ri=(n.ri+1)%route.length; wp=route[n.ri]; }
+          goal={x:wp.x, y:wp.y};
+        }
+      }
+      if(goal){
+        n.pathT-=dt;
+        if(!n.path || !n.path.length || n.pathT<=0){
+          setPath(n, W[n.floor], goal.x, goal.y);
+          n.pathT=1.0;
+          if(!n.path || !n.path.length) n.idleT+=dt;
+        }
+      } else {
+        n.idleT+=dt;
+      }
+      moveNpc(n,dt);
+    }
+
+    /* ---------- 5) 卡住检测 ---------- */
+    if(n.stuckT<=0){
+      var moved=Math.abs(n.x-n.lastX)+Math.abs(n.y-n.lastY);
+      if(moved<0.02){
+        n.path=null; n.stairGo=null;
+        if(patrolOf(n.floor)) n.ri=(n.ri+1)%patrolOf(n.floor).length;
+        /* 后台层卡住太久 → 强制换个楼层，别原地打转 */
+        if(n.floor!==S.floor && n.idleT>1.2){ rollPlan(n); n.idleT=0; }
+      }
+      n.lastX=n.x; n.lastY=n.y;
+      n.stuckT=0.7;
+    }
+  }
+}
+/* 规则说明见文件顶部 SEE_LIMIT */
+function checkCatch(dt){
+  if(S.mode!=='play') return;
+  if(CHEAT.god){ S.seeT=0; S.seenBy=''; return; }   /* 作弊：无视伤害 */
+  dt = dt || 0;
+
+  /* 刚被送回来的短暂保护，避免同一个敌人立刻再抓一次 */
+  if(S.safeT>0) S.safeT = Math.max(0, S.safeT-dt);
+
+  /* 1) 贴身必抓 */
+  for(var i=0;i<S.npcs.length;i++){
+    var n=S.npcs[i];
+    if(n.floor!==S.floor) continue;
+    var d=Math.sqrt(Math.pow(n.x-S.px,2)+Math.pow(n.y-S.py,2));
+    if(d<CATCH_RANGE){ if(S.safeT>0) continue; caughtBy(n); return; }
+  }
+
+  if(S.safeT>0){ S.seeT=0; return; }
+
+  /* 2) 被任何敌人看到就累计计时，满 3 秒被抓 */
+  var watcher=null, watchers=0;
+  for(var j=0;j<S.npcs.length;j++){
+    var m=S.npcs[j];
+    if(m.floor!==S.floor) continue;
+    if(npcSees(m)){ watchers++; if(!watcher) watcher=m; }
+  }
+  /* 2b) 监控也算「被看见」：站在有监控的路上，同样会累计 */
+  if(watchers===0){
+    var cam=camerasWatcher();
+    if(cam){ watchers=1; watcher={name:cam.label||'监控'}; }
+  }
+  if(watchers>0){
+    S.seenBy = watcher ? watcher.name : '';
+    S.everSpotted = true;
+    /* 地狱：被看见的第一眼就死（seeLimit 为 0.001） */
+    S.seeT += dt;
+    var lim=(typeof S.seeLimit==="number"? S.seeLimit : SEE_LIMIT);
+    if(S.seeT>=lim){ caughtBy(watcher || {name:'老师',home:{x:S.px,y:S.py}}); return; }
+  } else {
+    S.seeT = Math.max(0, S.seeT - dt*2.0);   /* 脱离视野后快速回落 */
+    if(S.seeT<=0) S.seenBy='';
+  }
+}
+
+function caughtBy(n){
+  S.catches++;
+  if(n && n.home && typeof n.x==='number'){
+    n.x=n.home.x; n.y=n.home.y; n.path=null; n.state='patrol'; n.ri=0;
+  }
+  /* 地狱模式下把抓到玩家的那名敌人就是"看见就死"的凶手 */
+  S.seeT=0; S.seenBy='';
+  S.lives--;                        /* 命数递减：地狱只有 1 命，碰到就结束 */
+  var maxLives=(DIFF[S.diff]||DIFF.normal).lives;
+  if(S.catches>=maxLives || S.lives<=0){
+    /* 结局一：命用完了，清空所有道具再结算 */
+    S.inv={};
+    updateHUD();
+    ending(1);
+    return;
+  }
+  /* 丢了东西：所有道具全部丢失，电闸状态也复位 */
+  var lost = [];
+  for(var id in S.inv){ if(S.inv[id]) lost.push(ITEM[id]?ITEM[id].name:id); }
+  S.inv = {};
+  S.sw = {};
+  S.tookFlag = false;
+  S.gogglesT = 0;
+  /* 手电筒也一起失效（道具全丢，得重新拿） */
+  S.flashLike = false; S.flashFloor = ''; S.flashOn = false;
+  /* 世界也要复位：砸过的车、开过的门、关掉的监控都回到初始状态 */
+  S.carBroken = false;
+  S.camsOff = false;
+  S.elecOpen = false;
+  S.wallBroken = false;
+  S.doorOpen = false;
+  /* 道具丢失后要能重新拿到：重建世界，把已被拾取/锯过的东西放回原位 */
+  buildWorld();
+  S.npcs = spawnNpcs(S.diff);
+
+  /* 送回教室（学生复活点＝原位） */
+  S.floor='2F'; S.px=4.5; S.py=3.5; S.stairLock=0.8; S._noCam=true;
+  S.safeT = SAFE_SHIELD;          /* 保护期，不要在教室被立刻再抓 */
+  S.moving=false; S.bobCur=0;
+  S.eyeX=0; S.eyeY=0;
+  for(var i=0;i<S.npcs.length;i++){
+    var t=S.npcs[i];
+    if(t.kind==='teacher'){ t.x=t.home.x; t.y=t.home.y; t.path=null; t.state='patrol'; t.ri=0; }
+  }
+  toast('被'+n.name+'抓住！'+(lost.length?('丢失：'+lost.join('、')+'。'):'')+'已送回教室（命 '+(S.lives>0?S.lives:0)+'/'+((DIFF[S.diff]||DIFF.normal).lives)+'）');
+  updateHUD();
+}
+
+/* ================= 跳回合 ================= */
+function skipTurn(){
+  if(S.mode!=='play') return;
+  var r=roomAt(fl(),S.px,S.py);
+  if(!r || !r.safe){ toast('只有在教室或厕所才能跳过回合'); return; }
+  /* 跳过回合 = 玩家原地不动，让敌人多走一个回合 */
+  S.needEnemyTurn=false;
+  updateNpcs(S.mode2==='classic' ? ENEMY_TURN*2 : ENEMY_TURN);
+  if(S.mode!=='play') return;
+  checkCatch(ENEMY_TURN);
+  if(S.mode!=='play') return;
+  updateSeeHUD();
+  toast('跳过一回合，老师 / 保安移动了');
+}
+
+/* ================= 楼层 ================= */
+function goFloor(to,tx,ty){
+  if(!W[to]) return;
+  S.floor=to;
+  /* 对齐到格子中心，保证按格移动时不会卡在半格上 */
+  S.px=Math.floor(tx)+0.5; S.py=Math.floor(ty)+0.5;
+  S.stepT=0;
+  S.stairLock=1.0;      /* 1 秒内不触发楼梯，避免来回传送 */
+  S._noCam=true;
+  updateHUD();
+  toast('来到 '+W[to].name);
+}
+
+function stairCheck(){
+  /* 只负责「走到另一段楼梯即胜利」；普通楼梯改由按 E 显式触发，
+     避免玩家一踩到楼梯就被自动传送、来回弹跳 */
+  if(S.stairLock>0){ S.stairLock -= 1/60; return; }
+  var f=fl(); if(!f) return;
+  for(var i=0;i<f.objs.length;i++){
+    var o=f.objs[i];
+    if(o.t!=='stairWin') continue;
+    var dx=Math.abs(o.x-S.px), dy=Math.abs(o.y-S.py);
+    if(dx<0.6 && dy<0.6){ ending(5); return; }
+  }
+}
+/* 兼容旧函数名 */
+/* ================= 监控（玩家动，不动的摄像头会转过来） ================= */
+/* 监控规则：在监控的视野锥内持续待满 SEE_LIMIT 秒 → 被抓（算作被抓一次）。
+   监控范围比人眼小，但视野宽；保安室里的「监控总闸」可以关掉全部监控。 */
+function cameraSees(cam){
+  if(S.camsOff) return false;
+  if(S.stealthT>0) return false;      /* 隐身针：监控看不见你 */
+  var dx=S.px-cam.x, dy=S.py-cam.y;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist>cam.range) return false;
+  var ang=Math.atan2(dy,dx);
+  if(angDiff(ang, cam.dir) > (cam.cone||0.5)) return false;
+  return losClear(fl(), cam.x, cam.y, S.px, S.py);
+}
+function camerasWatcher(){
+  if(S.camsOff) return null;
+  var f=fl(); if(!f) return null;
+  for(var i=0;i<f.objs.length;i++){
+    var c=f.objs[i];
+    if(c.t!=='camera') continue;
+    if(cameraSees(c)) return c;
+  }
+  return null;
+}
+/* 监控会缓慢转向玩家（跟踪），这样"有监控的路"确实有压力 */
+/* 监控是静态的：不转、不扫，直接把整个区域照住 */
+function updateCameras(dt){
+  /* 什么都不做：监控方向固定，靠 cameraSees 的锥形范围覆盖一片区域 */
+  return;
+}
+
+/* ================= 排行榜（只存本地 cookie） =================
+   没有数据库、没有服务器：成绩存在玩家自己的 cookie 里。
+   换设备/清 cookie 就没了，但完全离线可用、无需联网。
+*/
+var LB_KEY='efs_board_v1';
+var NAME_KEY='efs_name';
+
+function boardLoad(){
+  var raw=readCookie(LB_KEY);
+  if(!raw) return [];
+  try{
+    var a=JSON.parse(decodeURIComponent(raw));
+    if(a && a.length) return a.map(function(r){
+      return {name:r[0], diff:r[1], time:r[2], ending:r[3], catches:r[4], ach:r[5]};
+    });
+  }catch(e){}
+  return [];
+}
+function boardSave(list){
+  /* 压缩存储，避免 cookie 超过 4KB */
+  var arr=list.slice(0,15).map(function(r){
+    return [r.name, r.diff, r.time, r.ending, r.catches, r.ach||0];
+  });
+  writeCookie(LB_KEY, JSON.stringify(arr), 3650);
+}
+/* 记录一次通关成绩 */
+function reportClear(endingN){
+  if(!(endingN>=2 && endingN<=5)) return;
+  if(!boardAllowed()){ cheatDisableBoard(); return; }   /* 作弊：不记录成绩 */
+  var list=boardLoad();
+  var name=readCookie(NAME_KEY)||'无名同学';
+  var rec={name:name, diff:S.diff, time:Math.round(S.time*100)/100,
+           ending:endingN, catches:S.catches, ach:achCount()};
+  /* 同一难度只保留最好（用时最短）的一条 */
+  var hit=false;
+  for(var i=0;i<list.length;i++){
+    if(list[i].diff===rec.diff){
+      hit=true;
+      if(rec.time<list[i].time) list[i]=rec;
+    }
+  }
+  if(!hit) list.push(rec);
+  list.sort(function(a,b){ return a.time-b.time; });
+  boardSave(list);
+}
+function boardBest(){ return boardLoad().slice(0,20); }
+
+/* 排行榜面板 */
+function openBoard(){
+  showPanel('排行榜（本机记录）', renderBoardHtml());
+}
+function renderBoardHtml(){
+  var list=boardBest();
+  var head='<div style="font-size:11.5px;line-height:1.8;color:#8ea6c2;margin-bottom:6px">'+
+    '成绩只存在这台设备的 cookie 里，不上传服务器。</div>';
+  if(!list.length){
+    return head+'<div style="font-size:12px;color:#8ea6c2;line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
+  }
+  var html=head+'<div style="font-size:11.5px;line-height:1.95">';
+  for(var i=0;i<list.length;i++){
+    var r=list[i];
+    var dn=DIFF[r.diff]?DIFF[r.diff].name:r.diff;
+    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(120,160,220,.12)">'
+      +'<b style="width:22px;color:#8fd0ff">'+(i+1)+'</b>'
+      +'<span style="flex:1">'+(r.name||'无名')+'</span>'
+      +'<span style="color:#8ea6c2">'+dn+'</span>'
+      +'<span style="color:#fbbf24">'+(Number(r.time)||0).toFixed(2)+'s</span>'
+      +'</div>';
+  }
+  return html+'</div>';
+}
+
+/* 玩家昵称：存 cookie，改一次一直有效 */
+function askName(){
+  var cur=readCookie(NAME_KEY)||'';
+  var v=prompt('输入你的昵称（存在本机 cookie）', cur);
+  if(v===null) return;
+  v=String(v).trim().slice(0,12);
+  if(!v) return;
+  writeCookie(NAME_KEY, v, 3650);
+  toast('昵称已保存：'+v);
+}
+
+/* 把本机 cookie 里的成绩导出成 scores.json 下载下来 */
+function exportScores(){
+  var data={
+    game:'Escape From the School on HTML',
+    exportedAt:new Date().toISOString(),
+    player:readCookie(NAME_KEY)||'无名同学',
+    achievements:(function(){
+      var a=[]; for(var k in ACH_OWNED) if(ACH_OWNED[k]) a.push(k); return a;
+    })(),
+    scores:boardLoad()
+  };
+  var txt=JSON.stringify(data,null,2);
+  try{
+    var blob=new Blob([txt],{type:'application/json;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='scores.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },400);
+    toast('已导出 scores.json');
+  }catch(e){
+    toast('导出失败：'+e.message);
+  }
+}
+/* ================= 作弊菜单 =================
+   触发：连点标题「Escape From the School on HTML」7 次。
+   规则：本局开启作弊 → 立刻关闭排行榜、不记录成绩、不给成就。
+   每次进入页面只能开一次，重进页面要重新触发。
+*/
+var CHEAT = {
+  opened:false,      /* 本次页面是否已经触发过（只限一次） */
+  on:false,          /* 作弊是否生效 */
+  noClip:false,      /* 穿墙 */
+  god:false,         /* 无视伤害 */
+  fast:false,        /* 加速移动 */
+  torchAll:false,    /* 全局手电 */
+  tapCount:0,
+  tapTimer:null
+};
+
+/* 可单独开关的道具清单 */
+var CHEAT_ITEMS = ['flag','redkey','yellowkey','saw','hammer','wood','knife','blueprint','blackkey','torch','stealth','cola'];
+
+function cheatTap(){
+  if(CHEAT.opened){ toast('本页面已经触发过作弊了，刷新后再试'); return; }
+  CHEAT.tapCount++;
+  if(CHEAT.tapTimer) clearTimeout(CHEAT.tapTimer);
+  CHEAT.tapTimer=setTimeout(function(){ CHEAT.tapCount=0; }, 1200);
+  if(CHEAT.tapCount>=7){
+    CHEAT.tapCount=0;
+    CHEAT.opened=true;
+    openCheatPanel();
+  }
+}
+
+function openCheatPanel(){
+  var box=document.getElementById('cheatPanel');
+  var ball=document.getElementById('gmBall');
+  if(!box) return;
+  box.classList.remove('hidden');
+  if(ball) ball.classList.add('hidden');     /* 展开时收起小球 */
+  cheatRenderBox();
+}
+
+/* 收成小球：面板隐藏，红色 GM 球出现 */
+function collapseCheat(){
+  var box=document.getElementById('cheatPanel');
+  var ball=document.getElementById('gmBall');
+  if(box) box.classList.add('hidden');
+  if(ball) ball.classList.remove('hidden');
+}
+
+/* 点小球重新展开 */
+function toggleCheatPanel(){
+  var box=document.getElementById('cheatPanel');
+  if(!box) return;
+  if(box.classList.contains('hidden')) openCheatPanel();
+  else collapseCheat();
+}
+
+/* 单个道具开关：给一件就给一件，取消就收回 */
+/* 一键拉闸：三个电闸全拉下 + 直接打开电子门 */
+function cheatAllGates(){
+  S.sw = {sw1:true, sw2:true, sw3:true};
+  S.elecOpen = true;
+  /* 打通电子门那一格（如果在本层） */
+  var f=W['B1'];
+  if(f){
+    for(var i=0;i<f.objs.length;i++){
+      var o=f.objs[i];
+      if(o.t==='gate' && o.kind==='elec'){ openGateTile(f, o); break; }
+    }
+  }
+  updateHUD();
+  cheatDisableBoard();
+  toast('三个电闸已全部拉下，电子门通了');
+  cheatRenderBox();
+}
+
+function cheatToggle(key){
+  CHEAT[key]=!CHEAT[key];
+  if(key==='noClip'||key==='god'||key==='fast'||key==='torchAll') CHEAT.on=(CHEAT.noClip||CHEAT.god||CHEAT.fast||CHEAT.torchAll);
+  if(cheatBlocksBoard()) cheatDisableBoard();   /* 一开作弊就锁排行榜 */
+  updateCheatTag();
+  cheatRenderBox();
+}
+
+function cheatItem(id){
+  if(!S.inv) S.inv={};
+  if(S.inv[id]){
+    S.inv[id]=false;
+    if(id==='torch'){ S.flashLike=false; }
+    toast('收回：'+ITEM[id].name);
+  } else {
+    S.inv[id]=true;
+    if(id==='flag') S.tookFlag=true;
+    if(id==='torch'){ S.flashLike=true; S.flashFloor=''; S.flashOn=false; }
+    toast('给予：'+ITEM[id].name);
+  }
+  cheatDisableBoard();      /* 用过作弊道具同样锁排行榜 */
+  updateHUD();
+  cheatRenderBox();
+}
+
+function cheatRenderBox(){
+  var body=document.getElementById('cheatBody');
+  if(!body) return;
+
+  function sw(key,label,on,desc){
+    return '<div class="crow"><div><b>'+label+'</b><br>'+
+      '<span class="cdesc">'+desc+'</span></div>'+
+      '<button data-ck="'+key+'" class="'+(on?'on':'')+'">'+(on?'已开':'关闭')+'</button></div>';
+  }
+
+  var html='<div class="csec">功能</div>';
+  html+=sw('noClip','穿墙',CHEAT.noClip,'无视墙壁，直接走过去');
+  html+=sw('god','无视伤害',CHEAT.god,'老师 / 保安 / 监控都抓不到你');
+  html+=sw('fast','加速移动',CHEAT.fast,'移动速度 ×2（可乐可叠加）');
+  html+=sw('torchAll','全局手电',CHEAT.torchAll,'所有地下层都亮，随时可用');
+  html+='<div class="crow"><div><b>一键拉闸</b><br>'+
+    '<span class="cdesc">三个电闸一次全部拉下、打开电子门</span></div>'+
+    '<button data-ca="gates">全部拉闸</button></div>';
+
+  html+='<div class="csec">道具（逐个开关）</div>';
+  for(var i=0;i<CHEAT_ITEMS.length;i++){
+    var id=CHEAT_ITEMS[i];
+    var has=!!(S.inv && S.inv[id]);
+    html+='<div class="crow"><div>'+ITEM[id].icon+' <b>'+ITEM[id].name+'</b></div>'+
+      '<button data-ci="'+id+'" class="'+(has?'on':'')+'">'+(has?'已给':'给予')+'</button></div>';
+  }
+
+  html+='<div class="cwarn">⚠ 开启作弊会关闭排行榜：成绩和成就都不记录。<br>本页面只能触发一次，刷新后需重新连点标题。</div>';
+  body.innerHTML=html;
+
+  var bs=body.querySelectorAll('button');
+  for(var k=0;k<bs.length;k++){
+    (function(b){
+      b.onclick=function(){
+        var ck=b.getAttribute('data-ck');
+        var ci=b.getAttribute('data-ci');
+        var ca=b.getAttribute('data-ca');
+        if(ca==='gates') cheatAllGates();
+        else if(ck) cheatToggle(ck);
+        else if(ci) cheatItem(ci);
+      };
+    })(bs[k]);
+  }
+}
+
+/* 按玩法模式切换操作控件：回合制=四键，经典=圆形摇杆 */
+function refreshPadMode(){
+  var classic=(S.mode2==='classic');
+  var sw=document.getElementById('stickWrap');
+  var btns=document.getElementById('dpadBtns');
+  if(sw) sw.classList[classic?'add':'remove']('on');
+  if(btns) btns.style.display = classic ? 'none' : '';
+}
+
+function updateCheatTag(){
+  var t=document.getElementById('cheatTag');
+  if(!t) return;
+  var any=CHEAT.noClip||CHEAT.god;
+  if(any){ t.style.display=''; t.textContent='CHEAT'; }
+  else t.style.display='none';
+}
+
+function closeCheatPanel(){
+  collapseCheat();           /* 关闭 = 收成红色 GM 小球 */
+}
+
+/* 作弊是否拦截排行榜 */
+function cheatBlocksBoard(){ return CHEAT.noClip||CHEAT.god; }
+
+/* 作弊开启时清空并锁住排行榜 */
+function cheatDisableBoard(){
+  writeCookie(LB_KEY, '[]', 1);
+  writeCookie('efs_noboard','1', 1);
+}
+function boardAllowed(){
+  return !cheatBlocksBoard() && readCookie('efs_noboard')!=='1';
+}
+
+/* 面板拖动 */
+function makeDraggable(el, handle){
+  var sx=0, sy=0, ox=0, oy=0, dragging=false;
+  function down(e){
+    /* 按在按钮上时不拖动，否则按钮点不动 */
+    var tgt=e.target||e.srcElement;
+    if(tgt && tgt.tagName==='BUTTON') return;
+    var t=e.touches? e.touches[0] : e;
+    dragging=true;
+    sx=t.clientX; sy=t.clientY;
+    var r=el.getBoundingClientRect();
+    ox=r.left; oy=r.top;
+    el.style.left=ox+'px'; el.style.top=oy+'px';
+    el.style.transform='none';
+    el.style.margin='0';
+    e.preventDefault();
+  }
+  function move(e){
+    if(!dragging) return;
+    var t=e.touches? e.touches[0] : e;
+    el.style.left=(ox+t.clientX-sx)+'px';
+    el.style.top =(oy+t.clientY-sy)+'px';
+    e.preventDefault();
+  }
+  function up(){ dragging=false; }
+  handle.addEventListener('mousedown',down);
+  handle.addEventListener('touchstart',down,{passive:false});
+  document.addEventListener('mousemove',move);
+  document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('mouseup',up);
+  document.addEventListener('touchend',up);
+  document.addEventListener('touchcancel',up);
+}

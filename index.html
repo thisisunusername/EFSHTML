@@ -123,6 +123,18 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
   background:rgba(244,63,94,.16);border:1px solid rgba(244,63,94,.45);color:#ffc2cc}
 .crow button.on{background:rgba(34,197,94,.22);border-color:rgba(34,197,94,.6);color:#9df5b8}
 .cwarn{margin-top:10px;font-size:10.5px;line-height:1.7;color:#ff9aa8}
+#stickWrap{position:absolute;left:14px;bottom:14px;width:140px;height:140px;pointer-events:auto;
+  touch-action:none;user-select:none;display:none;z-index:9}
+#stickWrap.on{display:block}
+#stickBase2{position:absolute;inset:0;border-radius:50%;background:rgba(26,38,56,.82);
+  border:1px solid rgba(120,170,235,.38);box-shadow:inset 0 0 22px rgba(0,0,0,.45)}
+#stickBase2:after{content:'';position:absolute;left:50%;top:50%;width:104px;height:104px;
+  margin:-52px 0 0 -52px;border-radius:50%;border:1px dashed rgba(140,190,240,.2)}
+#stickKnob2{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;
+  border-radius:50%;background:radial-gradient(circle at 38% 32%,#7cc0ff,#2f66a8);
+  border:1px solid rgba(170,215,255,.65);box-shadow:0 3px 12px rgba(0,0,0,.5);
+  transition:transform .06s ease-out}
+
 #gmBall{position:absolute;right:12px;bottom:96px;width:52px;height:52px;border-radius:50%;
   z-index:68;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(circle at 36% 30%,#ff6274,#c81f36 62%,#8d0f22);
@@ -168,10 +180,11 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 
   <div id="pad">
     <div id="dpad">
-      <div class="btn up"    data-dir="up">▲</div>
+      <div id="stickWrap"><div id="stickBase2"><div id="stickKnob2"></div></div></div>
+      <div id="dpadBtns"><div class="btn up" data-dir="up">▲</div>
       <div class="btn left"  data-dir="left">◀</div>
       <div class="btn right" data-dir="right">▶</div>
-      <div class="btn down"  data-dir="down">▼</div>
+      <div class="btn down"  data-dir="down">▼</div></div>
     </div>
     <div id="actions">
       <div class="abtn" id="btnE"><span>✋</span>行动</div>
@@ -869,6 +882,7 @@ function startGame(diff){
   var ss=document.getElementById('startScr'); if(ss) ss.classList.add('hidden');
   var es=document.getElementById('endScr');   if(es) es.classList.add('hidden');
   hidePanel();
+  if(typeof refreshPadMode==='function') refreshPadMode();
   updateHUD();
   toast('任务：找一条路逃出学校');
 }
@@ -1635,6 +1649,15 @@ function cheatRenderBox(){
   }
 }
 
+/* 按玩法模式切换操作控件：回合制=四键，经典=圆形摇杆 */
+function refreshPadMode(){
+  var classic=(S.mode2==='classic');
+  var sw=document.getElementById('stickWrap');
+  var btns=document.getElementById('dpadBtns');
+  if(sw) sw.classList[classic?'add':'remove']('on');
+  if(btns) btns.style.display = classic ? 'none' : '';
+}
+
 function updateCheatTag(){
   var t=document.getElementById('cheatTag');
   if(!t) return;
@@ -2038,6 +2061,62 @@ function bindInput(){
     })(btns[i]);
   }
 
+  /* 圆形摇杆（经典模式）：按住拖动，按方向给 input */
+  var swrap=document.getElementById('stickWrap');
+  var sbase=document.getElementById('stickBase2');
+  var sknob=document.getElementById('stickKnob2');
+  var sid=null, scenter=null;
+  function sCenter(){
+    if(!sbase || !sbase.getBoundingClientRect) return {x:0,y:0,rad:70};
+    var r=sbase.getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2, rad:r.width/2};
+  }
+  function sMove(cx,cy){
+    var c=scenter||sCenter();
+    var dx=cx-c.x, dy=cy-c.y;
+    var d=Math.sqrt(dx*dx+dy*dy);
+    var maxR=(c.rad||70)*0.8;
+    if(d>maxR && d>0){ dx=dx/d*maxR; dy=dy/d*maxR; d=maxR; }
+    if(sknob) sknob.style.transform='translate('+dx+'px,'+dy+'px)';
+    var dead=(c.rad||70)*0.18;
+    if(d<dead){ input.up=input.down=input.left=input.right=false; return; }
+    var nx=dx/maxR, ny=dy/maxR;
+    input.right = nx> 0.32;
+    input.left  = nx<-0.32;
+    input.down  = ny> 0.32;
+    input.up    = ny<-0.32;
+  }
+  function sEnd(){
+    sid=null; scenter=null;
+    input.up=input.down=input.left=input.right=false;
+    if(sknob) sknob.style.transform='translate(0,0)';
+  }
+  if(swrap && sbase){
+    sbase.addEventListener('touchstart',function(ev){
+      ev.preventDefault();
+      var t=ev.changedTouches[0]; if(!t) return;
+      sid=t.identifier; scenter=sCenter();
+      sMove(t.clientX,t.clientY);
+    },{passive:false});
+    sbase.addEventListener('touchmove',function(ev){
+      ev.preventDefault();
+      for(var k2=0;k2<ev.changedTouches.length;k2++){
+        var t=ev.changedTouches[k2];
+        if(t.identifier===sid){ sMove(t.clientX,t.clientY); break; }
+      }
+    },{passive:false});
+    sbase.addEventListener('touchend',function(ev){ ev.preventDefault(); sEnd(); },{passive:false});
+    sbase.addEventListener('touchcancel',function(ev){ ev.preventDefault(); sEnd(); },{passive:false});
+    sbase.addEventListener('mousedown',function(ev){
+      ev.preventDefault(); scenter=sCenter();
+      sMove(ev.clientX,ev.clientY);
+      var mv=function(e){ sMove(e.clientX,e.clientY); };
+      var up=function(){ sEnd(); document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+  }
+  if(typeof refreshPadMode==='function') refreshPadMode();
+
   var bE=document.getElementById('btnE');
   bE.addEventListener('touchstart',function(e){ e.preventDefault(); bE.classList.add('on'); interact(); },{passive:false});
   bE.addEventListener('touchend',function(e){ e.preventDefault(); bE.classList.remove('on'); },{passive:false});
@@ -2069,6 +2148,7 @@ function bindInput(){
         for(var k=0;k<ms.length;k++) ms[k].classList.remove('on');
         d.classList.add('on');
         S.mode2=d.getAttribute('data-mode');
+        if(typeof refreshPadMode==='function') refreshPadMode();
       });
     })(ms[q]);
   }
@@ -2275,13 +2355,8 @@ function computeView(){
 
   /* 视口大约显示 18 格：回合制下要能看清敌人的走位 */
   var tiles = 18;
-  /* 经典模式 = 全地图可见：按整张地图大小算缩放 */
-  if(S.mode2==='classic'){
-    scale = Math.min(CW/(f.w+2), viewH/(f.h+2));
-    scale = Math.max(8, Math.min(scale, 34));
-    S._scale = scale;
-    return f;
-  }
+  /* 经典模式：格子保持看得清（13 格视野），相机跟随玩家 */
+  if(S.mode2==='classic'){ tiles = 13; }
   scale = Math.min(CW/tiles, viewH/tiles);
   scale = Math.max(12, Math.min(scale, 34));
   S._scale = scale;

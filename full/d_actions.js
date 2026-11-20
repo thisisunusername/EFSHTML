@@ -317,15 +317,33 @@ function bindInput(){
   /* DevTest 终端：输入框内的按键不传给游戏 */
   var dtInp=document.getElementById('devTermInput');
   if(dtInp){
-    /* 移动端：body 的 touch-action:none 会拦掉点击，这里手动聚焦唤键盘 */
+    /* 移动端：body 的 touch-action:none 会拦掉点击，这里手动聚焦唤键盘。
+       注意：绝不能在触摸事件里 preventDefault，否则会连带阻断浏览器的默认聚焦。 */
     var dtRow=document.getElementById('devTermRow');
     function dtFocus(ev){
-      if(ev && ev.target===dtInp) return;
-      if(ev && ev.preventDefault) ev.preventDefault();
-      try{ dtInp.focus(); dtInp.click(); }catch(err){}
+      if(ev && ev.target===dtInp) return;   /* 点到输入框本身就让浏览器自己处理 */
+      setTimeout(function(){ try{ dtInp.focus(); }catch(err){} }, 0);
     }
-    if(dtRow){ dtRow.addEventListener('touchstart',dtFocus,{passive:false}); dtRow.addEventListener('click',dtFocus); }
-    dtInp.addEventListener('touchstart',function(e){ e.stopPropagation(); },{passive:true});
+    if(dtRow){ dtRow.addEventListener('click',dtFocus); }
+    /* 软键盘弹出时把面板抬到可视区之上，否则面板被键盘遮住 = 看起来“打不了字” */
+    var dtEl=document.getElementById('devTerm');
+    function dtFit(){
+      if(!dtEl) return;
+      var vv=window.visualViewport;
+      var off=0;
+      if(vv) off=Math.max(0, (window.innerHeight||0) - (vv.height + vv.offsetTop));
+      dtEl.style.bottom=off>60? ('calc('+off+'px + env(safe-area-inset-bottom,0px))') : '0px';
+    }
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize',dtFit);
+      window.visualViewport.addEventListener('scroll',dtFit);
+    }
+    window.addEventListener('resize',dtFit);
+    if(dtInp){
+      dtInp.addEventListener('focus',function(){ setTimeout(dtFit,120); });
+      dtInp.addEventListener('blur',function(){ setTimeout(dtFit,120); });
+      dtInp.addEventListener('click',function(){ dtFit(); });
+    }
     dtInp.addEventListener('keydown',function(e){
       e.stopPropagation();
       if(e.key==='Enter'){

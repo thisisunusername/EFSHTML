@@ -107,8 +107,13 @@ function readCookie(name){
   return m? decodeURIComponent(m[1]) : null;
 }
 function writeCookie(name,val,days){
-  var d=new Date(); d.setTime(d.getTime()+days*86400000);
   try{
+    if(days===0){
+      /* 删除 cookie：过期时间设到过去 */
+      document.cookie=name+'=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+      return;
+    }
+    var d=new Date(); d.setTime(d.getTime()+days*86400000);
     document.cookie=name+'='+encodeURIComponent(val)+';expires='+d.toUTCString()+';path=/;SameSite=Lax';
   }catch(e){}
 }
@@ -308,6 +313,10 @@ function startGame(diff){
   S.stepLocked=false; S.stepKey=''; S.needEnemyTurn=false; S.turnDone=false;
   S.turnBusy=false; S.enemyAnimT=0; S.enemyFrom=null;
   S.flashLike=false; S.flashFloor=''; S.flashOn=false; S.usedFlashPick=false;
+  /* 新开一局：作弊状态重置（作弊只在本局生效，重开需要重新连点标题） */
+  CHEAT.noClip=false; CHEAT.god=false; CHEAT.fast=false; CHEAT.torchAll=false; CHEAT.on=false; CHEAT.banned=false;
+  writeCookie('efs_noboard','',0);
+  if(typeof updateCheatTag==='function') updateCheatTag();
   S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
   S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
   S.seeT=0; S.seenBy=''; S.safeT=0;
@@ -1035,6 +1044,7 @@ var CHEAT = {
   god:false,         /* 无视伤害 */
   fast:false,        /* 加速移动 */
   torchAll:false,    /* 全局手电 */
+  banned:false,      /* 本局用过作弊（跳楼/拉闸/给道具）→ 不记成绩 */
   tapCount:0,
   tapTimer:null
 };
@@ -1080,6 +1090,32 @@ function toggleCheatPanel(){
 }
 
 /* 单个道具开关：给一件就给一件，取消就收回 */
+/* 一键跳楼层：直接传送到指定楼层的坐标（优先用楼梯落点） */
+function cheatTeleport(floorKey){
+  if(!W[floorKey]) return;
+  var dest=null;
+  /* 优先复用这一层楼梯的自然落点，保证落在可站立的位置 */
+  for(var f2 in W){
+    var objs=W[f2].objs;
+    for(var i=0;i<objs.length;i++){
+      if(objs[i].t==='stairs' && objs[i].to===floorKey){
+        dest={x:objs[i].tx, y:objs[i].ty};
+        break;
+      }
+    }
+    if(dest) break;
+  }
+  if(!dest){
+    /* 找不到就从巡逻点里挑一个 */
+    var pt=patrolOf(floorKey);
+    dest = (pt && pt.length) ? {x:pt[0].x, y:pt[0].y} : {x:2.5, y:2.5};
+  }
+  goFloor(floorKey, dest.x, dest.y);
+  cheatDisableBoard();               /* 用过作弊跳楼 → 本局不记成绩 */
+  toast('已传送到 '+W[floorKey].name);
+  cheatRenderBox();
+}
+
 /* 一键拉闸：三个电闸全拉下 + 直接打开电子门 */
 function cheatAllGates(){
   S.sw = {sw1:true, sw2:true, sw3:true};
@@ -1142,6 +1178,17 @@ function cheatRenderBox(){
     '<span class="cdesc">三个电闸一次全部拉下、打开电子门</span></div>'+
     '<button data-ca="gates">全部拉闸</button></div>';
 
+  /* 一键跳楼层 */
+  html+='<div class="csec">一键跳楼层</div>';
+  html+='<div class="ctele">';
+  for(var fi=0;fi<FLOOR_CHAIN.length;fi++){
+    var fk=FLOOR_CHAIN[fi];
+    var cur=(S.floor===fk);
+    html+='<button data-cf="'+fk+'" class="'+(cur?'on':'')+'">'+
+      (W[fk]? W[fk].name.split('（')[0] : fk)+'</button>';
+  }
+  html+='</div>';
+
   html+='<div class="csec">道具（逐个开关）</div>';
   for(var i=0;i<CHEAT_ITEMS.length;i++){
     var id=CHEAT_ITEMS[i];
@@ -1160,7 +1207,9 @@ function cheatRenderBox(){
         var ck=b.getAttribute('data-ck');
         var ci=b.getAttribute('data-ci');
         var ca=b.getAttribute('data-ca');
-        if(ca==='gates') cheatAllGates();
+        var cf=b.getAttribute('data-cf');
+        if(cf) cheatTeleport(cf);
+        else if(ca==='gates') cheatAllGates();
         else if(ck) cheatToggle(ck);
         else if(ci) cheatItem(ci);
       };
@@ -1190,15 +1239,16 @@ function closeCheatPanel(){
 }
 
 /* 作弊是否拦截排行榜 */
-function cheatBlocksBoard(){ return CHEAT.noClip||CHEAT.god; }
+function cheatBlocksBoard(){ return CHEAT.noClip||CHEAT.god||CHEAT.fast||CHEAT.torchAll||CHEAT.banned; }
 
 /* 作弊开启时清空并锁住排行榜 */
 function cheatDisableBoard(){
+  CHEAT.banned=true;                 /* 本局作废（跳楼 / 拉闸 / 给道具都算） */
   writeCookie(LB_KEY, '[]', 1);
   writeCookie('efs_noboard','1', 1);
 }
 function boardAllowed(){
-  return !cheatBlocksBoard() && readCookie('efs_noboard')!=='1';
+  return !cheatBlocksBoard();
 }
 
 /* 面板拖动 */

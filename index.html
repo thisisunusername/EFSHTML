@@ -4622,6 +4622,7 @@ function customRenderUI(){
   html+='<button data-cp="light">浅色</button>';
   html+='<button data-cp="green">终端绿</button>';
   html+='<button data-cp="sunset">暖橙</button>';
+  html+='<button data-cp="cyber">赛博紫</button>';
   html+='</div></div>';
   html+='<div class="custRow">'+
     '<button id="custCopy">复制配置</button>'+
@@ -4637,7 +4638,8 @@ var CUSTOM_PRESETS = {
   dark:   { bg:'#0e1519', card:'#131c26', text:'#e8eef7', title:'#ffffff', sub:'#8ea6c2', accent:'#5b8def', line:'#2a3a4d', btn:'#1e2c42', btnText:'#dceaff' },
   light:  { bg:'#f2f4f8', card:'#ffffff', text:'#1b2430', title:'#0c1219', sub:'#5b6b7f', accent:'#2f6fe0', line:'#d3dae6', btn:'#e4eaf4', btnText:'#1b2430' },
   green:  { bg:'#04140a', card:'#071f10', text:'#5eff8f', title:'#a8ffc4', sub:'#3fb865', accent:'#5eff8f', line:'#1f7a3f', btn:'#0a2114', btnText:'#5eff8f' },
-  sunset: { bg:'#1a0f0a', card:'#241509', text:'#ffe8d6', title:'#ffd7a8', sub:'#c9a184', accent:'#ff8a3d', line:'#5a3520', btn:'#331d0f', btnText:'#ffd7a8' }
+  sunset: { bg:'#1a0f0a', card:'#241509', text:'#ffe8d6', title:'#ffd7a8', sub:'#c9a184', accent:'#ff8a3d', line:'#5a3520', btn:'#331d0f', btnText:'#ffd7a8' },
+  cyber:  { bg:'#0d0118', card:'#160a28', text:'#e0ccff', title:'#f0e0ff', sub:'#a088cc', accent:'#bf5af7', line:'#3d1a6b', btn:'#220a3d', btnText:'#e0ccff' }
 };
 function customPreset(name){
   var p=CUSTOM_PRESETS[name];

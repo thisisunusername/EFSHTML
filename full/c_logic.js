@@ -1215,6 +1215,25 @@ function askName(){
 */
 
 /* ---------- DevTest 终端 ---------- */
+var DEV_ROOT_PW = 'TerminalPassword';
+function devPromptText(){
+  return (typeof DEV!=='undefined' && DEV && DEV.root) ? 'root@efs:~#' : 'user@efs:~$';
+}
+function devUpdatePrompt(){
+  var el=document.getElementById('devTermPrompt');
+  if(!el) return;
+  var rt=!!(typeof DEV!=='undefined' && DEV && DEV.root);
+  el.textContent = rt ? 'root@efs:~#' : 'user@efs:~$';
+  el.style.color = rt ? '#ffd75e' : '#5eff8f';
+}
+function devSetMask(on){
+  var inp=document.getElementById('devTermInput');
+  if(!inp) return;
+  inp.type = on ? 'password' : 'text';
+  inp.value='';
+  inp.setAttribute('autocomplete', on ? 'new-password' : 'off');
+  inp.setAttribute('placeholder', on ? 'sudo 密码' : '输入 help 查看指令');
+}
 function devIsTerminalStyle(){
   return !!(typeof THEME!=='undefined' && THEME && THEME.style==='terminal');
 }
@@ -1241,12 +1260,16 @@ function devTermOpen(){
     t.setAttribute('data-welcomed','1');
     devTermLog('E.F.S  DevTest Terminal  [仅为终端风格]','tl-ok');
     devTermLog('输入 help 查看指令，close 关闭终端。');
+    devUpdatePrompt();
+    devTermLog('当前权限：user —— 输入 sudo -i 提权后才能用完整指令。','tl-err');
   }
   return true;
 }
 function devTermClose(){
   var t=document.getElementById('devTerm');
   if(t) t.classList.add('hidden');
+  DEV.root=false; DEV.sudoAsk=false; DEV.sudoFail=0;
+  devSetMask(false); devUpdatePrompt();
 }
 function devTermToggle(){
   var t=document.getElementById('devTerm');
@@ -1257,7 +1280,8 @@ function devTermToggle(){
 function devTermSubmit(raw){
   var v=String(raw||'').trim();
   if(!v) return;
-  devTermLog('> '+v,'tl-in');
+  if(DEV.sudoAsk) devTermLog('> ********','tl-in');
+  else devTermLog('> '+v,'tl-in');
   var r=devRunCommand(v);
   if(r===false) devTermLog('未知指令。输入 help 查看。','tl-err');
 }
@@ -1265,8 +1289,28 @@ function devRunCommand(v){
   var parts=v.split(/\s+/);
   var cmd=(parts[0]||'').toLowerCase();
   var a1=(parts[1]||'').toLowerCase();
+  /* ---- sudo 密码输入态 ---- */
+  if(DEV.sudoAsk){
+    DEV.sudoAsk=false; devSetMask(false);
+    if(v===DEV_ROOT_PW){
+      DEV.root=true; DEV.sudoFail=0; devUpdatePrompt();
+      devTermLog('root 权限已获取，完整指令集已解锁。','tl-ok');
+    } else {
+      DEV.sudoFail++;
+      if(DEV.sudoFail>=3){ devTermClose(); devTermLog('sudo: 3 次密码错误，终端已关闭。','tl-err'); return true; }
+      devTermLog('sudo: 密码错误（'+DEV.sudoFail+'/3）','tl-err');
+    }
+    return true;
+  }
 
   if(cmd==='help' || cmd==='?'){
+    if(!DEV.root){
+      devTermLog('当前权限：user（受限）','tl-err');
+      devTermLog('可用：help / clear / close / exit / sudo -i');
+      devTermLog('提权：sudo -i → 输入密码 → 解锁完整指令集');
+      return true;
+    }
+    devTermLog('当前权限：root','tl-ok');
     devTermLog('可用指令：','tl-ok');
     devTermLog('  help                    显示本列表');
     devTermLog('  close / exit            关闭终端');
@@ -1290,6 +1334,17 @@ function devRunCommand(v){
   }
   if(cmd==='close' || cmd==='exit'){ devTermClose(); return true; }
   if(cmd==='clear'){ var b=document.getElementById('devTermLog'); if(b) b.innerHTML=''; return true; }
+  if(cmd==='sudo'){
+    if(DEV.root){ devTermLog('已在 root 权限下。','tl-ok'); return true; }
+    DEV.sudoAsk=true; devSetMask(true);
+    devTermLog('[sudo] password for user: ','tl-err');
+    return true;
+  }
+  /* ---- 权限闸门：以下指令必须 root ---- */
+  if(!DEV.root){
+    devTermLog('权限不足：「'+cmd+'」需要 root。执行 sudo -i 提权。','tl-err');
+    return true;
+  }
 
   /* ---- 带参数 / 无参数指令（先于 on|off 分支处理） ---- */
   if(cmd==='tp'){
@@ -1391,7 +1446,7 @@ function devRunCommand(v){
   return false;
 }
 
-var DEV = { bypass:false, openGM:false, achPanel:false };
+var DEV = { bypass:false, openGM:false, achPanel:false, freeze:false, root:false, sudoAsk:false, sudoFail:0 };
 
 function handleDevTest(raw){
   var txt=String(raw).trim();

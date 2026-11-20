@@ -621,6 +621,36 @@ body.theme-terminal .achRow{
 body.theme-terminal .achRow.got{
   border-color:#1f7a3f; background:#04180a}
 body.theme-terminal .achDesc{color:#2b7d45}
+
+/* ================= 主题：摇杆 / 方向键 / 动作键 =================
+   这三个控件原先不跟主题，切到任何风格都是原版深蓝，这里补齐。
+*/
+/* ---------- 终端：方角、硬边框、绿字 ---------- */
+body.theme-terminal #stickBase2{background:#000; border:1px solid #1f7a3f;
+  border-radius:0; box-shadow:none}
+body.theme-terminal #stickBase2:after{border-radius:0; border:1px dashed rgba(94,255,143,.22)}
+body.theme-terminal #stickKnob2{background:#5eff8f; border-radius:0;
+  border:1px solid #5eff8f; box-shadow:0 0 10px rgba(94,255,143,.55)}
+body.theme-terminal .btn{background:#000; border:1px solid #1f7a3f; border-radius:0;
+  color:#5eff8f; box-shadow:none; font-family:"JetBrains Mono",Consolas,monospace}
+body.theme-terminal .btn.on{background:#5eff8f; border-color:#5eff8f; color:#000;
+  transform:none}
+body.theme-terminal .abtn{background:#000; border:1px solid #1f7a3f; border-radius:0;
+  color:#5eff8f; font-family:"JetBrains Mono",Consolas,monospace; text-transform:uppercase}
+body.theme-terminal .abtn:active{background:#5eff8f; color:#000; border-color:#5eff8f}
+/* ---------- Material：圆形柔和 ---------- */
+body.theme-material #stickBase2{background:rgba(28,28,30,.88);
+  border:1px solid rgba(255,255,255,.14); border-radius:50%
+  ; box-shadow:0 6px 22px rgba(0,0,0,.45)}
+body.theme-material #stickBase2:after{border:1px dashed rgba(255,255,255,.16)}
+body.theme-material #stickKnob2{background:radial-gradient(circle at 38% 32%,#e8e8e8,#9a9a9a);
+  border:1px solid rgba(255,255,255,.35); box-shadow:0 4px 14px rgba(0,0,0,.5)}
+body.theme-material .btn{background:rgba(32,32,34,.94); border:1px solid rgba(255,255,255,.14);
+  color:#f2f2f2; border-radius:14px}
+body.theme-material .btn.on{background:#e8e8e8; border-color:#e8e8e8; color:#141414}
+body.theme-material .abtn{background:rgba(32,32,34,.94); border:1px solid rgba(255,255,255,.16);
+  color:#f2f2f2}
+body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 /* ================= DevTest 终端 =================
    仅在终端主题下可用；反引号键开关。
 */
@@ -784,7 +814,7 @@ body.theme-terminal .achDesc{color:#2b7d45}
 <div id="devTerm" class="hidden">
   <div id="devTermLog"></div>
   <div id="devTermRow">
-    <span>&gt;</span>
+    <span id="devTermPrompt">user@efs:~$</span>
     <input id="devTermInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 help 查看指令">
   </div>
 </div>

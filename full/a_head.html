@@ -345,6 +345,75 @@ body.theme-material .tbtns button.prim{
   background:var(--m3-primary);color:var(--m3-on-primary);font-weight:600;
 }
 
+/* ---- GM / 作弊菜单：Material 风格（仅 body.theme-material 生效） ----
+   原则：表面/圆角/描边/文字层级全 M3 化；
+   作弊的红色语义保留，映射到 M3 的 error / error-container 角色。
+*/
+body.theme-material #cheatPanel{
+  background:var(--m3-surface-2); border:none;
+  border-radius:var(--m3-r-xl);
+  box-shadow:0 10px 32px rgba(0,0,0,.62),0 2px 6px rgba(0,0,0,.4);
+}
+body.theme-material #cheatHead{
+  background:var(--m3-surface-3); border-bottom:none;
+  border-radius:var(--m3-r-xl) var(--m3-r-xl) 0 0;
+  padding:12px 14px;
+}
+body.theme-material #cheatHead b{
+  color:var(--m3-error); font-weight:600; letter-spacing:.6px;
+}
+body.theme-material #cheatClose{
+  background:transparent; border:1px solid var(--m3-outline);
+  color:var(--m3-on-surface-var); border-radius:999px; font-weight:500;
+}
+body.theme-material #cheatClose:active{background:rgba(255,255,255,.08)}
+body.theme-material #cheatBody{padding:6px 14px 14px}
+body.theme-material .csec{
+  color:var(--m3-tertiary); font-weight:600; letter-spacing:.8px;
+  margin:14px 0 6px;
+}
+body.theme-material .crow{
+  border-bottom:none;
+  border-radius:var(--m3-r-m);
+  padding:9px 10px; margin:2px 0;
+  color:var(--m3-on-surface);
+}
+body.theme-material .crow:active{background:rgba(255,255,255,.06)}
+body.theme-material .cdesc{color:var(--m3-on-surface-var)}
+body.theme-material .crow button{
+  background:transparent;
+  border:1px solid var(--m3-error-container);
+  color:var(--m3-error);
+  border-radius:999px; font-weight:600; padding:7px 14px;
+}
+body.theme-material .crow button:active{background:rgba(242,184,181,.14)}
+body.theme-material .crow button.on{
+  background:var(--m3-success); border-color:var(--m3-success); color:#0d2a16;
+}
+body.theme-material .crow button.danger{
+  background:var(--m3-error-container); border-color:var(--m3-error-container);
+  color:#ffdad6;
+}
+body.theme-material .crow button.danger:active{filter:brightness(1.18)}
+body.theme-material .ctele button{
+  background:var(--m3-surface-3); border:1px solid var(--m3-outline-var);
+  color:var(--m3-on-surface); border-radius:999px;
+}
+body.theme-material .ctele button.on{
+  background:var(--m3-primary-container); border-color:var(--m3-primary-container);
+  color:var(--m3-on-primary-container); font-weight:600;
+}
+body.theme-material .cwarn{color:var(--m3-on-surface-var)}
+body.theme-material #cheatTag{
+  color:var(--m3-error); border:1px solid var(--m3-error-container);
+  border-radius:999px; padding:2px 8px; background:transparent;
+}
+body.theme-material #gmBall{
+  background:var(--m3-error-container); border:none; color:#ffdad6;
+  box-shadow:0 4px 14px rgba(0,0,0,.5); font-weight:700;
+}
+body.theme-material #gmBall:active{transform:scale(.93); filter:brightness(1.12)}
+
 </style>
 </head>
 <body>

@@ -414,6 +414,29 @@ body.theme-material #gmBall{
 }
 body.theme-material #gmBall:active{transform:scale(.93); filter:brightness(1.12)}
 
+/* ===== 面板 / 列表 / 成就 / 排行榜：Material 3 ===== */
+body.theme-material .pbox{
+  background:var(--m3-surface-2);border:none;border-radius:var(--m3-r-xl);
+  padding:18px 16px;box-shadow:0 10px 32px rgba(0,0,0,.5)}
+body.theme-material .pbox h3{color:var(--m3-primary);font-weight:700;letter-spacing:.2px}
+body.theme-material .pitem{
+  background:var(--m3-surface-3);border:none;border-radius:var(--m3-r-m);
+  padding:10px 12px}
+body.theme-material .pitem button{
+  background:var(--m3-primary-container);color:var(--m3-on-primary-container);
+  border:none;border-radius:999px;font-weight:600}
+body.theme-material .pitem button:disabled{opacity:.38}
+body.theme-material #panelClose{
+  background:transparent;color:var(--m3-on-surface);
+  border:1px solid var(--m3-outline);border-radius:999px}
+body.theme-material .achList{gap:7px}
+body.theme-material .achRow{
+  background:var(--m3-surface-3);border:none;border-radius:var(--m3-r-m);
+  padding:9px 11px}
+body.theme-material .achRow.got{
+  background:var(--m3-surface-2);
+  box-shadow:inset 0 0 0 1px var(--m3-outline-var)}
+body.theme-material .achDesc{color:var(--m3-on-surface-var)}
 </style>
 </head>
 <body>

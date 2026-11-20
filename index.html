@@ -414,6 +414,29 @@ body.theme-material #gmBall{
 }
 body.theme-material #gmBall:active{transform:scale(.93); filter:brightness(1.12)}
 
+/* ===== 面板 / 列表 / 成就 / 排行榜：Material 3 ===== */
+body.theme-material .pbox{
+  background:var(--m3-surface-2);border:none;border-radius:var(--m3-r-xl);
+  padding:18px 16px;box-shadow:0 10px 32px rgba(0,0,0,.5)}
+body.theme-material .pbox h3{color:var(--m3-primary);font-weight:700;letter-spacing:.2px}
+body.theme-material .pitem{
+  background:var(--m3-surface-3);border:none;border-radius:var(--m3-r-m);
+  padding:10px 12px}
+body.theme-material .pitem button{
+  background:var(--m3-primary-container);color:var(--m3-on-primary-container);
+  border:none;border-radius:999px;font-weight:600}
+body.theme-material .pitem button:disabled{opacity:.38}
+body.theme-material #panelClose{
+  background:transparent;color:var(--m3-on-surface);
+  border:1px solid var(--m3-outline);border-radius:999px}
+body.theme-material .achList{gap:7px}
+body.theme-material .achRow{
+  background:var(--m3-surface-3);border:none;border-radius:var(--m3-r-m);
+  padding:9px 11px}
+body.theme-material .achRow.got{
+  background:var(--m3-surface-2);
+  box-shadow:inset 0 0 0 1px var(--m3-outline-var)}
+body.theme-material .achDesc{color:var(--m3-on-surface-var)}
 </style>
 </head>
 <body>
@@ -1145,6 +1168,7 @@ function showAchPopup(id, col, first, times){
 }
 /* 成就页：主界面点「🏆 成就」打开，列出全部成就与解锁状态 */
 function openAchPage(){
+  var UC=themeUiColors();
   var html='<div class="achList">';
   for(var i=0;i<ACH_ORDER.length;i++){
     var id=ACH_ORDER[i], a=ACH[id];
@@ -1153,23 +1177,23 @@ function openAchPage(){
     var col = achColor(a.tier);
     var timesTag = times>1 ? ' <span style="color:'+col+';font-size:11px;font-weight:700">×'+times+'</span>' : '';
     html+='<div class="achRow'+(has?' got':'')+'">'+
-      '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
+      '<div class="achDot" style="background:'+(has?col:UC.dotOff)+
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
       '<div class="achTxt">'+
-        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
+        '<b style="color:'+(has?col:UC.dim)+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
         '<span class="achDesc">'+(has?a.desc:'尚未解锁')+
-          (HELL_BANNED_ACH[id]?' <span style="color:#ff8095">（地狱不给）</span>':'')+
+          (HELL_BANNED_ACH[id]?' <span style="color:'+UC.warn+'">（地狱不给）</span>':'')+
         '</span>'+
       '</div>'+
-      '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
+      '<div class="achTag" style="color:'+(has?col:UC.faint)+'">'+
         achTierName(a.tier)+'</div>'+ 
     '</div>';
   }
   html+='</div>';
-  html+='<div style="margin-top:8px;font-size:11px;color:#8ea6c2;line-height:1.7">'+
-    '已解锁 <b style="color:#9fe6ff">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
-    '　累计达成 <b style="color:#fbbf24">'+achTotalTimes()+'</b> 次'+
-    '　<span style="color:#ff8095">（用 GM 的那一局不给成就）</span></div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:'+UC.sub+';line-height:1.7">'+
+    '已解锁 <b style="color:'+UC.title+'">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
+    '　累计达成 <b style="color:'+UC.gold+'">'+achTotalTimes()+'</b> 次'+
+    '　<span style="color:'+UC.warn+'">（用 GM 的那一局不给成就）</span></div>';
   showPanel('🏆 成就', html);
 }
 /* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
@@ -2029,21 +2053,22 @@ function openBoard(){
   showPanel('排行榜（本机记录）', renderBoardHtml());
 }
 function renderBoardHtml(){
+  var UC=themeUiColors();
   var list=boardBest();
-  var head='<div style="font-size:11.5px;line-height:1.8;color:#8ea6c2;margin-bottom:6px">'+
+  var head='<div style="font-size:11.5px;line-height:1.8;color:'+UC.sub+';margin-bottom:6px">'+
     '成绩只存在这台设备的 cookie 里，不上传服务器。</div>';
   if(!list.length){
-    return head+'<div style="font-size:12px;color:#8ea6c2;line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
+    return head+'<div style="font-size:12px;color:'+UC.sub+';line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
   }
   var html=head+'<div style="font-size:11.5px;line-height:1.95">';
   for(var i=0;i<list.length;i++){
     var r=list[i];
     var dn=DIFF[r.diff]?DIFF[r.diff].name:r.diff;
-    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(120,160,220,.12)">'
-      +'<b style="width:22px;color:#8fd0ff">'+(i+1)+'</b>'
+    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid '+UC.line+'">'
+      +'<b style="width:22px;color:'+UC.accent+'">'+(i+1)+'</b>'
       +'<span style="flex:1">'+(r.name||'无名')+'</span>'
-      +'<span style="color:#8ea6c2">'+dn+'</span>'
-      +'<span style="color:#fbbf24">'+(Number(r.time)||0).toFixed(2)+'s</span>'
+      +'<span style="color:'+UC.sub+'">'+dn+'</span>'
+      +'<span style="color:'+UC.gold+'">'+(Number(r.time)||0).toFixed(2)+'s</span>'
       +'</div>';
   }
   return html+'</div>';
@@ -3501,6 +3526,58 @@ function themeMapColors(){
     roomOther:rgba(themeTone(h, 0.4, 70, 1), 0.04),
     roomLabel:rgba(themeTone(h, ns, 88, 1), 0.34),
     border:rgba(themeTone(h, s, 70, 1), 0.18)
+  };
+}
+
+/* ================= 通用 UI 调色板（成就/排行榜/商店等面板共用） =================
+   面板里很多颜色写在 JS 内联 style 里，CSS 覆盖不了，所以统一从这里取。
+   经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
+*/
+function themeUiColors(){
+  if(typeof THEME==='undefined' || THEME.style!=='material'){
+    return {
+      m3:false,
+      title:'#9fe6ff',      /* 面板标题 */
+      text:'#e8f2ff',       /* 正文 */
+      sub:'#8ea6c2',        /* 说明/次要文字 */
+      dim:'#6f8298',        /* 更弱的文字 */
+      faint:'#4b5a68',      /* 最弱（未解锁标签） */
+      accent:'#8fd0ff',     /* 强调（名次等） */
+      gold:'#fbbf24',       /* 成绩/星级 */
+      warn:'#ff8095',       /* 警告文字 */
+      line:'rgba(120,160,220,.12)', /* 分隔线 */
+      rowBg:'rgba(24,34,48,.9)',
+      rowGot:'rgba(30,44,62,.95)',
+      rowBorder:'rgba(120,160,220,.16)',
+      rowGotBorder:'rgba(140,190,250,.32)',
+      dotOff:'rgba(120,140,160,.25)'
+    };
+  }
+  var hex=themeColorHex();
+  var h=themeHue(hex), s=themeSat(hex);
+  var ns=Math.min(s, 0.16);
+  /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
+  var as=Math.max(s, 0.42);
+  var rgba=function(hx, a){
+    var v=themeHexToRgb(hx);
+    return 'rgba('+v[0]+','+v[1]+','+v[2]+','+a+')';
+  };
+  return {
+    m3:true,
+    title:themeTone(h, Math.min(as,0.34), 88, 1),
+    text:themeTone(h, ns, 92, 1),
+    sub:themeTone(h, ns, 72, 1),
+    dim:themeTone(h, ns, 58, 1),
+    faint:themeTone(h, ns, 44, 1),
+    accent:themeTone(h, Math.min(as,0.50), 80, 1),
+    gold:themeTone(h+40, Math.min(Math.max(s,0.50),0.62), 78, 1),
+    warn:themeTone(h-150, Math.min(Math.max(s,0.45),0.6), 76, 1),
+    line:rgba(themeTone(h, ns, 60, 1), 0.16),
+    rowBg:rgba(themeTone(h, ns, 14, 1), 0.92),
+    rowGot:rgba(themeTone(h, ns, 20, 1), 0.95),
+    rowBorder:rgba(themeTone(h, ns, 55, 1), 0.20),
+    rowGotBorder:rgba(themeTone(h, Math.min(as,0.35), 70, 1), 0.42),
+    dotOff:rgba(themeTone(h, ns, 55, 1), 0.28)
   };
 }
 

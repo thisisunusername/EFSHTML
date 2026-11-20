@@ -324,3 +324,55 @@ function themeMapColors(){
     border:rgba(themeTone(h, s, 70, 1), 0.18)
   };
 }
+
+/* ================= 通用 UI 调色板（成就/排行榜/商店等面板共用） =================
+   面板里很多颜色写在 JS 内联 style 里，CSS 覆盖不了，所以统一从这里取。
+   经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
+*/
+function themeUiColors(){
+  if(typeof THEME==='undefined' || THEME.style!=='material'){
+    return {
+      m3:false,
+      title:'#9fe6ff',      /* 面板标题 */
+      text:'#e8f2ff',       /* 正文 */
+      sub:'#8ea6c2',        /* 说明/次要文字 */
+      dim:'#6f8298',        /* 更弱的文字 */
+      faint:'#4b5a68',      /* 最弱（未解锁标签） */
+      accent:'#8fd0ff',     /* 强调（名次等） */
+      gold:'#fbbf24',       /* 成绩/星级 */
+      warn:'#ff8095',       /* 警告文字 */
+      line:'rgba(120,160,220,.12)', /* 分隔线 */
+      rowBg:'rgba(24,34,48,.9)',
+      rowGot:'rgba(30,44,62,.95)',
+      rowBorder:'rgba(120,160,220,.16)',
+      rowGotBorder:'rgba(140,190,250,.32)',
+      dotOff:'rgba(120,140,160,.25)'
+    };
+  }
+  var hex=themeColorHex();
+  var h=themeHue(hex), s=themeSat(hex);
+  var ns=Math.min(s, 0.16);
+  /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
+  var as=Math.max(s, 0.42);
+  var rgba=function(hx, a){
+    var v=themeHexToRgb(hx);
+    return 'rgba('+v[0]+','+v[1]+','+v[2]+','+a+')';
+  };
+  return {
+    m3:true,
+    title:themeTone(h, Math.min(as,0.34), 88, 1),
+    text:themeTone(h, ns, 92, 1),
+    sub:themeTone(h, ns, 72, 1),
+    dim:themeTone(h, ns, 58, 1),
+    faint:themeTone(h, ns, 44, 1),
+    accent:themeTone(h, Math.min(as,0.50), 80, 1),
+    gold:themeTone(h+40, Math.min(Math.max(s,0.50),0.62), 78, 1),
+    warn:themeTone(h-150, Math.min(Math.max(s,0.45),0.6), 76, 1),
+    line:rgba(themeTone(h, ns, 60, 1), 0.16),
+    rowBg:rgba(themeTone(h, ns, 14, 1), 0.92),
+    rowGot:rgba(themeTone(h, ns, 20, 1), 0.95),
+    rowBorder:rgba(themeTone(h, ns, 55, 1), 0.20),
+    rowGotBorder:rgba(themeTone(h, Math.min(as,0.35), 70, 1), 0.42),
+    dotOff:rgba(themeTone(h, ns, 55, 1), 0.28)
+  };
+}

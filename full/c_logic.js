@@ -271,6 +271,7 @@ function showAchPopup(id, col, first, times){
 }
 /* 成就页：主界面点「🏆 成就」打开，列出全部成就与解锁状态 */
 function openAchPage(){
+  var UC=themeUiColors();
   var html='<div class="achList">';
   for(var i=0;i<ACH_ORDER.length;i++){
     var id=ACH_ORDER[i], a=ACH[id];
@@ -279,23 +280,23 @@ function openAchPage(){
     var col = achColor(a.tier);
     var timesTag = times>1 ? ' <span style="color:'+col+';font-size:11px;font-weight:700">×'+times+'</span>' : '';
     html+='<div class="achRow'+(has?' got':'')+'">'+
-      '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
+      '<div class="achDot" style="background:'+(has?col:UC.dotOff)+
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
       '<div class="achTxt">'+
-        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
+        '<b style="color:'+(has?col:UC.dim)+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
         '<span class="achDesc">'+(has?a.desc:'尚未解锁')+
-          (HELL_BANNED_ACH[id]?' <span style="color:#ff8095">（地狱不给）</span>':'')+
+          (HELL_BANNED_ACH[id]?' <span style="color:'+UC.warn+'">（地狱不给）</span>':'')+
         '</span>'+
       '</div>'+
-      '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
+      '<div class="achTag" style="color:'+(has?col:UC.faint)+'">'+
         achTierName(a.tier)+'</div>'+ 
     '</div>';
   }
   html+='</div>';
-  html+='<div style="margin-top:8px;font-size:11px;color:#8ea6c2;line-height:1.7">'+
-    '已解锁 <b style="color:#9fe6ff">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
-    '　累计达成 <b style="color:#fbbf24">'+achTotalTimes()+'</b> 次'+
-    '　<span style="color:#ff8095">（用 GM 的那一局不给成就）</span></div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:'+UC.sub+';line-height:1.7">'+
+    '已解锁 <b style="color:'+UC.title+'">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
+    '　累计达成 <b style="color:'+UC.gold+'">'+achTotalTimes()+'</b> 次'+
+    '　<span style="color:'+UC.warn+'">（用 GM 的那一局不给成就）</span></div>';
   showPanel('🏆 成就', html);
 }
 /* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
@@ -1155,21 +1156,22 @@ function openBoard(){
   showPanel('排行榜（本机记录）', renderBoardHtml());
 }
 function renderBoardHtml(){
+  var UC=themeUiColors();
   var list=boardBest();
-  var head='<div style="font-size:11.5px;line-height:1.8;color:#8ea6c2;margin-bottom:6px">'+
+  var head='<div style="font-size:11.5px;line-height:1.8;color:'+UC.sub+';margin-bottom:6px">'+
     '成绩只存在这台设备的 cookie 里，不上传服务器。</div>';
   if(!list.length){
-    return head+'<div style="font-size:12px;color:#8ea6c2;line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
+    return head+'<div style="font-size:12px;color:'+UC.sub+';line-height:1.8">还没有记录，通关一次就会出现在这里。</div>';
   }
   var html=head+'<div style="font-size:11.5px;line-height:1.95">';
   for(var i=0;i<list.length;i++){
     var r=list[i];
     var dn=DIFF[r.diff]?DIFF[r.diff].name:r.diff;
-    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(120,160,220,.12)">'
-      +'<b style="width:22px;color:#8fd0ff">'+(i+1)+'</b>'
+    html+='<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid '+UC.line+'">'
+      +'<b style="width:22px;color:'+UC.accent+'">'+(i+1)+'</b>'
       +'<span style="flex:1">'+(r.name||'无名')+'</span>'
-      +'<span style="color:#8ea6c2">'+dn+'</span>'
-      +'<span style="color:#fbbf24">'+(Number(r.time)||0).toFixed(2)+'s</span>'
+      +'<span style="color:'+UC.sub+'">'+dn+'</span>'
+      +'<span style="color:'+UC.gold+'">'+(Number(r.time)||0).toFixed(2)+'s</span>'
       +'</div>';
   }
   return html+'</div>';

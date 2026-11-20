@@ -152,12 +152,9 @@ function themeApply(){
   var body=document.body;
   var root=document.documentElement;
   var mat = (THEME.style==='material');
-  var mix = (THEME.style==='miuix');
   if(body && body.classList){
     if(mat) body.classList.add('theme-material');
     else body.classList.remove('theme-material');
-    if(mix) body.classList.add('theme-miuix');
-    else body.classList.remove('theme-miuix');
   }
   /* 生成并注入 Material 变量 */
   var hex=themeColorHex();
@@ -169,7 +166,7 @@ function themeApply(){
   /* 浏览器地址栏配色也跟着走 */
   var meta=document.querySelector? document.querySelector('meta[name="theme-color"]') : null;
   if(meta && meta.setAttribute){
-    meta.setAttribute('content', (mat||mix) ? tok['--m3-surface'] : '#0b0f16');
+    meta.setAttribute('content', mat ? tok['--m3-surface'] : '#0b0f16');
   }
   /* 同步选中态 */
   themeSyncUI();
@@ -227,11 +224,10 @@ function themeSyncUI(){
 }
 function themeStyleName(){
   if(THEME.style==='material') return 'Material';
-  if(THEME.style==='miuix') return 'Miuix';
   return '原版';
 }
 function themeSetStyle(s){
-  THEME.style = (s==='material')?'material':((s==='miuix')?'miuix':'classic');
+  THEME.style = (s==='material')?'material':'classic';
   themeSave();
   themeApply();
 }
@@ -338,7 +334,7 @@ function themeMapColors(){
    经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
 */
 function themeUiColors(){
-  if(typeof THEME==='undefined' || (THEME.style!=='material' && THEME.style!=='miuix')){
+  if(typeof THEME==='undefined' || (THEME.style!=='material')){
     return {
       m3:false,
       title:'#9fe6ff',      /* 面板标题 */
@@ -359,30 +355,6 @@ function themeUiColors(){
   }
   var hex=themeColorHex();
   var h=themeHue(hex), s=themeSat(hex);
-  /* ===== Miuix：纯黑底 + 卡片分层，不靠饰边靠背景层次 ===== */
-  if(THEME.style==='miuix'){
-    return {
-      m3:false,
-      mx:true,
-      /* 文字层：Miuix 用中性白，不携入色相；靠字重与明度差拉层级 */
-      title:'#ffffff',
-      text:'#e8e8e8',
-      sub:'#9a9a9a',
-      dim:'#6a6a6a',
-      faint:'#3a3a3a',
-      /* 强调色只取纯色相，饱和度拉满（HyperOS 单色强调） */
-      accent:themeTone(h, Math.min(Math.max(s,0.62),0.78), 62, 1),
-      gold:themeTone(h+40, 0.70, 64, 1),
-      warn:themeTone(h-150, 0.66, 62, 1),
-      /* 表面层：中性灰阶，不染色，纯靠明暗分层 */
-      line:'rgba(255,255,255,0.10)',
-      rowBg:'#141414',
-      rowGot:'#1c1c1c',
-      rowBorder:'rgba(255,255,255,0.06)',
-      rowGotBorder:themeTone(h, Math.min(Math.max(s,0.62),0.78), 62, 0.55),
-      dotOff:'rgba(255,255,255,0.16)'
-    };
-  }
   var ns=Math.min(s, 0.16);
   /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
   var as=Math.max(s, 0.42);

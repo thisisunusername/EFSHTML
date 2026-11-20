@@ -391,12 +391,6 @@ function spawnNpcs(diff){
     home:{x:11.5, y:2.5},
     sight:d.sight, cone:0.66, speed:d.tspeed
   });
-  /* 副班主任：从一层小卖部层出发，复活点在二层老师办公室 */
-  out.push({
-    kind:'teacher', name:'副班主任', floor:'1F',
-    home:{x:3.5, y:13.5},
-    sight:d.sight, cone:0.66, speed:d.tspeed
-  });
   /* 保安从各层楼梯口开始巡逻 */
   var gset=[
     {floor:'1F', home:{x:3.5,y:13.5}},

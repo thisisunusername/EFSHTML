@@ -89,7 +89,7 @@ function buildWorld(){
     carve(g,26,10,30,16); carve(g,28,9,28,9);    /* 图书角 */
 
     W['2F'] = {
-      key:'2F', name:'二层（教室层）', w:w, h:h, g:g, dark:false,
+      key:'2F', name:'一层', w:w, h:h, g:g, dark:false,
       rooms:[
         {name:'教室',       x0:1, y0:1,  x1:7,  y1:5,  safe:'class'},
         {name:'老师办公室', x0:9, y0:1,  x1:14, y1:5},
@@ -126,7 +126,7 @@ function buildWorld(){
     carve(g,24,10,30,16); carve(g,27,9,27,9);    /* 杂物间 */
 
     W['1F'] = {
-      key:'1F', name:'一层（小卖部层）', w:w, h:h, g:g, dark:false,
+      key:'1F', name:'二层', w:w, h:h, g:g, dark:false,
       rooms:[
         {name:'小卖部',     x0:1, y0:1,  x1:7,  y1:5},
         {name:'校长办公室', x0:9, y0:1,  x1:15, y1:5},
@@ -167,7 +167,7 @@ function buildWorld(){
     carve(g,26,11,28,16);                         /* 砖墙后的小隔间 */
 
     W['B1'] = {
-      key:'B1', name:'三层（地下车库）', w:w, h:h, g:g, dark:true,
+      key:'B1', name:'三层', w:w, h:h, g:g, dark:true,
       rooms:[
         {name:'楼梯间',   x0:1,  y0:1,  x1:6,  y1:6},
         {name:'保安室',   x0:8,  y0:1,  x1:12, y1:5},
@@ -208,7 +208,7 @@ function buildWorld(){
     carve(g,22,11,27,16);  carve(g,24,10,24,10); /* 库房 */
 
     W['B2'] = {
-      key:'B2', name:'四层（地下二层）', w:w, h:h, g:g, dark:true,
+      key:'B2', name:'四层', w:w, h:h, g:g, dark:true,
       rooms:[
         {name:'楼梯间',     x0:1,  y0:1,  x1:6,  y1:6},
         {name:'工具房',     x0:8,  y0:1,  x1:12, y1:5},

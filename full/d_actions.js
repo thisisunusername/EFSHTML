@@ -211,11 +211,10 @@ function interact(){
   /* ---------- 新机关 ---------- */
   if(o.t==='cctv'){ tryCctv(o); return; }
   if(o.t==='car'){
-    /* 砸车会掉木头（做黑钥匙要用） */
+    /* 砸车只会发出巨响引来敌人，不再产出木头 */
     if(S.carBroken){ toast('车已经砸烂了'); return; }
     if(!S.inv.hammer){ toast('需要锤子才能砸车'); return; }
     tryCar(o);
-    if(!S.inv.wood){ S.inv.wood=true; toast('从车里翻出一根木头'); updateHUD(); }
     return;
   }
   if(o.t==='stairs'){
@@ -285,7 +284,9 @@ var ENDINGS = {
   4:{title:'结局四 · 地下车库逃脱', color:'#a78bfa',
      desc:'三个电闸全部拉下，你举着锤子砸开铁门，从车库通道走了出去。'},
   5:{title:'结局五 · 地下室逃脱', color:'#38bdf8',
-     desc:'锯树、买刀、拿到制作图，你在制作室做出黑钥匙。推开门，走过那段没人知道的楼梯——你赢了。'}
+     desc:'锯树、买刀、拿到制作图，你在制作室做出黑钥匙。推开门，走过那段没人知道的楼梯——你赢了。'},
+  6:{title:'结局六 · 打电话给原作者', color:'#a855f7',
+     desc:'你在地下室的出口旁边站了很久，忽然听见一阵电话铃声。拨出 7777777，电话那头是原作者。<br>「行，我佩服你的实力」—— 你被放行了。'}
 };
 
 function ending(n){
@@ -300,6 +301,7 @@ function ending(n){
   t.style.textShadow='0 0 22px '+e.color+'88';
   var extra='';
   if(n===5) extra='<br><br><span style="color:#8ea6c2">从楼梯走到另一个楼梯，就是出口。</span>';
+  if(n===6) extra='<br><br><span style="color:#c4a0ff">隐藏结局 · 仅地狱模式可触发</span>';
   document.getElementById('endDesc').innerHTML=e.desc+extra+
     '<br><br><span style="color:#8ea6c2;font-size:12px">难度：'+DIFF[S.diff].name+' · 被抓 '+S.catches+' 次 · 剩余命 '+(S.lives>0?S.lives:0)+'</span>'
     +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+'</div>';

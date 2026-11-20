@@ -440,6 +440,8 @@ function loop(t){
     }
     /* 抓捕判定：每帧都要跑，站着不动也会被监控/视野抓到 */
     if(S.mode==='play') checkCatch(dt);
+    /* 隐藏结局：地狱模式在地下室出口旁站满 5 秒 → 电话 */
+    updatePhoneHidden(dt);
     if(S.msgT>0){
       S.msgT-=dt;
       if(S.msgT<=0){
@@ -461,6 +463,7 @@ bindInput();
 buildWorld();
 achLoad();          /* 载入本地保存的成就（localStorage / cookie） */
 renderAchChip();
+refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
 S.mode='menu';
 requestAnimationFrame(loop);
 })();

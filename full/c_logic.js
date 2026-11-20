@@ -151,9 +151,31 @@ function showAchPopup(id, col){
   clearTimeout(box._tm);
   box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
 }
+/* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
+var UNLOCK_KEY='efs_clear_once';
+function markCleared(){
+  writeCookie(UNLOCK_KEY,'1',3650);
+  refreshEndingList();
+}
+function isEnding6Unlocked(){
+  return readCookie(UNLOCK_KEY)==='1';
+}
+/* 刷新主界面结局列表里的 ⑥ */
+function refreshEndingList(){
+  var el=document.getElementById('endMystery');
+  if(!el) return;
+  if(isEnding6Unlocked()){
+    el.innerHTML='<span style="color:#c4a0ff">隐藏结局 · 地下室的神秘电话</span>';
+    el.style.opacity='1';
+  } else {
+    el.textContent='？？？';
+    el.style.opacity='.6';
+  }
+}
+
 /* 通关时统一结算成就 */
 function settleAch(endingN){
-  if(!(endingN>=2 && endingN<=5)) return;
+  if(!(endingN>=2 && endingN<=6)) return;
   if(!boardAllowed()) return;   /* 作弊：不给成就 */
   var d=DIFF[S.diff]||DIFF.normal;
   unlockAch('clear_any');
@@ -952,7 +974,8 @@ function boardSave(list){
 }
 /* 记录一次通关成绩 */
 function reportClear(endingN){
-  if(!(endingN>=2 && endingN<=5)) return;
+  if(!(endingN>=2 && endingN<=6)) return;
+  markCleared();                                   /* 通关一次 → 解锁结局六提示 */
   if(!boardAllowed()){ cheatDisableBoard(); return; }   /* 作弊：不记录成绩 */
   var list=boardLoad();
   var name=readCookie(NAME_KEY)||'无名同学';
@@ -1185,7 +1208,7 @@ function cheatRenderBox(){
     var fk=FLOOR_CHAIN[fi];
     var cur=(S.floor===fk);
     html+='<button data-cf="'+fk+'" class="'+(cur?'on':'')+'">'+
-      (W[fk]? W[fk].name.split('（')[0] : fk)+'</button>';
+      (W[fk]? W[fk].name : fk)+'</button>';
   }
   html+='</div>';
 
@@ -1283,4 +1306,116 @@ function makeDraggable(el, handle){
   document.addEventListener('mouseup',up);
   document.addEventListener('touchend',up);
   document.addEventListener('touchcancel',up);
+}
+/* ================= 隐藏结局：地下室打电话 =================
+   条件：必须在地狱模式，站在地下室 EXIT（stairWin）旁边不动满 5 秒。
+   触发后弹出拨号界面，输入 7 个 7 并拨打，进入原作者对话，最终通关。
+*/
+var PHONE = {
+  timer:0,
+  open:false,
+  input:'',
+  talking:false
+};
+var PHONE_WAIT = 5.0;
+
+function phoneReset(){
+  PHONE.timer=0; PHONE.open=false; PHONE.input=''; PHONE.talking=false;
+}
+
+function updatePhoneHidden(dt){
+  if(S.mode!=='play'){ PHONE.timer=0; return; }
+  if(PHONE.open || PHONE.talking) return;
+  if(S.diff!=='hell'){ PHONE.timer=0; return; }
+  var f=fl();
+  if(!f || f.key!=='B3'){ PHONE.timer=0; return; }
+  var win=null;
+  for(var i=0;i<f.objs.length;i++){ if(f.objs[i].t==='stairWin'){ win=f.objs[i]; break; } }
+  if(!win){ PHONE.timer=0; return; }
+  var d=Math.sqrt(Math.pow(win.x-S.px,2)+Math.pow(win.y-S.py,2));
+  if(d>1.2){ PHONE.timer=0; return; }
+  if(S.moving){ PHONE.timer=0; return; }
+  PHONE.timer += dt;
+  if(PHONE.timer>=PHONE_WAIT){
+    PHONE.timer=0;
+    openPhone();
+  }
+}
+
+function openPhone(){
+  PHONE.open=true; PHONE.input=''; PHONE.talking=false;
+  var box=document.getElementById('phonePanel');
+  if(!box) return;
+  box.classList.remove('hidden');
+  phoneRender();
+}
+
+function phoneRender(){
+  var body=document.getElementById('phoneBody');
+  if(!body) return;
+
+  if(PHONE.talking){
+    body.innerHTML =
+      '<div class="chat">'+
+      '<div class="say them"><b>原作者</b><br>干啥?</div>'+
+      '<div class="say me"><b>你</b><br>我要通关</div>'+
+      '<div class="say them"><b>原作者</b><br>行，我佩服你的实力</div>'+
+      '</div>'+
+      '<button class="pbtn" id="phoneDone">结束通话 · 通关</button>';
+    var b=document.getElementById('phoneDone');
+    if(b) b.onclick=function(){ phoneFinish(); };
+    return;
+  }
+
+  var shown = PHONE.input ? PHONE.input : '—';
+  var keys='';
+  for(var n=1;n<=9;n++){ keys+='<button class="pk" data-n="'+n+'">'+n+'</button>'; }
+  keys+='<button class="pk fn" data-n="del">⌫</button>';
+  keys+='<button class="pk" data-n="0">0</button>';
+  keys+='<button class="pk fn" data-n="call">拨打</button>';
+
+  body.innerHTML =
+    '<div class="pnum">'+shown+'</div>'+
+    '<div class="pkey">'+keys+'</div>'+
+    '<button class="pbtn ghost" id="phoneCancel">挂断</button>';
+
+  var ks=body.querySelectorAll('.pk');
+  for(var i=0;i<ks.length;i++){
+    (function(el){
+      el.onclick=function(){ phoneKey(el.getAttribute('data-n')); };
+    })(ks[i]);
+  }
+  var c=document.getElementById('phoneCancel');
+  if(c) c.onclick=function(){ closePhone(); };
+}
+
+function phoneKey(k){
+  if(k==='del'){ PHONE.input=PHONE.input.slice(0,-1); phoneRender(); return; }
+  if(k==='call'){
+    if(PHONE.input==='7777777'){
+      PHONE.talking=true;
+      phoneRender();
+    } else {
+      toast('号码不对…');
+      PHONE.input='';
+      phoneRender();
+    }
+    return;
+  }
+  if(PHONE.input.length>=11) return;
+  PHONE.input += k;
+  phoneRender();
+}
+
+function closePhone(){
+  PHONE.open=false; PHONE.input=''; PHONE.talking=false;
+  var box=document.getElementById('phonePanel');
+  if(box) box.classList.add('hidden');
+}
+
+function phoneFinish(){
+  closePhone();
+  PHONE.timer=0;
+  S.hiddenEnding=true;
+  ending(6);
 }

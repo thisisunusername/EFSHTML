@@ -153,6 +153,28 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 #gmBall.hidden{display:none}
 #gmBall:active{transform:scale(.93)}
 
+#phonePanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(300px,86vw);
+  z-index:75;background:rgba(10,16,24,.98);border:1px solid rgba(90,200,255,.45);border-radius:18px;
+  box-shadow:0 12px 40px rgba(0,0,0,.7),0 0 30px rgba(60,180,255,.25);padding:12px}
+#phonePanel.hidden{display:none}
+#phoneBody{display:flex;flex-direction:column;gap:10px}
+.pnum{font-size:20px;letter-spacing:4px;text-align:center;color:#9fe6ff;
+  background:rgba(20,34,48,.9);border-radius:10px;padding:8px 6px;min-height:38px;
+  font-family:monospace;word-break:break-all}
+.pkey{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.pk{padding:12px 0;border-radius:10px;font-size:17px;font-weight:700;
+  background:rgba(30,48,68,.95);border:1px solid rgba(110,170,230,.4);color:#dceaff}
+.pk:active{background:rgba(70,140,230,.8)}
+.pk.fn{font-size:13px;background:rgba(60,40,90,.9);border-color:rgba(160,120,230,.5);color:#dcc8ff}
+.pbtn{width:100%;padding:11px;border-radius:11px;font-size:13.5px;font-weight:700;
+  background:linear-gradient(180deg,#3aa7ff,#1f6ecb);border:none;color:#fff;margin-top:2px}
+.pbtn.ghost{background:rgba(40,56,76,.9);border:1px solid rgba(120,160,210,.35);color:#b9cde4}
+.chat{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;padding:2px}
+.say{padding:9px 11px;border-radius:12px;font-size:13px;line-height:1.6}
+.say.them{background:rgba(40,58,80,.95);color:#dceaff;border-bottom-left-radius:4px;align-self:flex-start;max-width:88%}
+.say.me{background:rgba(30,110,200,.85);color:#fff;border-bottom-right-radius:4px;align-self:flex-end;max-width:88%}
+.say b{font-size:11px;opacity:.75;font-weight:600}
+
 #cheatTag{position:absolute;right:10px;top:8px;z-index:65;font-size:10px;letter-spacing:1px;
   color:#ff9aa8;border:1px solid rgba(244,63,94,.5);border-radius:6px;padding:1px 6px;display:none}
 
@@ -181,6 +203,7 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
   <div id="cheatTag"></div>
 
   <div id="gmBall" class="hidden">GM</div>
+  <div id="phonePanel" class="hidden"><div id="phoneBody"></div></div>
   <div id="cheatPanel" class="hidden">
     <div id="cheatHead"><b>CHEAT MENU</b><button id="cheatClose">收起 ▾</button></div>
     <div id="cheatBody"></div>
@@ -242,13 +265,10 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
       <button class="ghostbtn" id="expBtn">⬇️ 导出</button>
     </div>
     <div class="card" style="margin-top:12px;font-size:11px;line-height:1.7">
-      <b>五条逃走路线</b><br>
-      ① 被老师抓到两次 → 失败<br>
-      ② 老师办公室拿工作牌 → 刷开校长办公室拿红钥匙 → 打开大门<br>
-      ③ 小卖部选黄色钥匙 → 打开一层的侧门<br>
-      ④ 关掉 2F / 3F(B1) / 4F(B2) 三个电闸 → 打开三层电子门 → 用锤子砸开后墙<br>
-      ⑤ 工具房拿锯子 → 锯小卖部旁的树得木头 → 小卖部选小刀 → 主任办公室拿制作图 → 制作室做黑钥匙 → 开地下室门 → 走到通到校外的楼梯<br>
-      <b>注意</b>：老师和保安会自己上下楼，别以为躲到别的楼层就安全了
+      <b>五种结局</b><br>
+      ① 被抓住到命数耗尽 → 失败<br>
+      ② 大门逃脱　③ 侧门逃脱　④ 地下车库逃脱　⑤ 地下室逃脱<br>
+      ⑥ <span id="endMystery">？？？</span>
     </div>
     <div class="credits">
       原版纸上77所做<br>

@@ -153,6 +153,28 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 #gmBall.hidden{display:none}
 #gmBall:active{transform:scale(.93)}
 
+#phonePanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(300px,86vw);
+  z-index:75;background:rgba(10,16,24,.98);border:1px solid rgba(90,200,255,.45);border-radius:18px;
+  box-shadow:0 12px 40px rgba(0,0,0,.7),0 0 30px rgba(60,180,255,.25);padding:12px}
+#phonePanel.hidden{display:none}
+#phoneBody{display:flex;flex-direction:column;gap:10px}
+.pnum{font-size:20px;letter-spacing:4px;text-align:center;color:#9fe6ff;
+  background:rgba(20,34,48,.9);border-radius:10px;padding:8px 6px;min-height:38px;
+  font-family:monospace;word-break:break-all}
+.pkey{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.pk{padding:12px 0;border-radius:10px;font-size:17px;font-weight:700;
+  background:rgba(30,48,68,.95);border:1px solid rgba(110,170,230,.4);color:#dceaff}
+.pk:active{background:rgba(70,140,230,.8)}
+.pk.fn{font-size:13px;background:rgba(60,40,90,.9);border-color:rgba(160,120,230,.5);color:#dcc8ff}
+.pbtn{width:100%;padding:11px;border-radius:11px;font-size:13.5px;font-weight:700;
+  background:linear-gradient(180deg,#3aa7ff,#1f6ecb);border:none;color:#fff;margin-top:2px}
+.pbtn.ghost{background:rgba(40,56,76,.9);border:1px solid rgba(120,160,210,.35);color:#b9cde4}
+.chat{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto;padding:2px}
+.say{padding:9px 11px;border-radius:12px;font-size:13px;line-height:1.6}
+.say.them{background:rgba(40,58,80,.95);color:#dceaff;border-bottom-left-radius:4px;align-self:flex-start;max-width:88%}
+.say.me{background:rgba(30,110,200,.85);color:#fff;border-bottom-right-radius:4px;align-self:flex-end;max-width:88%}
+.say b{font-size:11px;opacity:.75;font-weight:600}
+
 #cheatTag{position:absolute;right:10px;top:8px;z-index:65;font-size:10px;letter-spacing:1px;
   color:#ff9aa8;border:1px solid rgba(244,63,94,.5);border-radius:6px;padding:1px 6px;display:none}
 
@@ -181,6 +203,7 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
   <div id="cheatTag"></div>
 
   <div id="gmBall" class="hidden">GM</div>
+  <div id="phonePanel" class="hidden"><div id="phoneBody"></div></div>
   <div id="cheatPanel" class="hidden">
     <div id="cheatHead"><b>CHEAT MENU</b><button id="cheatClose">收起 ▾</button></div>
     <div id="cheatBody"></div>
@@ -242,13 +265,10 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
       <button class="ghostbtn" id="expBtn">⬇️ 导出</button>
     </div>
     <div class="card" style="margin-top:12px;font-size:11px;line-height:1.7">
-      <b>五条逃走路线</b><br>
-      ① 被老师抓到两次 → 失败<br>
-      ② 老师办公室拿工作牌 → 刷开校长办公室拿红钥匙 → 打开大门<br>
-      ③ 小卖部选黄色钥匙 → 打开一层的侧门<br>
-      ④ 关掉 2F / 3F(B1) / 4F(B2) 三个电闸 → 打开三层电子门 → 用锤子砸开后墙<br>
-      ⑤ 工具房拿锯子 → 锯小卖部旁的树得木头 → 小卖部选小刀 → 主任办公室拿制作图 → 制作室做黑钥匙 → 开地下室门 → 走到通到校外的楼梯<br>
-      <b>注意</b>：老师和保安会自己上下楼，别以为躲到别的楼层就安全了
+      <b>五种结局</b><br>
+      ① 被抓住到命数耗尽 → 失败<br>
+      ② 大门逃脱　③ 侧门逃脱　④ 地下车库逃脱　⑤ 地下室逃脱<br>
+      ⑥ <span id="endMystery">？？？</span>
     </div>
     <div class="credits">
       原版纸上77所做<br>
@@ -363,7 +383,7 @@ function buildWorld(){
     carve(g,26,10,30,16); carve(g,28,9,28,9);    /* 图书角 */
 
     W['2F'] = {
-      key:'2F', name:'二层（教室层）', w:w, h:h, g:g, dark:false,
+      key:'2F', name:'一层', w:w, h:h, g:g, dark:false,
       rooms:[
         {name:'教室',       x0:1, y0:1,  x1:7,  y1:5,  safe:'class'},
         {name:'老师办公室', x0:9, y0:1,  x1:14, y1:5},
@@ -400,7 +420,7 @@ function buildWorld(){
     carve(g,24,10,30,16); carve(g,27,9,27,9);    /* 杂物间 */
 
     W['1F'] = {
-      key:'1F', name:'一层（小卖部层）', w:w, h:h, g:g, dark:false,
+      key:'1F', name:'二层', w:w, h:h, g:g, dark:false,
       rooms:[
         {name:'小卖部',     x0:1, y0:1,  x1:7,  y1:5},
         {name:'校长办公室', x0:9, y0:1,  x1:15, y1:5},
@@ -441,7 +461,7 @@ function buildWorld(){
     carve(g,26,11,28,16);                         /* 砖墙后的小隔间 */
 
     W['B1'] = {
-      key:'B1', name:'三层（地下车库）', w:w, h:h, g:g, dark:true,
+      key:'B1', name:'三层', w:w, h:h, g:g, dark:true,
       rooms:[
         {name:'楼梯间',   x0:1,  y0:1,  x1:6,  y1:6},
         {name:'保安室',   x0:8,  y0:1,  x1:12, y1:5},
@@ -482,7 +502,7 @@ function buildWorld(){
     carve(g,22,11,27,16);  carve(g,24,10,24,10); /* 库房 */
 
     W['B2'] = {
-      key:'B2', name:'四层（地下二层）', w:w, h:h, g:g, dark:true,
+      key:'B2', name:'四层', w:w, h:h, g:g, dark:true,
       rooms:[
         {name:'楼梯间',     x0:1,  y0:1,  x1:6,  y1:6},
         {name:'工具房',     x0:8,  y0:1,  x1:12, y1:5},
@@ -741,9 +761,31 @@ function showAchPopup(id, col){
   clearTimeout(box._tm);
   box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
 }
+/* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
+var UNLOCK_KEY='efs_clear_once';
+function markCleared(){
+  writeCookie(UNLOCK_KEY,'1',3650);
+  refreshEndingList();
+}
+function isEnding6Unlocked(){
+  return readCookie(UNLOCK_KEY)==='1';
+}
+/* 刷新主界面结局列表里的 ⑥ */
+function refreshEndingList(){
+  var el=document.getElementById('endMystery');
+  if(!el) return;
+  if(isEnding6Unlocked()){
+    el.innerHTML='<span style="color:#c4a0ff">隐藏结局 · 地下室的神秘电话</span>';
+    el.style.opacity='1';
+  } else {
+    el.textContent='？？？';
+    el.style.opacity='.6';
+  }
+}
+
 /* 通关时统一结算成就 */
 function settleAch(endingN){
-  if(!(endingN>=2 && endingN<=5)) return;
+  if(!(endingN>=2 && endingN<=6)) return;
   if(!boardAllowed()) return;   /* 作弊：不给成就 */
   var d=DIFF[S.diff]||DIFF.normal;
   unlockAch('clear_any');
@@ -1542,7 +1584,8 @@ function boardSave(list){
 }
 /* 记录一次通关成绩 */
 function reportClear(endingN){
-  if(!(endingN>=2 && endingN<=5)) return;
+  if(!(endingN>=2 && endingN<=6)) return;
+  markCleared();                                   /* 通关一次 → 解锁结局六提示 */
   if(!boardAllowed()){ cheatDisableBoard(); return; }   /* 作弊：不记录成绩 */
   var list=boardLoad();
   var name=readCookie(NAME_KEY)||'无名同学';
@@ -1775,7 +1818,7 @@ function cheatRenderBox(){
     var fk=FLOOR_CHAIN[fi];
     var cur=(S.floor===fk);
     html+='<button data-cf="'+fk+'" class="'+(cur?'on':'')+'">'+
-      (W[fk]? W[fk].name.split('（')[0] : fk)+'</button>';
+      (W[fk]? W[fk].name : fk)+'</button>';
   }
   html+='</div>';
 
@@ -1873,6 +1916,118 @@ function makeDraggable(el, handle){
   document.addEventListener('mouseup',up);
   document.addEventListener('touchend',up);
   document.addEventListener('touchcancel',up);
+}
+/* ================= 隐藏结局：地下室打电话 =================
+   条件：必须在地狱模式，站在地下室 EXIT（stairWin）旁边不动满 5 秒。
+   触发后弹出拨号界面，输入 7 个 7 并拨打，进入原作者对话，最终通关。
+*/
+var PHONE = {
+  timer:0,
+  open:false,
+  input:'',
+  talking:false
+};
+var PHONE_WAIT = 5.0;
+
+function phoneReset(){
+  PHONE.timer=0; PHONE.open=false; PHONE.input=''; PHONE.talking=false;
+}
+
+function updatePhoneHidden(dt){
+  if(S.mode!=='play'){ PHONE.timer=0; return; }
+  if(PHONE.open || PHONE.talking) return;
+  if(S.diff!=='hell'){ PHONE.timer=0; return; }
+  var f=fl();
+  if(!f || f.key!=='B3'){ PHONE.timer=0; return; }
+  var win=null;
+  for(var i=0;i<f.objs.length;i++){ if(f.objs[i].t==='stairWin'){ win=f.objs[i]; break; } }
+  if(!win){ PHONE.timer=0; return; }
+  var d=Math.sqrt(Math.pow(win.x-S.px,2)+Math.pow(win.y-S.py,2));
+  if(d>1.2){ PHONE.timer=0; return; }
+  if(S.moving){ PHONE.timer=0; return; }
+  PHONE.timer += dt;
+  if(PHONE.timer>=PHONE_WAIT){
+    PHONE.timer=0;
+    openPhone();
+  }
+}
+
+function openPhone(){
+  PHONE.open=true; PHONE.input=''; PHONE.talking=false;
+  var box=document.getElementById('phonePanel');
+  if(!box) return;
+  box.classList.remove('hidden');
+  phoneRender();
+}
+
+function phoneRender(){
+  var body=document.getElementById('phoneBody');
+  if(!body) return;
+
+  if(PHONE.talking){
+    body.innerHTML =
+      '<div class="chat">'+
+      '<div class="say them"><b>原作者</b><br>干啥?</div>'+
+      '<div class="say me"><b>你</b><br>我要通关</div>'+
+      '<div class="say them"><b>原作者</b><br>行，我佩服你的实力</div>'+
+      '</div>'+
+      '<button class="pbtn" id="phoneDone">结束通话 · 通关</button>';
+    var b=document.getElementById('phoneDone');
+    if(b) b.onclick=function(){ phoneFinish(); };
+    return;
+  }
+
+  var shown = PHONE.input ? PHONE.input : '—';
+  var keys='';
+  for(var n=1;n<=9;n++){ keys+='<button class="pk" data-n="'+n+'">'+n+'</button>'; }
+  keys+='<button class="pk fn" data-n="del">⌫</button>';
+  keys+='<button class="pk" data-n="0">0</button>';
+  keys+='<button class="pk fn" data-n="call">拨打</button>';
+
+  body.innerHTML =
+    '<div class="pnum">'+shown+'</div>'+
+    '<div class="pkey">'+keys+'</div>'+
+    '<button class="pbtn ghost" id="phoneCancel">挂断</button>';
+
+  var ks=body.querySelectorAll('.pk');
+  for(var i=0;i<ks.length;i++){
+    (function(el){
+      el.onclick=function(){ phoneKey(el.getAttribute('data-n')); };
+    })(ks[i]);
+  }
+  var c=document.getElementById('phoneCancel');
+  if(c) c.onclick=function(){ closePhone(); };
+}
+
+function phoneKey(k){
+  if(k==='del'){ PHONE.input=PHONE.input.slice(0,-1); phoneRender(); return; }
+  if(k==='call'){
+    if(PHONE.input==='7777777'){
+      PHONE.talking=true;
+      phoneRender();
+    } else {
+      toast('号码不对…');
+      PHONE.input='';
+      phoneRender();
+    }
+    return;
+  }
+  if(PHONE.input.length>=11) return;
+  PHONE.input += k;
+  phoneRender();
+}
+
+function closePhone(){
+  PHONE.open=false; PHONE.input=''; PHONE.talking=false;
+  var box=document.getElementById('phonePanel');
+  if(box) box.classList.add('hidden');
+}
+
+function phoneFinish(){
+  closePhone();
+  PHONE.timer=0;
+  S.hiddenEnding=true;
+  ending(6);
 }
 /* ================= 商店 / 制作 / 门 ================= */
 function hidePanel(){ document.getElementById('panel').classList.add('hidden'); }
@@ -2087,11 +2242,10 @@ function interact(){
   /* ---------- 新机关 ---------- */
   if(o.t==='cctv'){ tryCctv(o); return; }
   if(o.t==='car'){
-    /* 砸车会掉木头（做黑钥匙要用） */
+    /* 砸车只会发出巨响引来敌人，不再产出木头 */
     if(S.carBroken){ toast('车已经砸烂了'); return; }
     if(!S.inv.hammer){ toast('需要锤子才能砸车'); return; }
     tryCar(o);
-    if(!S.inv.wood){ S.inv.wood=true; toast('从车里翻出一根木头'); updateHUD(); }
     return;
   }
   if(o.t==='stairs'){
@@ -2161,7 +2315,9 @@ var ENDINGS = {
   4:{title:'结局四 · 地下车库逃脱', color:'#a78bfa',
      desc:'三个电闸全部拉下，你举着锤子砸开铁门，从车库通道走了出去。'},
   5:{title:'结局五 · 地下室逃脱', color:'#38bdf8',
-     desc:'锯树、买刀、拿到制作图，你在制作室做出黑钥匙。推开门，走过那段没人知道的楼梯——你赢了。'}
+     desc:'锯树、买刀、拿到制作图，你在制作室做出黑钥匙。推开门，走过那段没人知道的楼梯——你赢了。'},
+  6:{title:'结局六 · 打电话给原作者', color:'#a855f7',
+     desc:'你在地下室的出口旁边站了很久，忽然听见一阵电话铃声。拨出 7777777，电话那头是原作者。<br>「行，我佩服你的实力」—— 你被放行了。'}
 };
 
 function ending(n){
@@ -2176,6 +2332,7 @@ function ending(n){
   t.style.textShadow='0 0 22px '+e.color+'88';
   var extra='';
   if(n===5) extra='<br><br><span style="color:#8ea6c2">从楼梯走到另一个楼梯，就是出口。</span>';
+  if(n===6) extra='<br><br><span style="color:#c4a0ff">隐藏结局 · 仅地狱模式可触发</span>';
   document.getElementById('endDesc').innerHTML=e.desc+extra+
     '<br><br><span style="color:#8ea6c2;font-size:12px">难度：'+DIFF[S.diff].name+' · 被抓 '+S.catches+' 次 · 剩余命 '+(S.lives>0?S.lives:0)+'</span>'
     +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+'</div>';
@@ -2891,6 +3048,8 @@ function loop(t){
     }
     /* 抓捕判定：每帧都要跑，站着不动也会被监控/视野抓到 */
     if(S.mode==='play') checkCatch(dt);
+    /* 隐藏结局：地狱模式在地下室出口旁站满 5 秒 → 电话 */
+    updatePhoneHidden(dt);
     if(S.msgT>0){
       S.msgT-=dt;
       if(S.msgT<=0){
@@ -2912,6 +3071,7 @@ bindInput();
 buildWorld();
 achLoad();          /* 载入本地保存的成就（localStorage / cookie） */
 renderAchChip();
+refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
 S.mode='menu';
 requestAnimationFrame(loop);
 })();

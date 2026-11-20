@@ -1052,11 +1052,9 @@ var ENEMY_TURN = 0.5;      /* 一回合里敌人推进的等效秒数 */
 function runEnemyTurn(){
   if(S.mode!=='play') return;
   S.needEnemyTurn=false;
-  /* 敌人行动一回合 */
+  /* 敌人移动一回合（被抓判定由主循环每帧处理） */
   updateNpcs(ENEMY_TURN);
   if(S.mode!=='play') return;
-  /* 每回合结算一次是否被发现 / 被抓 */
-  checkCatch(ENEMY_TURN);
   updateSeeHUD();
 }
 
@@ -2229,10 +2227,10 @@ function computeView(){
   padBot = (CH>620) ? 190 : 172;
   viewH = Math.max(140, CH-padTop-padBot);
 
-  /* 视口大约显示 13 格，保证手机上格子够大 */
-  var tiles = 13;
+  /* 视口大约显示 18 格：回合制下要能看清敌人的走位 */
+  var tiles = 18;
   scale = Math.min(CW/tiles, viewH/tiles);
-  scale = Math.max(16, Math.min(scale, 42));
+  scale = Math.max(12, Math.min(scale, 34));
   S._scale = scale;
   return f;
 }
@@ -2567,8 +2565,10 @@ function loop(t){
     updateCameras(dt);
     movePlayer(dt);
     stairCheck();
-    /* 回合制：敌人只在玩家走完一格后才行动一次 */
+    /* 敌人移动：回合制，只在玩家走完一格后行动一次 */
     if(S.needEnemyTurn && S.stepT<=0) runEnemyTurn();
+    /* 抓捕判定：每帧都要跑，站着不动也会被监控/视野抓到 */
+    if(S.mode==='play') checkCatch(dt);
     if(S.msgT>0){
       S.msgT-=dt;
       if(S.msgT<=0){

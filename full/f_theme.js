@@ -125,7 +125,7 @@ function themeLoad(){
     try{
       var o=JSON.parse(raw);
       if(o){
-        if(o.style==='material'||o.style==='classic') THEME.style=o.style;
+        if(o.style==='material'||o.style==='classic'||o.style==='terminal') THEME.style=o.style;
         var c=parseInt(o.color,10);
         if(!isNaN(c) && c>=0 && c<256) THEME.color=c;
       }
@@ -152,9 +152,12 @@ function themeApply(){
   var body=document.body;
   var root=document.documentElement;
   var mat = (THEME.style==='material');
+  var trm = (THEME.style==='terminal');
   if(body && body.classList){
     if(mat) body.classList.add('theme-material');
     else body.classList.remove('theme-material');
+    if(trm) body.classList.add('theme-terminal');
+    else body.classList.remove('theme-terminal');
   }
   /* 生成并注入 Material 变量 */
   var hex=themeColorHex();
@@ -166,7 +169,7 @@ function themeApply(){
   /* 浏览器地址栏配色也跟着走 */
   var meta=document.querySelector? document.querySelector('meta[name="theme-color"]') : null;
   if(meta && meta.setAttribute){
-    meta.setAttribute('content', mat ? tok['--m3-surface'] : '#0b0f16');
+    meta.setAttribute('content', (mat||trm) ? tok['--m3-surface'] : '#0b0f16');
   }
   /* 同步选中态 */
   themeSyncUI();
@@ -224,10 +227,11 @@ function themeSyncUI(){
 }
 function themeStyleName(){
   if(THEME.style==='material') return 'Material';
+  if(THEME.style==='terminal') return '终端';
   return '原版';
 }
 function themeSetStyle(s){
-  THEME.style = (s==='material')?'material':'classic';
+  THEME.style = (s==='material')?'material':((s==='terminal')?'terminal':'classic');
   themeSave();
   themeApply();
 }
@@ -290,7 +294,7 @@ function themeBind(){
    不动那些语义色，避免玩家看不懂哪扇门对应哪把钥匙。
 */
 function themeMapColors(){
-  if(THEME.style !== 'material'){
+  if(THEME.style !== 'material' && THEME.style !== 'terminal'){
     return {
       m3:false,
       bg0:'#16222b', bg1:'#111a21', bg2:'#0b1216',
@@ -300,6 +304,19 @@ function themeMapColors(){
       roomClass:'rgba(60,160,255,.11)', roomToilet:'rgba(80,220,180,.10)', roomOther:'rgba(120,160,220,.05)',
       roomLabel:'rgba(200,225,255,.30)',
       border:'rgba(90,170,235,.18)'
+    };
+  }
+  /* ===== 终端：绿色磷光栅格，硬边界、无色相派生 ===== */
+  if(THEME.style === 'terminal'){
+    return {
+      m3:false, trm:true,
+      bg0:'#000000', bg1:'#000000', bg2:'#000000',
+      floorA:'#04140a', floorB:'#030f07',
+      wallA:'#0f4a26', wallB:'#0b3a1e',
+      grid:'rgba(94,255,143,0.10)', wallEdge:'rgba(94,255,143,0.16)',
+      roomClass:'rgba(94,255,143,0.10)', roomToilet:'rgba(94,255,143,0.07)', roomOther:'rgba(94,255,143,0.03)',
+      roomLabel:'rgba(94,255,143,0.45)',
+      border:'rgba(31,122,63,0.55)'
     };
   }
   var seed = themeColorHex();
@@ -334,7 +351,7 @@ function themeMapColors(){
    经典分支返回与原版完全一致的硬编码色；Material 分支由种子色派生。
 */
 function themeUiColors(){
-  if(typeof THEME==='undefined' || (THEME.style!=='material')){
+  if(typeof THEME==='undefined' || (THEME.style!=='material' && THEME.style!=='terminal')){
     return {
       m3:false,
       title:'#9fe6ff',      /* 面板标题 */
@@ -355,6 +372,18 @@ function themeUiColors(){
   }
   var hex=themeColorHex();
   var h=themeHue(hex), s=themeSat(hex);
+  /* ===== 终端：磷光绿 CRT，零圆角硬框，颜色固定不随色轮走 ===== */
+  if(THEME.style==='terminal'){
+    return {
+      m3:false, trm:true,
+      title:'#5eff8f', text:'#3fb865', sub:'#35a058', dim:'#2b7d45', faint:'#1c5a30',
+      accent:'#5eff8f', gold:'#ffd75e', warn:'#ff6b6b',
+      line:'rgba(94,255,143,0.16)',
+      rowBg:'#000000', rowGot:'#04180a',
+      rowBorder:'#14532b', rowGotBorder:'#1f7a3f',
+      dotOff:'rgba(43,125,69,0.35)'
+    };
+  }
   var ns=Math.min(s, 0.16);
   /* 种子接近灰色时，强调色会失去区分度，抬一个保底饱和度 */
   var as=Math.max(s, 0.42);

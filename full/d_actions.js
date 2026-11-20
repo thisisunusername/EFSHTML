@@ -317,6 +317,15 @@ function bindInput(){
   /* DevTest 终端：输入框内的按键不传给游戏 */
   var dtInp=document.getElementById('devTermInput');
   if(dtInp){
+    /* 移动端：body 的 touch-action:none 会拦掉点击，这里手动聚焦唤键盘 */
+    var dtRow=document.getElementById('devTermRow');
+    function dtFocus(ev){
+      if(ev && ev.target===dtInp) return;
+      if(ev && ev.preventDefault) ev.preventDefault();
+      try{ dtInp.focus(); dtInp.click(); }catch(err){}
+    }
+    if(dtRow){ dtRow.addEventListener('touchstart',dtFocus,{passive:false}); dtRow.addEventListener('click',dtFocus); }
+    dtInp.addEventListener('touchstart',function(e){ e.stopPropagation(); },{passive:true});
     dtInp.addEventListener('keydown',function(e){
       e.stopPropagation();
       if(e.key==='Enter'){

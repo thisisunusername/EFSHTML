@@ -664,12 +664,19 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 #devTermLog .tl-ok{color:#5eff8f}
 #devTermLog .tl-err{color:#ff6b6b}
 #devTermLog .tl-in{color:#ffd75e}
-#devTermRow{display:flex; align-items:center; gap:6px;
-  border-top:1px solid #14532b; padding:8px 12px 12px;}
+#devTermRow{display:flex; align-items:center; gap:6px; flex:0 0 auto;
+  border-top:1px solid #14532b; padding:8px 12px calc(12px + env(safe-area-inset-bottom,0px));}
 #devTermRow span{color:#5eff8f; font-size:13px; font-weight:700}
 #devTermInput{flex:1; background:#000; border:none; outline:none;
   color:#5eff8f; font-family:inherit; font-size:13px; padding:4px 0;}
 #devTermInput::placeholder{color:#1c5a30}
+/* 关键：body 全局 touch-action:none 会让输入框点不到、打不出字，过继回来 */
+#devTerm{touch-action:manipulation; user-select:text; -webkit-user-select:text}
+#devTerm *{touch-action:manipulation; user-select:text; -webkit-user-select:text}
+#devTermInput{touch-action:manipulation; user-select:text; -webkit-user-select:text;
+  pointer-events:auto; -webkit-appearance:none; appearance:none;
+  min-height:24px; line-height:1.4;}
+#devTermInput:focus{outline:none}
 </style>
 </head>
 <body>

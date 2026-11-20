@@ -1255,7 +1255,11 @@ function devTermOpen(){
   }
   t.classList.remove('hidden');
   var inp=document.getElementById('devTermInput');
-  if(inp){ try{ inp.focus(); }catch(e){} }
+  if(inp){
+    /* display 生效后再聚焦，否则部分内核 focus 无效 */
+    try{ inp.focus(); inp.click(); }catch(e){}
+    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 60);
+  }
   if(!t.getAttribute('data-welcomed')){
     t.setAttribute('data-welcomed','1');
     devTermLog('E.F.S  DevTest Terminal  [仅为终端风格]','tl-ok');

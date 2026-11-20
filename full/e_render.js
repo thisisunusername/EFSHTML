@@ -462,6 +462,8 @@ resize();
 bindInput();
 buildWorld();
 achLoad();          /* 载入本地保存的成就（localStorage / cookie） */
+themeLoad();        /* 载入主题设置 */
+themeApply();       /* 应用主题（原版 / Material + 256 色） */
 renderAchChip();
 refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
 S.mode='menu';

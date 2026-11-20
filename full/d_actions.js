@@ -447,6 +447,8 @@ function bindInput(){
   if(nb) nb.addEventListener('click',function(){ askName(); });
   var eb=document.getElementById('expBtn');
   if(eb) eb.addEventListener('click',function(){ exportScores(); });
+  /* 主题面板 */
+  if(typeof themeBind==='function') themeBind();
 
   /* 作弊：连点标题 7 次打开 */
   var h1=document.querySelector('h1');

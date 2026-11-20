@@ -188,6 +188,163 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 #cheatTag{position:absolute;right:10px;top:8px;z-index:65;font-size:10px;letter-spacing:1px;
   color:#ff9aa8;border:1px solid rgba(244,63,94,.5);border-radius:6px;padding:1px 6px;display:none}
 
+/* ================= Material Design 3 主题（仅主菜单） =================
+   变量由 f_theme.js 的 themeApply() 注入到 :root
+   默认兜底值 = 蓝色的 M3 深色配色，防止脚本未执行时变白
+*/
+:root{
+  --m3-primary:#a8c7fa; --m3-on-primary:#06305f;
+  --m3-primary-container:#1d4f8c; --m3-on-primary-container:#d6e6ff;
+  --m3-secondary:#bcc8dc; --m3-on-secondary:#1b2738;
+  --m3-tertiary:#f0b8d0; --m3-surface:#0b1017; --m3-surface-1:#0f1620;
+  --m3-surface-2:#131b26; --m3-surface-3:#18212e;
+  --m3-on-surface:#e6ebf4; --m3-on-surface-var:#a3aebf;
+  --m3-outline:#717b8c; --m3-outline-var:#3b4553;
+  --m3-error:#f2b8b5; --m3-on-error:#601410; --m3-error-container:#8c1d18;
+  --m3-success:#8ed9a4; --m3-seed:#5b8def;
+  --m3-r-xl:28px; --m3-r-l:20px; --m3-r-m:16px; --m3-r-s:12px; --m3-r-xs:8px;
+}
+
+/* ---- 主菜单外观：M3 深色表面 + 大圆角 + 状态层 ---- */
+body.theme-material #startScr.overlay{
+  background:var(--m3-surface);
+  background-image:none;
+  padding:26px 18px 30px; gap:12px;
+  font-family:"Roboto","Noto Sans SC",-apple-system,"PingFang SC",system-ui,sans-serif;
+}
+body.theme-material #startScr h1{
+  font-size:26px; letter-spacing:.6px; color:var(--m3-on-surface);
+  text-shadow:none; font-weight:500; margin:4px 0 0; line-height:1.25;
+}
+body.theme-material #startScr .sub{
+  color:var(--m3-on-surface-var); font-size:13px; line-height:1.65; letter-spacing:.1px;
+}
+/* M3 Card：填充式 + 28dp 圆角 + 无重边框 */
+body.theme-material #startScr .card{
+  background:var(--m3-surface-2);
+  border:none; border-radius:var(--m3-r-xl);
+  padding:16px 18px; font-size:12.5px; color:var(--m3-on-surface-var); line-height:1.85;
+  box-shadow:0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.28);
+}
+body.theme-material #startScr .card b{color:var(--m3-primary); font-weight:600}
+/* 分段按钮（难度 / 玩法）：M3 Segmented Button 观感 */
+body.theme-material #startScr .diffs{gap:8px}
+body.theme-material #startScr .dbtn{
+  background:transparent;
+  border:1px solid var(--m3-outline);
+  color:var(--m3-on-surface);
+  border-radius:var(--m3-r-l);
+  font-size:14px; font-weight:500; letter-spacing:.2px;
+  padding:13px 8px; line-height:1.4;
+}
+body.theme-material #startScr .dbtn small{
+  color:var(--m3-on-surface-var); font-size:11px; margin-top:3px; letter-spacing:0;
+}
+body.theme-material #startScr .dbtn.on{
+  background:var(--m3-primary-container);
+  border-color:var(--m3-primary-container);
+  color:var(--m3-on-primary-container);
+}
+body.theme-material #startScr .dbtn.on small{color:var(--m3-on-primary-container); opacity:.85}
+body.theme-material #startScr .dbtn.hell{
+  border-color:var(--m3-error); background:transparent;
+}
+body.theme-material #startScr .dbtn.hell.on{
+  background:var(--m3-error-container); border-color:var(--m3-error-container); color:#ffdad6;
+}
+body.theme-material #startScr .dbtn.hell.on small{color:#ffdad6}
+/* 主按钮：M3 Filled Button，全圆角 */
+body.theme-material #startScr .bigbtn{
+  background:var(--m3-primary); color:var(--m3-on-primary);
+  border:none; border-radius:999px; padding:15px 40px;
+  font-size:15px; font-weight:600; letter-spacing:.4px;
+  box-shadow:0 1px 2px rgba(0,0,0,.4);
+  margin-top:16px; width:100%; max-width:340px;
+}
+body.theme-material #startScr .bigbtn:active{transform:scale(.98)}
+/* 次按钮：M3 Tonal Button */
+body.theme-material #startScr .ghostbtn{
+  background:var(--m3-surface-3); color:var(--m3-on-surface);
+  border:none; border-radius:999px; padding:11px 18px;
+  font-size:12.5px; font-weight:500;
+}
+body.theme-material #startScr .ghostbtn:active{transform:scale(.97); background:var(--m3-secondary)}
+/* 底部制作名单：M3 辅助文字 */
+body.theme-material #startScr .credits{
+  color:var(--m3-on-surface-var); opacity:.62; font-size:10.5px; margin-top:16px;
+}
+body.theme-material #startScr .credits .cl{color:var(--m3-primary)}
+body.theme-material #startScr .credits a{color:var(--m3-primary)}
+
+/* ---- 主题按钮（两种风格下都显示在主菜单） ---- */
+.themeFab{
+  position:absolute; right:14px; top:14px; z-index:12;
+  width:46px; height:46px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  background:rgba(18,26,40,.86); border:1px solid rgba(120,160,220,.35);
+  color:#cfe4ff; cursor:pointer; touch-action:manipulation;
+}
+.themeFab:active{transform:scale(.92)}
+body.theme-material .themeFab{
+  background:var(--m3-surface-3); border:none; color:var(--m3-primary);
+  box-shadow:0 2px 6px rgba(0,0,0,.4);
+}
+
+/* ---- 主题选择面板 ---- */
+#themePanel{position:absolute;inset:0;z-index:55;background:rgba(4,8,14,.78);
+  display:flex;align-items:center;justify-content:center;padding:16px}
+#themePanel.hidden{display:none}
+.tbox{width:100%;max-width:360px;max-height:88vh;overflow-y:auto;
+  background:rgba(18,26,40,.99);border:1px solid rgba(120,180,240,.35);
+  border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px}
+body.theme-material .tbox{
+  background:var(--m3-surface-2); border:none; border-radius:var(--m3-r-xl);
+  box-shadow:0 8px 28px rgba(0,0,0,.6);
+}
+.tbox h3{margin:0;font-size:16px;color:#9fe6ff;text-align:left;font-weight:700;letter-spacing:.5px}
+body.theme-material .tbox h3{color:var(--m3-on-surface);font-weight:500}
+.tlabel{font-size:11.5px;color:#8ea6c2;letter-spacing:.6px;margin-bottom:-4px}
+body.theme-material .tlabel{color:var(--m3-on-surface-var)}
+#themeStyles{display:flex;gap:8px}
+.tsty{flex:1;padding:12px 8px;border-radius:14px;font-size:13px;font-weight:600;
+  background:rgba(28,40,60,.92);border:1px solid rgba(120,170,235,.35);color:#e2eefc;
+  display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.3}
+.tsty small{font-size:10.5px;font-weight:400;color:#8ea6c2}
+.tsty.on{background:rgba(60,130,220,.9);border-color:rgba(150,220,255,.6);color:#fff}
+.tsty.on small{color:#dbeaff}
+body.theme-material .tsty{
+  background:transparent;border:1px solid var(--m3-outline);
+  border-radius:var(--m3-r-l);color:var(--m3-on-surface);font-weight:500;
+}
+body.theme-material .tsty small{color:var(--m3-on-surface-var)}
+body.theme-material .tsty.on{
+  background:var(--m3-primary-container);border-color:var(--m3-primary-container);
+  color:var(--m3-on-primary-container);
+}
+body.theme-material .tsty.on small{color:var(--m3-on-primary-container);opacity:.85}
+#themeGrid{display:grid;grid-template-columns:repeat(16,1fr);gap:2px}
+.tsw{aspect-ratio:1;border:none;border-radius:3px;padding:0;cursor:pointer;
+  outline:none;-webkit-appearance:none;appearance:none}
+.tsw.sel{box-shadow:0 0 0 2px #fff inset,0 0 0 2px rgba(0,0,0,.6);border-radius:4px;
+  transform:scale(1.18);z-index:2;position:relative}
+#themePreviewRow{display:flex;align-items:center;gap:10px}
+#themePreview{width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+  border:2px solid rgba(255,255,255,.22);box-shadow:0 0 12px rgba(0,0,0,.5)}
+#themeNowName{font-size:12.5px;color:#b8c9de;font-family:monospace}
+body.theme-material #themeNowName{color:var(--m3-on-surface-var)}
+#themeNote{font-size:10.5px;color:#6f8298;line-height:1.6}
+.tbtns{display:flex;gap:8px}
+.tbtns button{flex:1;padding:11px;border-radius:12px;font-size:13px;font-weight:600;
+  background:rgba(40,56,76,.9);border:1px solid rgba(120,160,210,.35);color:#b9cde4}
+.tbtns button.prim{background:linear-gradient(180deg,rgba(60,130,220,.95),rgba(35,85,160,.95));
+  border-color:rgba(120,200,255,.5);color:#fff}
+body.theme-material .tbtns button{
+  background:var(--m3-surface-3);border:none;color:var(--m3-on-surface);border-radius:999px;font-weight:500;
+}
+body.theme-material .tbtns button.prim{
+  background:var(--m3-primary);color:var(--m3-on-primary);font-weight:600;
+}
+
 </style>
 </head>
 <body>
@@ -242,7 +399,30 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
     </div>
   </div>
 
+  <div id="themePanel" class="hidden">
+    <div class="tbox">
+      <h3>🎨 主题</h3>
+      <div class="tlabel">风格</div>
+      <div id="themeStyles">
+        <div class="tsty on" data-ts="classic">原版<small>深蓝暗色</small></div>
+        <div class="tsty" data-ts="material">Material<small>M3 设计</small></div>
+      </div>
+      <div class="tlabel">颜色（256 色）</div>
+      <div id="themeGrid"></div>
+      <div id="themePreviewRow">
+        <div id="themePreview"></div>
+        <div id="themeNowName">原版 · #5B8DEF</div>
+      </div>
+      <div id="themeNote">颜色只在 Material 风格下生效；原版风格始终是深蓝色。风格仅作用于主菜单，游戏内界面不变。</div>
+      <div class="tbtns">
+        <button id="themeReset">恢复默认</button>
+        <button id="themeClose" class="prim">完成</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="startScr">
+    <div class="themeFab" id="themeBtn" title="主题">🎨</div>
     <h1>Escape From the School on HTML</h1><p class="sub" style="margin:2px 0 0">逃离学校 · HTML版</p>
     <p class="sub">五种结局 · 被抓两次就失败</p>
     <div class="card">
@@ -2796,6 +2976,8 @@ function bindInput(){
   if(nb) nb.addEventListener('click',function(){ askName(); });
   var eb=document.getElementById('expBtn');
   if(eb) eb.addEventListener('click',function(){ exportScores(); });
+  /* 主题面板 */
+  if(typeof themeBind==='function') themeBind();
 
   /* 作弊：连点标题 7 次打开 */
   var h1=document.querySelector('h1');
@@ -2927,6 +3109,287 @@ function openGateTile(f, o){
   /* 打开后把门对象移除，别再挡互动 */
   for(var i=0;i<f.objs.length;i++){ if(f.objs[i]===o){ f.objs.splice(i,1); break; } }
 }
+/* ================= 主题系统：原版 / Material You =================
+   THEME.style: 'classic'（原版深蓝）+ 'material'（Material Design 3）
+   THEME.color: 0..255，从 256 色板里选，Material 模式下用它生成整套色调
+   只影响主菜单（.overlay#startScr），游戏内 HUD 保持原样
+*/
+var THEME_KEY = 'efs_theme_v1';
+var THEME = { style:'classic', color: 108 };   /* 108 ≈ 那个熟悉的蓝 */
+
+var THEME_PALETTE = null;   /* 256 色，惰性生成 */
+
+/* HCT 简化版：把种子色转成 M3 的 tonal palette（明度分档） */
+function themeHexToRgb(hex){
+  var s=String(hex).replace('#','');
+  if(s.length===3) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+  return [parseInt(s.substr(0,2),16), parseInt(s.substr(2,2),16), parseInt(s.substr(4,2),16)];
+}
+function themeRgbToHex(r,g,b){
+  function h(v){ v=Math.max(0,Math.min(255,Math.round(v))); return (v<16?'0':'')+v.toString(16); }
+  return '#'+h(r)+h(g)+h(b);
+}
+/* 从种子色求色相（HSL 空间足够近似 M3 的 HCT 色相） */
+function themeHue(hex){
+  var c=themeHexToRgb(hex);
+  var r=c[0]/255, g=c[1]/255, b=c[2]/255;
+  var mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  if(d===0) return 0;
+  var h;
+  if(mx===r) h=((g-b)/d)%6;
+  else if(mx===g) h=(b-r)/d+2;
+  else h=(r-g)/d+4;
+  h*=60;
+  if(h<0) h+=360;
+  return h;
+}
+function themeSat(hex){
+  var c=themeHexToRgb(hex);
+  var r=c[0]/255, g=c[1]/255, b=c[2]/255;
+  var mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+  var l=(mx+mn)/2;
+  if(mx===mn) return 0;
+  return (mx-mn)/(1-Math.abs(2*l-1));
+}
+/* HSL → HEX */
+function themeHsl(h,s,l){
+  h=((h%360)+360)%360; s=Math.max(0,Math.min(1,s)); l=Math.max(0,Math.min(1,l));
+  var c=(1-Math.abs(2*l-1))*s;
+  var x=c*(1-Math.abs((h/60)%2-1));
+  var m=l-c/2;
+  var r,g,b;
+  if(h<60){ r=c; g=x; b=0; }
+  else if(h<120){ r=x; g=c; b=0; }
+  else if(h<180){ r=0; g=c; b=x; }
+  else if(h<240){ r=0; g=x; b=c; }
+  else if(h<300){ r=x; g=0; b=c; }
+  else { r=c; g=0; b=x; }
+  return themeRgbToHex((r+m)*255,(g+m)*255,(b+m)*255);
+}
+/* 色调值 token → 颜色。chroma 控制偏离灰色的程度（灰阶种子自动降饱和） */
+function themeTone(hue, sat, tone, chromaScale){
+  var s = sat * (chromaScale==null?1:chromaScale);
+  if(s < 0.06) s = 0.06;
+  /* tone 0..100 → HSL 亮度，暗端收得比线性更快，接近 M3 实际观感 */
+  var l = tone/100;
+  if(l < 0.5) l = l*0.86;
+  return themeHsl(hue, s, l);
+}
+
+/* 生成整套 M3 颜色变量 */
+function themeBuildTokens(hex){
+  var h = themeHue(hex);
+  var s = themeSat(hex);
+  var neutralSat = Math.min(s, 0.16);      /* 表面色用极低饱和的同色相 */
+  var t = {};
+  t['--m3-primary']            = themeTone(h, s, 80, 1);
+  t['--m3-on-primary']         = themeTone(h, s, 20, 1.2);
+  t['--m3-primary-container']  = themeTone(h, s, 30, 1);
+  t['--m3-on-primary-container']= themeTone(h, s, 90, 0.7);
+  t['--m3-secondary']          = themeTone(h, s*0.55, 80, 1);
+  t['--m3-on-secondary']       = themeTone(h, s*0.55, 20, 1);
+  t['--m3-tertiary']           = themeTone(h+60, s*0.8, 80, 1);
+  t['--m3-surface']            = themeTone(h, neutralSat, 6, 1);
+  t['--m3-surface-1']          = themeTone(h, neutralSat, 10, 1);
+  t['--m3-surface-2']          = themeTone(h, neutralSat, 14, 1);
+  t['--m3-surface-3']          = themeTone(h, neutralSat, 18, 1);
+  t['--m3-on-surface']         = themeTone(h, neutralSat, 92, 0.5);
+  t['--m3-on-surface-var']     = themeTone(h, neutralSat, 70, 0.5);
+  t['--m3-outline']            = themeTone(h, neutralSat, 45, 0.8);
+  t['--m3-outline-var']        = themeTone(h, neutralSat, 28, 0.8);
+  t['--m3-error']              = '#f2b8b5';
+  t['--m3-on-error']           = '#601410';
+  t['--m3-error-container']    = '#8c1d18';
+  t['--m3-success']            = themeTone(h+120, 0.45, 78, 1);
+  t['--m3-seed']               = hex;
+  return t;
+}
+
+/* 256 色板：16×16。色相绕一圈，饱和/亮度分档 */
+function themePalette(){
+  if(THEME_PALETTE) return THEME_PALETTE;
+  var arr=[];
+  /* 按 16 个色相列、16 个明度行排：方便手机上一眼扫到喜欢的颜色 */
+  for(var row=0; row<16; row++){
+    for(var col=0; col<16; col++){
+      var hue = col*22.5;                       /* 0..360 一圈 */
+      var tv  = row/15;                         /* 0..1 明度梯度 */
+      var sat, lig;
+      if(row<2){ sat=0; lig=0.10+row*0.13; }    /* 前两行是灰阶 */
+      else {
+        sat = Math.min(1, 0.30 + (row-2)/13*0.65);
+        lig = 0.78 - (row-2)/13*0.52;
+      }
+      arr.push({ hex: themeHsl(hue, sat, lig), hue: hue, row: row, col: col });
+    }
+  }
+  THEME_PALETTE = arr;
+  return arr;
+}
+
+/* 读写 */
+function themeLoad(){
+  var raw=null;
+  try{ raw=localStorage.getItem(THEME_KEY); }catch(e){}
+  if(!raw) raw=readCookie(THEME_KEY);
+  if(raw){
+    try{
+      var o=JSON.parse(raw);
+      if(o){
+        if(o.style==='material'||o.style==='classic') THEME.style=o.style;
+        var c=parseInt(o.color,10);
+        if(!isNaN(c) && c>=0 && c<256) THEME.color=c;
+      }
+    }catch(e){}
+  }
+  return THEME;
+}
+function themeSave(){
+  var raw=JSON.stringify({style:THEME.style, color:THEME.color});
+  try{ localStorage.setItem(THEME_KEY, raw); }catch(e){}
+  writeCookie(THEME_KEY, raw, 3650);
+}
+/* 当前选中色的十六进制 */
+function themeColorHex(){
+  var p=themePalette();
+  var i=THEME.color;
+  if(isNaN(i) || i<0 || i>=p.length) i=108;
+  return p[i].hex;
+}
+
+/* 把主题作用到 DOM */
+function themeApply(){
+  if(typeof document==='undefined') return;
+  var body=document.body;
+  var root=document.documentElement;
+  var mat = (THEME.style==='material');
+  if(body && body.classList){
+    if(mat) body.classList.add('theme-material');
+    else body.classList.remove('theme-material');
+  }
+  /* 生成并注入 Material 变量 */
+  var hex=themeColorHex();
+  var tok=themeBuildTokens(hex);
+  var target=root && root.style ? root.style : (body && body.style ? body.style : null);
+  if(target && target.setProperty){
+    for(var k in tok) target.setProperty(k, tok[k]);
+  }
+  /* 浏览器地址栏配色也跟着走 */
+  var meta=document.querySelector? document.querySelector('meta[name="theme-color"]') : null;
+  if(meta && meta.setAttribute){
+    meta.setAttribute('content', mat ? tok['--m3-surface'] : '#0b0f16');
+  }
+  /* 同步选中态 */
+  themeSyncUI();
+}
+
+/* 打开 / 关闭主题面板 */
+function themeOpenPanel(){
+  var p=document.getElementById('themePanel');
+  if(p) p.classList.remove('hidden');
+  themeRenderGrid();
+  themeSyncUI();
+}
+function themeClosePanel(){
+  var p=document.getElementById('themePanel');
+  if(p) p.classList.add('hidden');
+}
+/* 渲染 256 色格 */
+function themeRenderGrid(){
+  var g=document.getElementById('themeGrid');
+  if(!g) return;
+  var pal=themePalette();
+  var html='';
+  for(var i=0;i<pal.length;i++){
+    var on=(i===THEME.color)?' sel':'';
+    html+='<button class="tsw'+on+'" data-ti="'+i+'" style="background:'+pal[i].hex+'"></button>';
+  }
+  g.innerHTML=html;
+}
+/* 同步风格胶囊 + 色格高亮 + 预览条 */
+function themeSyncUI(){
+  var st=document.getElementById('themeStyles');
+  if(st && st.querySelectorAll){
+    var bs=st.querySelectorAll('.tsty');
+    for(var i=0;i<bs.length;i++){
+      var isOn=(bs[i].getAttribute('data-ts')===THEME.style);
+      if(isOn) bs[i].classList.add('on');
+      else bs[i].classList.remove('on');
+    }
+  }
+  var g=document.getElementById('themeGrid');
+  if(g && g.querySelectorAll){
+    var sw=g.querySelectorAll('.tsw');
+    for(var j=0;j<sw.length;j++){
+      var on=(parseInt(sw[j].getAttribute('data-ti'),10)===THEME.color);
+      if(on) sw[j].classList.add('sel');
+      else sw[j].classList.remove('sel');
+    }
+  }
+  var pv=document.getElementById('themePreview');
+  if(pv && pv.style){
+    pv.style.background=themeColorHex();
+  }
+  var nm=document.getElementById('themeNowName');
+  if(nm) nm.textContent = (THEME.style==='material'?'Material':'原版')+' · '+themeColorHex().toUpperCase();
+}
+function themeSetStyle(s){
+  THEME.style = (s==='material')?'material':'classic';
+  themeSave();
+  themeApply();
+}
+function themeSetColor(i){
+  i=parseInt(i,10);
+  if(isNaN(i) || i<0 || i>=256) return;
+  THEME.color=i;
+  themeSave();
+  themeApply();
+}
+/* 恢复默认：原版 + 蓝 */
+function themeReset(){
+  THEME.style='classic';
+  THEME.color=108;
+  themeSave();
+  themeApply();
+  toast('已恢复默认主题');
+}
+
+/* 绑定主题面板的交互 */
+function themeBind(){
+  var open=document.getElementById('themeBtn');
+  if(open) open.addEventListener('click',function(e){
+    if(e && e.stopPropagation) e.stopPropagation();
+    themeOpenPanel();
+  });
+  var cl=document.getElementById('themeClose');
+  if(cl) cl.addEventListener('click',function(){ themeClosePanel(); });
+  var rs=document.getElementById('themeReset');
+  if(rs) rs.addEventListener('click',function(){ themeReset(); });
+
+  var st=document.getElementById('themeStyles');
+  if(st){
+    var bs=st.querySelectorAll('.tsty');
+    for(var i=0;i<bs.length;i++){
+      (function(b){
+        b.addEventListener('click',function(){
+          themeSetStyle(b.getAttribute('data-ts'));
+        });
+      })(bs[i]);
+    }
+  }
+  var g=document.getElementById('themeGrid');
+  if(g) g.addEventListener('click',function(e){
+    var t=e.target||e.srcElement;
+    while(t && t!==g){
+      if(t.getAttribute && t.getAttribute('data-ti')!==null && t.getAttribute('data-ti')!==''){
+        themeSetColor(t.getAttribute('data-ti'));
+        return;
+      }
+      t=t.parentNode;
+    }
+  });
+}
+
 /* ================= 画布基础 ================= */
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
@@ -3391,6 +3854,8 @@ resize();
 bindInput();
 buildWorld();
 achLoad();          /* 载入本地保存的成就（localStorage / cookie） */
+themeLoad();        /* 载入主题设置 */
+themeApply();       /* 应用主题（原版 / Material + 256 色） */
 renderAchChip();
 refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
 S.mode='menu';

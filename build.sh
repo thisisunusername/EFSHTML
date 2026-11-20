@@ -14,6 +14,7 @@ OUT=index.html
   cat full/b_world.js;   printf '\n'
   cat full/c_logic.js;   printf '\n'
   cat full/d_actions.js; printf '\n'
+  cat full/f_theme.js;   printf '\n'
   cat full/e_render.js
   printf '</script>\n'
   printf '</body>\n'

@@ -702,6 +702,53 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 .dkKey.warn{color:#ffd75e; border-color:#ffd75e}
 .dkKey.warn:active{background:#ffd75e; color:#000}
 .dkKey.dim{color:#2b7d45; border-color:#14532b; font-size:12px}
+/* ===== 自定义主题面板 ===== */
+#custBox{margin-top:2px}
+.custRow{display:flex; align-items:center; gap:8px; margin:6px 0}
+.custSw{display:flex; align-items:center; gap:6px; font-size:13px; color:#cfe4ff; cursor:pointer}
+.custSw input{width:16px; height:16px; accent-color:#5b8def}
+.custName{width:64px; font-size:12.5px; color:#8ea6c2; flex:0 0 auto}
+.custPick{width:38px; height:30px; border:1px solid rgba(120,170,235,.35); border-radius:7px;
+  background:transparent; padding:2px; flex:0 0 auto; cursor:pointer}
+.custHex{flex:1 1 0; min-width:0; height:30px; background:rgba(8,14,22,.9);
+  border:1px solid rgba(120,170,235,.3); border-radius:7px; color:#dceaff;
+  font-family:"JetBrains Mono",Consolas,monospace; font-size:12px; padding:0 8px}
+.custPresets{display:flex; gap:5px; flex:1 1 0; flex-wrap:wrap}
+.custPresets button{flex:1 1 auto; min-width:52px; height:28px; font-size:12px;
+  background:rgba(30,44,66,.9); border:1px solid rgba(120,170,235,.35);
+  border-radius:7px; color:#dceaff; cursor:pointer; padding:0 6px}
+.custPresets button:active{transform:scale(.96)}
+#custBox .custRow button{height:30px; font-size:12.5px; padding:0 10px;
+  background:rgba(30,44,66,.9); border:1px solid rgba(120,170,235,.35);
+  border-radius:7px; color:#dceaff; cursor:pointer; flex:1 1 auto}
+#custBox .custRow button.danger{color:#ff8095; border-color:rgba(255,128,149,.45)}
+#custBox .custRow button:active{transform:scale(.96)}
+.custIO{width:100%; height:78px; margin-top:6px; resize:vertical;
+  background:rgba(6,10,16,.92); border:1px solid rgba(120,170,235,.28);
+  border-radius:8px; color:#9fc3e8; font-family:"JetBrains Mono",Consolas,monospace;
+  font-size:11px; line-height:1.5; padding:6px 8px}
+/* 终端主题下的自定义区域 */
+body.theme-terminal .custName,body.theme-terminal .custSw{color:#3fb865}
+body.theme-terminal .custHex,body.theme-terminal .custIO{
+  background:#000; border:1px solid #1f7a3f; color:#5eff8f; border-radius:0}
+body.theme-terminal .custPick{border:1px solid #1f7a3f; border-radius:0}
+body.theme-terminal .custPresets button,
+body.theme-terminal #custBox .custRow button{
+  background:#000; border:1px solid #1f7a3f; color:#5eff8f; border-radius:0}
+/* ===== 自定义主题作用到主界面 ===== */
+body.theme-custom #startScr{background:var(--cf-bg)}
+body.theme-custom #startScr h1{color:var(--cf-title)}
+body.theme-custom #startScr .sub{color:var(--cf-sub)}
+body.theme-custom #startScr .card{background:var(--cf-card); border-color:var(--cf-line); color:var(--cf-text)}
+body.theme-custom #startScr .card b{color:var(--cf-accent)}
+body.theme-custom #startScr .bigbtn{background:var(--cf-accent); color:var(--cf-bg); border-color:var(--cf-accent)}
+body.theme-custom #startScr .ghostbtn{background:var(--cf-btn); color:var(--cf-btnText); border-color:var(--cf-line)}
+body.theme-custom #startScr .dbtn{background:var(--cf-btn); color:var(--cf-btnText); border-color:var(--cf-line)}
+body.theme-custom #startScr .dbtn.on,body.theme-custom #startScr .dbtn:active{
+  background:var(--cf-accent); color:var(--cf-bg); border-color:var(--cf-accent)}
+body.theme-custom #startScr .credits{color:var(--cf-sub)}
+body.theme-custom #startScr .themeFab{background:var(--cf-btn); border-color:var(--cf-line)}
+
 </style>
 </head>
 <body>
@@ -767,6 +814,7 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
       </div>
       <div class="tlabel">颜色（256 色）</div>
       <div id="themeGrid"></div>
+      <div id="custBox"></div>
       <div id="themePreviewRow">
         <div id="themePreview"></div>
         <div id="themeNowName">原版 · #5B8DEF</div>
@@ -2482,21 +2530,36 @@ var DEV_KB_LAYOUT = [
   ['q','w','e','r','t','y','u','i','o','p'],
   ['a','s','d','f','g','h','j','k','l','-'],
   ['z','x','c','v','b','n','m','.','_','/'],
-  ['SHIFT','?','SPACE','TAB','BKSP','ENTER']
+  ['SHIFT','SYM','SPACE','BKSP','ENTER']
 ];
+var DEV_KB_SYM = [
+  ['!','@','#','$','%','^','&','*','(',')'],
+  ['=','+','[',']','{','}',':',';','"',"'"],
+  ['<','>','|','\\','~','`',',','?','*','&'],
+  ['SPACE','=','-','_','.','/',':',';','(',')'],
+  ['ABC','SPACE','BKSP','ENTER']
+];
+var DEV_KB_SYM_MODE = false;
 var DEV_KB_SHIFT = false;
 
+
+function devKbCurrent(){
+  return DEV_KB_SYM_MODE ? DEV_KB_SYM : DEV_KB_LAYOUT;
+}
 function devKbRender(){
   var kb=document.getElementById('devKb');
   if(!kb) return;
+  var LAY=devKbCurrent();
   var html='';
-  for(var r=0;r<DEV_KB_LAYOUT.length;r++){
+  for(var r=0;r<LAY.length;r++){
     html+='<div class="dkRow">';
-    var row=DEV_KB_LAYOUT[r];
+    var row=LAY[r];
     for(var c=0;c<row.length;c++){
       var kk=row[c];
       var lbl=kk, cls='dkKey';
       if(kk==='SHIFT'){ lbl='SH'; cls+=' w15'+(DEV_KB_SHIFT?' on':''); }
+      else if(kk==='SYM'){ lbl='!#='; cls+=' w15 warn'; }
+      else if(kk==='ABC'){ lbl='abc'; cls+=' w15 warn'; }
       else if(kk==='SPACE'){ lbl='空格'; cls+=' space'; }
       else if(kk==='TAB'){ lbl='TAB'; cls+=' w15 dim'; }
       else if(kk==='BKSP'){ lbl='DEL'; cls+=' w15 warn'; }
@@ -2519,6 +2582,8 @@ function devKbSync(){
 }
 function devKbPress(kk){
   if(kk==='SHIFT'){ DEV_KB_SHIFT=!DEV_KB_SHIFT; devKbRender(); return; }
+  if(kk==='SYM'){ DEV_KB_SYM_MODE=true; devKbRender(); return; }
+  if(kk==='ABC'){ DEV_KB_SYM_MODE=false; devKbRender(); return; }
   if(kk==='BKSP'){ DEV_KB_BUF=DEV_KB_BUF.slice(0,-1); devKbSync(); return; }
   if(kk==='TAB'){ DEV_KB_BUF+=' '; devKbSync(); return; }
   if(kk==='SPACE'){ DEV_KB_BUF+=' '; devKbSync(); return; }
@@ -3973,7 +4038,7 @@ function openGateTile(f, o){
    只影响主菜单（.overlay#startScr），游戏内 HUD 保持原样
 */
 var THEME_KEY = 'efs_theme_v1';
-var THEME = { style:'classic', color: 108 };   /* 108 ≈ 那个熟悉的蓝 */
+var THEME = { style:'classic', color: 108, custom:false };   /* 108 ≈ 那个熟悉的蓝 */
 
 var THEME_PALETTE = null;   /* 256 色，惰性生成 */
 
@@ -4101,13 +4166,15 @@ function themeLoad(){
         if(o.style==='material'||o.style==='classic'||o.style==='terminal') THEME.style=o.style;
         var c=parseInt(o.color,10);
         if(!isNaN(c) && c>=0 && c<256) THEME.color=c;
+        THEME.custom=!!o.custom;
       }
     }catch(e){}
   }
+  if(THEME.custom){ try{ customLoad(); }catch(e){} }
   return THEME;
 }
 function themeSave(){
-  var raw=JSON.stringify({style:THEME.style, color:THEME.color});
+  var raw=JSON.stringify({style:THEME.style, color:THEME.color, custom:!!THEME.custom});
   try{ localStorage.setItem(THEME_KEY, raw); }catch(e){}
   writeCookie(THEME_KEY, raw, 3650);
 }
@@ -4144,6 +4211,8 @@ function themeApply(){
   if(meta && meta.setAttribute){
     meta.setAttribute('content', (mat||trm) ? tok['--m3-surface'] : '#0b0f16');
   }
+  /* 自定义主题变量注入 */
+  if(typeof customApply==='function') customApply();
   /* 同步选中态 */
   themeSyncUI();
 }
@@ -4152,8 +4221,10 @@ function themeApply(){
 function themeOpenPanel(){
   var p=document.getElementById('themePanel');
   if(p) p.classList.remove('hidden');
+  if(!CUSTOM_THEME) customLoad();
   themeRenderGrid();
   themeSyncUI();
+  customRenderUI();
 }
 function themeClosePanel(){
   var p=document.getElementById('themePanel');
@@ -4381,6 +4452,272 @@ function themeUiColors(){
     rowGotBorder:rgba(themeTone(h, Math.min(as,0.35), 70, 1), 0.42),
     dotOff:rgba(themeTone(h, ns, 55, 1), 0.28)
   };
+}
+/* ================= 自定义主题 =================
+   允许用户自定义主界面各项颜色，并可导出/导入/复制配置。
+   配置结构：{ v:1, name:'', ui:{ bg, card, text, title, sub, accent, line, btn, btnText } }
+*/
+var CUSTOM_KEY = 'efs_custom_theme_v1';
+var CUSTOM_THEME = null;
+var CUSTOM_FIELDS = [
+  { k:'bg',      n:'背景',     d:'#0e1519' },
+  { k:'card',    n:'卡片底',   d:'#131c26' },
+  { k:'text',    n:'正文',     d:'#e8eef7' },
+  { k:'title',   n:'标题',     d:'#ffffff' },
+  { k:'sub',     n:'次要文字', d:'#8ea6c2' },
+  { k:'accent',  n:'强调色',   d:'#5b8def' },
+  { k:'line',    n:'描边',     d:'#2a3a4d' },
+  { k:'btn',     n:'按钮底',   d:'#1e2c42' },
+  { k:'btnText', n:'按钮字',   d:'#dceaff' }
+];
+function customDefaults(){
+  var o={ v:1, name:'我的主题', ui:{} };
+  for(var i=0;i<CUSTOM_FIELDS.length;i++) o.ui[CUSTOM_FIELDS[i].k]=CUSTOM_FIELDS[i].d;
+  return o;
+}
+function customNormHex(v){
+  if(v===null || v===undefined) return null;
+  var s=String(v).trim();
+  if(!s) return null;
+  if(s.charAt(0)!=='#') s='#'+s;
+  if(/^#[0-9a-fA-F]{3}$/.test(s)){
+    s='#'+s.charAt(1)+s.charAt(1)+s.charAt(2)+s.charAt(2)+s.charAt(3)+s.charAt(3);
+  }
+  if(!/^#[0-9a-fA-F]{6}$/.test(s)) return null;
+  return s.toLowerCase();
+}
+
+function customLoad(){
+  var raw=null;
+  try{ raw=localStorage.getItem(CUSTOM_KEY); }catch(e){}
+  if(!raw) raw=readCookie(CUSTOM_KEY);
+  if(!raw){ CUSTOM_THEME=null; return null; }
+  CUSTOM_THEME=customParse(raw);
+  return CUSTOM_THEME;
+}
+function customSave(){
+  if(!CUSTOM_THEME) return;
+  var raw=JSON.stringify(CUSTOM_THEME);
+  try{ localStorage.setItem(CUSTOM_KEY, raw); }catch(e){}
+  writeCookie(CUSTOM_KEY, raw, 3650);
+}
+function customParse(raw){
+  var o=null;
+  try{ o=(typeof raw==='string')? JSON.parse(raw) : raw; }catch(e){ return null; }
+  if(!o || typeof o!=='object') return null;
+  var base=customDefaults();
+  var out={ v:1, name:String(o.name||base.name).slice(0,32), ui:{} };
+  var src=o.ui||o;
+  for(var i=0;i<CUSTOM_FIELDS.length;i++){
+    var f=CUSTOM_FIELDS[i];
+    var v=customNormHex(src[f.k]);
+    out.ui[f.k]= v||base.ui[f.k];
+  }
+  return out;
+}
+function customGet(){
+  if(!CUSTOM_THEME) CUSTOM_THEME=customDefaults();
+  return CUSTOM_THEME;
+}
+function customSerialize(pretty){
+  var o=customGet();
+  return pretty? JSON.stringify(o,null,2) : JSON.stringify(o);
+}
+function customSetField(k,v){
+  var h=customNormHex(v);
+  if(!h) return false;
+  for(var i=0;i<CUSTOM_FIELDS.length;i++){
+    if(CUSTOM_FIELDS[i].k===k){ customGet().ui[k]=h; customSave(); customApply(); return true; }
+  }
+  return false;
+}
+
+/* 把自定义色注入为 CSS 变量；关掉时清空 */
+function customApply(){
+  if(typeof document==='undefined') return;
+  var root=document.documentElement;
+  if(!root || !root.style || !root.style.setProperty) return;
+  var on=!!(THEME.custom && CUSTOM_THEME);
+  if(on){
+    var ui=customGet().ui;
+    root.style.setProperty('--cf-bg', ui.bg);
+    root.style.setProperty('--cf-card', ui.card);
+    root.style.setProperty('--cf-text', ui.text);
+    root.style.setProperty('--cf-title', ui.title);
+    root.style.setProperty('--cf-sub', ui.sub);
+    root.style.setProperty('--cf-accent', ui.accent);
+    root.style.setProperty('--cf-line', ui.line);
+    root.style.setProperty('--cf-btn', ui.btn);
+    root.style.setProperty('--cf-btnText', ui.btnText);
+  }
+  var body=document.body;
+  if(body && body.classList){
+    if(on) body.classList.add('theme-custom');
+    else body.classList.remove('theme-custom');
+  }
+}
+function customEnable(on){
+  THEME.custom=!!on;
+  if(on && !CUSTOM_THEME) CUSTOM_THEME=customDefaults();
+  themeSave();
+  themeApply();
+  customRenderUI();
+}
+function customReset(){
+  CUSTOM_THEME=customDefaults();
+  customSave();
+  customApply();
+  customRenderUI();
+  toast('已恢复自定义主题默认值');
+}
+
+function customRenderUI(){
+  var box=document.getElementById('custBox');
+  if(!box) return;
+  var o=customGet();
+  var html='';
+  html+='<div class="tlabel">自定义主题</div>';
+  html+='<div class="custRow"><label class="custSw"><input type="checkbox" id="custOn"'+(THEME.custom?' checked':'')+'> 启用自定义主题</label></div>';
+  for(var i=0;i<CUSTOM_FIELDS.length;i++){
+    var f=CUSTOM_FIELDS[i];
+    html+='<div class="custRow">'+
+      '<span class="custName">'+f.n+'</span>'+
+      '<input type="color" class="custPick" id="cust_'+f.k+'" value="'+o.ui[f.k]+'">'+
+      '<input type="text" class="custHex" id="custHex_'+f.k+'" value="'+o.ui[f.k]+'" maxlength="7" spellcheck="false">'+
+      '</div>';
+  }
+  html+='<div class="custRow"><span class="custName">预设</span><div class="custPresets">';
+  html+='<button data-cp="dark">深色</button>';
+  html+='<button data-cp="light">浅色</button>';
+  html+='<button data-cp="green">终端绿</button>';
+  html+='<button data-cp="sunset">暖橙</button>';
+  html+='</div></div>';
+  html+='<div class="custRow">'+
+    '<button id="custCopy">复制配置</button>'+
+    '<button id="custExport">导出文件</button>'+
+    '<button id="custImport">导入</button>'+
+    '<button id="custReset2" class="danger">重置</button></div>';
+  html+='<textarea id="custIOText" class="custIO" placeholder="点「复制配置」会把 JSON 放这里；也可以粘贴别人的配置后点「导入」"></textarea>';
+  box.innerHTML=html;
+  customBindUI();
+}
+
+var CUSTOM_PRESETS = {
+  dark:   { bg:'#0e1519', card:'#131c26', text:'#e8eef7', title:'#ffffff', sub:'#8ea6c2', accent:'#5b8def', line:'#2a3a4d', btn:'#1e2c42', btnText:'#dceaff' },
+  light:  { bg:'#f2f4f8', card:'#ffffff', text:'#1b2430', title:'#0c1219', sub:'#5b6b7f', accent:'#2f6fe0', line:'#d3dae6', btn:'#e4eaf4', btnText:'#1b2430' },
+  green:  { bg:'#04140a', card:'#071f10', text:'#5eff8f', title:'#a8ffc4', sub:'#3fb865', accent:'#5eff8f', line:'#1f7a3f', btn:'#0a2114', btnText:'#5eff8f' },
+  sunset: { bg:'#1a0f0a', card:'#241509', text:'#ffe8d6', title:'#ffd7a8', sub:'#c9a184', accent:'#ff8a3d', line:'#5a3520', btn:'#331d0f', btnText:'#ffd7a8' }
+};
+function customPreset(name){
+  var p=CUSTOM_PRESETS[name];
+  if(!p) return false;
+  var o=customGet();
+  for(var i=0;i<CUSTOM_FIELDS.length;i++){
+    var k=CUSTOM_FIELDS[i].k;
+    if(p[k]) o.ui[k]=p[k];
+  }
+  o.name='预设 · '+name;
+  customSave(); customApply(); customRenderUI();
+  toast('已套用预设：'+name);
+  return true;
+}
+function customBindUI(){
+  var on=document.getElementById('custOn');
+  if(on) on.onchange=function(){ customEnable(!!this.checked); };
+  for(var i=0;i<CUSTOM_FIELDS.length;i++){
+    (function(f){
+      var pk=document.getElementById('cust_'+f.k);
+      var hx=document.getElementById('custHex_'+f.k);
+      if(pk) pk.oninput=function(){
+        customSetField(f.k, this.value);
+        if(hx) hx.value=customGet().ui[f.k];
+        customRefreshSwatches();
+      };
+      if(hx) hx.onchange=function(){
+        if(customSetField(f.k, this.value)){
+          if(pk) pk.value=customGet().ui[f.k];
+          this.value=customGet().ui[f.k];
+          customRefreshSwatches();
+        } else { this.value=customGet().ui[f.k]; toast('颜色格式不对，用 #RRGGBB'); }
+      };
+    })(CUSTOM_FIELDS[i]);
+  }
+  var ps=document.querySelectorAll('#custBox .custPresets button');
+  for(var j=0;j<ps.length;j++){
+    (function(b){ b.onclick=function(){ customPreset(b.getAttribute('data-cp')); }; })(ps[j]);
+  }
+  var cp=document.getElementById('custCopy');
+  if(cp) cp.onclick=function(){ customCopyConfig(); };
+  var ex=document.getElementById('custExport');
+  if(ex) ex.onclick=function(){ customExportFile(); };
+  var im=document.getElementById('custImport');
+  if(im) im.onclick=function(){ customImportText(); };
+  var rs=document.getElementById('custReset2');
+  if(rs) rs.onclick=function(){ customReset(); };
+}
+function customRefreshSwatches(){ customApply(); }
+
+function customCopyConfig(){
+  var txt=customSerialize(true);
+  var ta=document.getElementById('custIOText');
+  if(ta) ta.value=txt;
+  /* 优先 Clipboard API，失败回退到选中 textarea */
+  var done=false;
+  try{
+    if(navigator && navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt);
+      done=true;
+      toast('配置已复制到剪贴板');
+    }
+  }catch(e){ done=false; }
+  if(!done && ta){
+    try{ ta.focus(); ta.select(); document.execCommand('copy'); toast('配置已复制'); done=true; }catch(e){}
+  }
+  if(!done) toast('已生成配置，请手动长按文本框全选复制');
+  return txt;
+}
+function customExportFile(){
+  var txt=customSerialize(true);
+  try{
+    var blob=new Blob([txt],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download='efs-theme-'+Date.now()+'.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); },1500);
+    toast('配置文件已导出');
+  }catch(e){
+    /* 不支持 Blob 下载时退化为复制 */
+    customCopyConfig();
+    toast('此浏览器不支持下载，已复制到文本框');
+  }
+}
+function customImportText(raw){
+  var ta=document.getElementById('custIOText');
+  var txt=(raw===undefined)? (ta? ta.value : '') : String(raw);
+  txt=String(txt||'').trim();
+  if(!txt){ toast('请先粘贴配置 JSON'); return false; }
+  var o=customParse(txt);
+  if(!o){ toast('配置解析失败：不是合法 JSON'); return false; }
+  CUSTOM_THEME=o;
+  THEME.custom=true;
+  customSave();
+  themeSave();
+  themeApply();
+  customRenderUI();
+  toast('配置已导入并启用');
+  return true;
+}
+function customImportFile(file){
+  if(!file) return false;
+  try{
+    var fr=new FileReader();
+    fr.onload=function(){ customImportText(fr.result); };
+    fr.readAsText(file);
+    return true;
+  }catch(e){ toast('读取文件失败'); return false; }
 }
 
 /* ================= 画布基础 ================= */

@@ -1310,21 +1310,36 @@ var DEV_KB_LAYOUT = [
   ['q','w','e','r','t','y','u','i','o','p'],
   ['a','s','d','f','g','h','j','k','l','-'],
   ['z','x','c','v','b','n','m','.','_','/'],
-  ['SHIFT','?','SPACE','TAB','BKSP','ENTER']
+  ['SHIFT','SYM','SPACE','BKSP','ENTER']
 ];
+var DEV_KB_SYM = [
+  ['!','@','#','$','%','^','&','*','(',')'],
+  ['=','+','[',']','{','}',':',';','"',"'"],
+  ['<','>','|','\\','~','`',',','?','*','&'],
+  ['SPACE','=','-','_','.','/',':',';','(',')'],
+  ['ABC','SPACE','BKSP','ENTER']
+];
+var DEV_KB_SYM_MODE = false;
 var DEV_KB_SHIFT = false;
 
+
+function devKbCurrent(){
+  return DEV_KB_SYM_MODE ? DEV_KB_SYM : DEV_KB_LAYOUT;
+}
 function devKbRender(){
   var kb=document.getElementById('devKb');
   if(!kb) return;
+  var LAY=devKbCurrent();
   var html='';
-  for(var r=0;r<DEV_KB_LAYOUT.length;r++){
+  for(var r=0;r<LAY.length;r++){
     html+='<div class="dkRow">';
-    var row=DEV_KB_LAYOUT[r];
+    var row=LAY[r];
     for(var c=0;c<row.length;c++){
       var kk=row[c];
       var lbl=kk, cls='dkKey';
       if(kk==='SHIFT'){ lbl='SH'; cls+=' w15'+(DEV_KB_SHIFT?' on':''); }
+      else if(kk==='SYM'){ lbl='!#='; cls+=' w15 warn'; }
+      else if(kk==='ABC'){ lbl='abc'; cls+=' w15 warn'; }
       else if(kk==='SPACE'){ lbl='空格'; cls+=' space'; }
       else if(kk==='TAB'){ lbl='TAB'; cls+=' w15 dim'; }
       else if(kk==='BKSP'){ lbl='DEL'; cls+=' w15 warn'; }
@@ -1347,6 +1362,8 @@ function devKbSync(){
 }
 function devKbPress(kk){
   if(kk==='SHIFT'){ DEV_KB_SHIFT=!DEV_KB_SHIFT; devKbRender(); return; }
+  if(kk==='SYM'){ DEV_KB_SYM_MODE=true; devKbRender(); return; }
+  if(kk==='ABC'){ DEV_KB_SYM_MODE=false; devKbRender(); return; }
   if(kk==='BKSP'){ DEV_KB_BUF=DEV_KB_BUF.slice(0,-1); devKbSync(); return; }
   if(kk==='TAB'){ DEV_KB_BUF+=' '; devKbSync(); return; }
   if(kk==='SPACE'){ DEV_KB_BUF+=' '; devKbSync(); return; }

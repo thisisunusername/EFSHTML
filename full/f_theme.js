@@ -104,8 +104,12 @@ function themePalette(){
       var hue = col*22.5;                       /* 0..360 一圈 */
       var tv  = row/15;                         /* 0..1 明度梯度 */
       var sat, lig;
-      if(row<2){ sat=0; lig=0.10+row*0.13; }    /* 前两行是灰阶 */
-      else {
+      if(row===0){
+        /* 第 0 行：完整中性灰阶，从左到右纯黑 → 纯白（col=15 就是 #ffffff） */
+        sat = 0; lig = col/15;
+      } else if(row===1){
+        sat = 0; lig = 0.10 + (col/15)*0.55;    /* 第 1 行：暗部灰阶，补中间调 */
+      } else {
         sat = Math.min(1, 0.30 + (row-2)/13*0.65);
         lig = 0.78 - (row-2)/13*0.52;
       }

@@ -621,6 +621,25 @@ body.theme-terminal .achRow{
 body.theme-terminal .achRow.got{
   border-color:#1f7a3f; background:#04180a}
 body.theme-terminal .achDesc{color:#2b7d45}
+/* ================= DevTest 终端 =================
+   仅在终端主题下可用；反引号键开关。
+*/
+#devTerm{position:fixed; left:0; right:0; bottom:0; z-index:9000;
+  background:#000; border-top:1px solid #1f7a3f;
+  font-family:"JetBrains Mono",Consolas,monospace;
+  max-height:55vh; display:flex; flex-direction:column;}
+#devTerm.hidden{display:none}
+#devTermLog{flex:1; overflow-y:auto; padding:10px 12px 4px;
+  font-size:11.5px; line-height:1.65; color:#3fb865;}
+#devTermLog .tl-ok{color:#5eff8f}
+#devTermLog .tl-err{color:#ff6b6b}
+#devTermLog .tl-in{color:#ffd75e}
+#devTermRow{display:flex; align-items:center; gap:6px;
+  border-top:1px solid #14532b; padding:8px 12px 12px;}
+#devTermRow span{color:#5eff8f; font-size:13px; font-weight:700}
+#devTermInput{flex:1; background:#000; border:none; outline:none;
+  color:#5eff8f; font-family:inherit; font-size:13px; padding:4px 0;}
+#devTermInput::placeholder{color:#1c5a30}
 </style>
 </head>
 <body>
@@ -760,6 +779,13 @@ body.theme-terminal .achDesc{color:#2b7d45}
     <div id="endDesc"></div>
     <button class="bigbtn" id="againBtn">再来一次</button>
     <button class="ghostbtn" id="backMenuBtn">回主菜单</button>
+  </div>
+</div>
+<div id="devTerm" class="hidden">
+  <div id="devTermLog"></div>
+  <div id="devTermRow">
+    <span>&gt;</span>
+    <input id="devTermInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 help 查看指令">
   </div>
 </div>
 <script>
@@ -1909,6 +1935,7 @@ function moveNpc(n,dt){
 
 function updateNpcs(dt){
   var d=DIFF[S.diff] || DIFF.normal;
+  if(typeof DEV!=='undefined' && DEV.freeze) return;   /* DevTest: freeze on */
   for(var i=0;i<S.npcs.length;i++){
     var n=S.npcs[i];
     if(n.flash>0) n.flash-=dt;
@@ -1937,10 +1964,19 @@ function updateNpcs(dt){
 
     /* ---------- 3) 当前层：追 / 巡逻 ---------- */
     if(onPlayerFloor){
+      /* 保安不追进教室：玩家躲在教室里时，保安只能在外巡逻 */
+      var playerInClass=false;
+      if(n.kind==='guard'){
+        var pr=roomAt(f,S.px,S.py);
+        playerInClass=!!(pr && pr.safe==='class');
+      }
       if(n.state==='chase' || npcSees(n)){
-        n.state='chase';
-        setPath(n, f, S.px, S.py);
-        if(!n.path || !n.path.length) n.state='patrol';
+        if(n.kind==='guard' && playerInClass){ n.state='patrol'; }
+        else{
+          n.state='chase';
+          setPath(n, f, S.px, S.py);
+          if(!n.path || !n.path.length) n.state='patrol';
+        }
       } else n.state='patrol';
     } else {
       n.state='patrol';        /* 后台层只巡逻，不追 */
@@ -2028,10 +2064,14 @@ function checkCatch(dt){
   /* 刚被送回来的短暂保护，避免同一个敌人立刻再抓一次 */
   if(S.safeT>0) S.safeT = Math.max(0, S.safeT-dt);
 
-  /* 1) 贴身必抓 */
+  /* 教室是绝对安全区：任何敌人（含保安）都进不去、抓不到 */
+  var here=roomAt(fl(),S.px,S.py);
+  var inClass = !!(here && here.safe==='class');
+  /* 1) 贴身必抓（保安在教室不生效） */
   for(var i=0;i<S.npcs.length;i++){
     var n=S.npcs[i];
     if(n.floor!==S.floor) continue;
+    if(n.kind==='guard' && inClass) continue;
     var d=Math.sqrt(Math.pow(n.x-S.px,2)+Math.pow(n.y-S.py,2));
     if(d<CATCH_RANGE){ if(S.safeT>0) continue; caughtBy(n); return; }
   }
@@ -2043,6 +2083,7 @@ function checkCatch(dt){
   for(var j=0;j<S.npcs.length;j++){
     var m=S.npcs[j];
     if(m.floor!==S.floor) continue;
+    if(m.kind==='guard' && inClass) continue;   /* 保安看不进教室 */
     if(npcSees(m)){ watchers++; if(!watcher) watcher=m; }
   }
   /* 2b) 监控也算「被看见」：站在有监控的路上，同样会累计 */
@@ -2265,9 +2306,9 @@ function askName(){
   var v=prompt('输入你的昵称（存在本机 cookie）', cur);
   if(v===null) return;
   v=String(v).trim();
-  /* DevTest 调试指令：输入后不保存成昵称 */
+  /* 旧版 DevTest:BypassGMMenu 这类前缀入口已废弃 */
   if(/^DevTest:/i.test(v)){
-    handleDevTest(v);
+    toast('DevTest 已改为终端指令：请在「终端」风格下按反引号键打开终端');
     return;
   }
   v=v.slice(0,12);
@@ -2277,9 +2318,187 @@ function askName(){
 }
 
 /* ================= DevTest 调试指令 =================
-   DevTest:BypassGMMenu=true|false    临时允许多用 GM 也给成就/记榜
-   DevTest:OpenTheGMMenu=true|false   直接打开/关闭 GM 菜单（不消耗连点次数）
+   指令只能在「终端」主题下、通过 DevTest 终端（反引号键开关）输入。
+   输入时不带 DevTest: 前缀：例如 bypass on、gm open。
 */
+
+/* ---------- DevTest 终端 ---------- */
+function devIsTerminalStyle(){
+  return !!(typeof THEME!=='undefined' && THEME && THEME.style==='terminal');
+}
+function devTermLog(msg, cls){
+  var box=document.getElementById('devTermLog');
+  if(!box) return;
+  var d=document.createElement('div');
+  if(cls) d.className=cls;
+  d.textContent=msg;
+  box.appendChild(d);
+  box.scrollTop=box.scrollHeight;
+}
+function devTermOpen(){
+  var t=document.getElementById('devTerm');
+  if(!t) return false;
+  if(!devIsTerminalStyle()){
+    toast('DevTest 终端仅在「终端」风格下可用');
+    return false;
+  }
+  t.classList.remove('hidden');
+  var inp=document.getElementById('devTermInput');
+  if(inp){ try{ inp.focus(); }catch(e){} }
+  if(!t.getAttribute('data-welcomed')){
+    t.setAttribute('data-welcomed','1');
+    devTermLog('E.F.S  DevTest Terminal  [仅为终端风格]','tl-ok');
+    devTermLog('输入 help 查看指令，close 关闭终端。');
+  }
+  return true;
+}
+function devTermClose(){
+  var t=document.getElementById('devTerm');
+  if(t) t.classList.add('hidden');
+}
+function devTermToggle(){
+  var t=document.getElementById('devTerm');
+  if(!t) return;
+  if(t.classList.contains('hidden')) devTermOpen();
+  else devTermClose();
+}
+function devTermSubmit(raw){
+  var v=String(raw||'').trim();
+  if(!v) return;
+  devTermLog('> '+v,'tl-in');
+  var r=devRunCommand(v);
+  if(r===false) devTermLog('未知指令。输入 help 查看。','tl-err');
+}
+function devRunCommand(v){
+  var parts=v.split(/\s+/);
+  var cmd=(parts[0]||'').toLowerCase();
+  var a1=(parts[1]||'').toLowerCase();
+
+  if(cmd==='help' || cmd==='?'){
+    devTermLog('可用指令：','tl-ok');
+    devTermLog('  help                    显示本列表');
+    devTermLog('  close / exit            关闭终端');
+    devTermLog('  bypass on|off           允许多用 GM 仍给成就与排行榜');
+    devTermLog('  gm open|close           强制打开/关闭 GM 菜单');
+    devTermLog('  gm addach on|off        GM 菜单里加「一键全成就」');
+    devTermLog('  god on|off              无视伤害（老师/保安/监控都抓不到）');
+    devTermLog('  tp <楼层>               传送到指定楼层（2F/1F/B1/B2/B3）');
+    devTermLog('  tpobj <名称>            传送到本层指定对象旁（门/楼梯/监控…）');
+    devTermLog('  item <物品>             直接给一件道具（key/redkey/blueprint…）');
+    devTermLog('  allitem                 一次给齐所有必需道具');
+    devTermLog('  lives <n>               设置剩余命数');
+    devTermLog('  floor                  显示当前楼层与安全区');
+    devTermLog('  npcs                    列出本层所有敌人');
+    devTermLog('  freeze on|off           冻住所有 NPC（不再移动）');
+    devTermLog('  see                    显示当前被谁看见、计时多少');
+    devTermLog('  achall                  解锁全部成就');
+    devTermLog('  clear                   清屏');
+    devTermLog('  exitwin                 当前层直接触发逃脱结局');
+    return true;
+  }
+  if(cmd==='close' || cmd==='exit'){ devTermClose(); return true; }
+  if(cmd==='clear'){ var b=document.getElementById('devTermLog'); if(b) b.innerHTML=''; return true; }
+
+  /* ---- 带参数 / 无参数指令（先于 on|off 分支处理） ---- */
+  if(cmd==='tp'){
+    var f=String(parts[1]||'').toUpperCase();
+    if(!W[f]){ devTermLog('楼层不存在：'+f+'（可用 2F/1F/B1/B2/B3）','tl-err'); return true; }
+    S.floor=f;
+    var st=W[f].objs.filter(function(o){return o.t==='stairs';})[0];
+    if(st){ S.px=st.x; S.py=st.y+1; } else { S.px=W[f].w/2; S.py=W[f].h/2; }
+    devTermLog('已传送到 '+f,'tl-ok');
+    return true;
+  }
+  if(cmd==='tpobj'){
+    var q=parts.slice(1).join(' ').toLowerCase();
+    if(!q){ devTermLog('用法：tpobj <名称>，如 tpobj 楼梯','tl-err'); return true; }
+    var fobj=W[S.floor].objs.filter(function(o){
+      var nm=String(o.label||o.t||'').toLowerCase();
+      return nm.indexOf(q)>=0;
+    })[0];
+    if(!fobj){ devTermLog('本层找不到：'+q,'tl-err'); return true; }
+    S.px=fobj.x; S.py=fobj.y+1;
+    devTermLog('已传送到 '+(fobj.label||fobj.t),'tl-ok');
+    return true;
+  }
+  if(cmd==='item'){
+    var it=String(parts[1]||'').toLowerCase();
+    if(!it || !ITEM[it]){ devTermLog('物品不存在：'+it,'tl-err'); return true; }
+    S.inv[it]=true;
+    devTermLog('已获得：'+ITEM[it].name,'tl-ok');
+    return true;
+  }
+  if(cmd==='allitem'){
+    var got=0;
+    for(var ik in ITEM){ if(!S.inv[ik]){ S.inv[ik]=true; got++; } }
+    devTermLog('已补全 '+got+' 件道具','tl-ok');
+    return true;
+  }
+  if(cmd==='lives'){
+    var n=parseInt(parts[1],10);
+    if(isNaN(n)){ devTermLog('用法：lives <数字>','tl-err'); return true; }
+    S.lives=n;
+    devTermLog('命数已设为 '+n,'tl-ok');
+    return true;
+  }
+  if(cmd==='floor'){
+    var rr=roomAt(fl(),S.px,S.py);
+    devTermLog('当前楼层：'+S.floor+(rr?('（'+rr.name+(rr.safe?' · 安全区':'')+'）'):''),'tl-ok');
+    return true;
+  }
+  if(cmd==='npcs'){
+    var list=S.npcs.filter(function(n){return n.floor===S.floor;});
+    if(!list.length){ devTermLog('本层没有敌人','tl-ok'); return true; }
+    list.forEach(function(n){
+      devTermLog('  '+n.name+' @('+n.x.toFixed(1)+','+n.y.toFixed(1)+') '+n.state);
+    });
+    return true;
+  }
+  if(cmd==='see'){
+    var lim=(typeof S.seeLimit==='number'?S.seeLimit:SEE_LIMIT);
+    devTermLog('被看见：'+(S.seenBy||'无人')+'　计时 '+S.seeT.toFixed(2)+' / '+lim,'tl-ok');
+    return true;
+  }
+  if(cmd==='achall'){
+    if(typeof cheatUnlockAllAch==='function'){ cheatUnlockAllAch(); devTermLog('已解锁全部成就','tl-ok'); }
+    else devTermLog('无法调用成就解锁','tl-err');
+    return true;
+  }
+  if(cmd==='exitwin'){
+    devTermLog('脱逃指令需在当前层楼梯口使用，已略。','tl-err');
+    return true;
+  }
+
+  var on = (a1==='on'||a1==='true'||a1==='1');
+  var off= (a1==='off'||a1==='false'||a1==='0');
+  if(!on && !off){ devTermLog('用法：'+cmd+' on|off','tl-err'); return false; }
+
+  if(cmd==='bypass'){
+    DEV.bypass=on;
+    devTermLog(on?'已允许多用 GM 仍给成就与排行榜':'已恢复 GM 限制','tl-ok');
+    return true;
+  }
+  if(cmd==='gm'){
+    if(a1==='open'){ CHEAT.opened=true; openCheatPanel(); devTermLog('GM 菜单已打开','tl-ok'); return true; }
+    if(a1==='close'){ closeCheatPanel(); collapseCheat(); devTermLog('GM 菜单已关闭','tl-ok'); return true; }
+    if(a1==='addach'){ DEV.achPanel=true; CHEAT.opened=true; openCheatPanel(); devTermLog('已加入「一键全成就」','tl-ok'); return true; }
+    devTermLog('用法：gm open|close|addach','tl-err'); return false;
+  }
+  if(cmd==='god'){
+    CHEAT.god=on;
+    devTermLog(on?'已开启无视伤害':'已关闭无视伤害','tl-ok');
+    if(typeof cheatRenderBox==='function') cheatRenderBox();
+    return true;
+  }
+  if(cmd==='freeze'){
+    DEV.freeze=on;
+    devTermLog(on?'已冻住所有 NPC':'已解冻 NPC','tl-ok');
+    return true;
+  }
+  devTermLog('用法：'+cmd+' on|off','tl-err');
+  return false;
+}
+
 var DEV = { bypass:false, openGM:false, achPanel:false };
 
 function handleDevTest(raw){
@@ -3121,8 +3340,30 @@ function ending(n){
 
 /* ================= 输入 ================= */
 function bindInput(){
+  /* DevTest 终端：输入框内的按键不传给游戏 */
+  var dtInp=document.getElementById('devTermInput');
+  if(dtInp){
+    dtInp.addEventListener('keydown',function(e){
+      e.stopPropagation();
+      if(e.key==='Enter'){
+        var v=dtInp.value;
+        dtInp.value='';
+        if(v && v.trim()) devTermSubmit(v);
+      } else if(e.key==='Escape'){
+        devTermClose();
+      }
+    });
+  }
   document.addEventListener('keydown',function(e){
     var k=e.key.toLowerCase();
+    /* 反引号 / 波浪键：开关 DevTest 终端 */
+    if(e.key==='`' || e.key==='~'){
+      e.preventDefault();
+      devTermToggle();
+      return;
+    }
+    var dtw=document.getElementById('devTerm');
+    if(dtw && !dtw.classList.contains('hidden')) return;
     if(k==='w'||k==='arrowup'){ input.up=true; e.preventDefault(); }
     else if(k==='s'||k==='arrowdown'){ input.down=true; e.preventDefault(); }
     else if(k==='a'||k==='arrowleft'){ input.left=true; e.preventDefault(); }
@@ -3493,8 +3734,12 @@ function themePalette(){
       var hue = col*22.5;                       /* 0..360 一圈 */
       var tv  = row/15;                         /* 0..1 明度梯度 */
       var sat, lig;
-      if(row<2){ sat=0; lig=0.10+row*0.13; }    /* 前两行是灰阶 */
-      else {
+      if(row===0){
+        /* 第 0 行：完整中性灰阶，从左到右纯黑 → 纯白（col=15 就是 #ffffff） */
+        sat = 0; lig = col/15;
+      } else if(row===1){
+        sat = 0; lig = 0.10 + (col/15)*0.55;    /* 第 1 行：暗部灰阶，补中间调 */
+      } else {
         sat = Math.min(1, 0.30 + (row-2)/13*0.65);
         lig = 0.78 - (row-2)/13*0.52;
       }

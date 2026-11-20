@@ -621,6 +621,25 @@ body.theme-terminal .achRow{
 body.theme-terminal .achRow.got{
   border-color:#1f7a3f; background:#04180a}
 body.theme-terminal .achDesc{color:#2b7d45}
+/* ================= DevTest 终端 =================
+   仅在终端主题下可用；反引号键开关。
+*/
+#devTerm{position:fixed; left:0; right:0; bottom:0; z-index:9000;
+  background:#000; border-top:1px solid #1f7a3f;
+  font-family:"JetBrains Mono",Consolas,monospace;
+  max-height:55vh; display:flex; flex-direction:column;}
+#devTerm.hidden{display:none}
+#devTermLog{flex:1; overflow-y:auto; padding:10px 12px 4px;
+  font-size:11.5px; line-height:1.65; color:#3fb865;}
+#devTermLog .tl-ok{color:#5eff8f}
+#devTermLog .tl-err{color:#ff6b6b}
+#devTermLog .tl-in{color:#ffd75e}
+#devTermRow{display:flex; align-items:center; gap:6px;
+  border-top:1px solid #14532b; padding:8px 12px 12px;}
+#devTermRow span{color:#5eff8f; font-size:13px; font-weight:700}
+#devTermInput{flex:1; background:#000; border:none; outline:none;
+  color:#5eff8f; font-family:inherit; font-size:13px; padding:4px 0;}
+#devTermInput::placeholder{color:#1c5a30}
 </style>
 </head>
 <body>
@@ -760,6 +779,13 @@ body.theme-terminal .achDesc{color:#2b7d45}
     <div id="endDesc"></div>
     <button class="bigbtn" id="againBtn">再来一次</button>
     <button class="ghostbtn" id="backMenuBtn">回主菜单</button>
+  </div>
+</div>
+<div id="devTerm" class="hidden">
+  <div id="devTermLog"></div>
+  <div id="devTermRow">
+    <span>&gt;</span>
+    <input id="devTermInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 help 查看指令">
   </div>
 </div>
 <script>

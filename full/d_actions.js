@@ -314,8 +314,30 @@ function ending(n){
 
 /* ================= 输入 ================= */
 function bindInput(){
+  /* DevTest 终端：输入框内的按键不传给游戏 */
+  var dtInp=document.getElementById('devTermInput');
+  if(dtInp){
+    dtInp.addEventListener('keydown',function(e){
+      e.stopPropagation();
+      if(e.key==='Enter'){
+        var v=dtInp.value;
+        dtInp.value='';
+        if(v && v.trim()) devTermSubmit(v);
+      } else if(e.key==='Escape'){
+        devTermClose();
+      }
+    });
+  }
   document.addEventListener('keydown',function(e){
     var k=e.key.toLowerCase();
+    /* 反引号 / 波浪键：开关 DevTest 终端 */
+    if(e.key==='`' || e.key==='~'){
+      e.preventDefault();
+      devTermToggle();
+      return;
+    }
+    var dtw=document.getElementById('devTerm');
+    if(dtw && !dtw.classList.contains('hidden')) return;
     if(k==='w'||k==='arrowup'){ input.up=true; e.preventDefault(); }
     else if(k==='s'||k==='arrowdown'){ input.down=true; e.preventDefault(); }
     else if(k==='a'||k==='arrowleft'){ input.left=true; e.preventDefault(); }

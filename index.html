@@ -652,7 +652,7 @@ body.theme-material .abtn{background:rgba(32,32,34,.94); border:1px solid rgba(2
   color:#f2f2f2}
 body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 /* ================= DevTest 终端 =================
-   仅在终端主题下可用；反引号键开关。
+   仅在终端主题下可用；按右侧 Shift 键开关。
 */
 #devTerm{position:fixed; left:0; right:0; bottom:0; z-index:9000;
   background:#000; border-top:1px solid #1f7a3f;
@@ -2345,7 +2345,7 @@ function askName(){
   v=String(v).trim();
   /* 旧版 DevTest:BypassGMMenu 这类前缀入口已废弃 */
   if(/^DevTest:/i.test(v)){
-    toast('DevTest 已改为终端指令：请在「终端」风格下按反引号键打开终端');
+    toast('DevTest 已改为终端指令：请在「终端」风格下按右侧 Shift 打开终端');
     return;
   }
   v=v.slice(0,12);
@@ -2355,7 +2355,7 @@ function askName(){
 }
 
 /* ================= DevTest 调试指令 =================
-   指令只能在「终端」主题下、通过 DevTest 终端（反引号键开关）输入。
+   指令只能在「终端」主题下、通过 DevTest 终端（右侧 Shift 开关）输入。
    输入时不带 DevTest: 前缀：例如 bypass on、gm open。
 */
 
@@ -3462,8 +3462,9 @@ function bindInput(){
   }
   document.addEventListener('keydown',function(e){
     var k=e.key.toLowerCase();
-    /* 反引号 / 波浪键：开关 DevTest 终端 */
-    if(e.key==='`' || e.key==='~'){
+    /* 右侧 Shift：开关 DevTest 终端（e.location===2 表示右 Shift） */
+    if(e.key==='Shift' && (e.location===2 || e.code==='ShiftRight')){
+      if(e.repeat) return;
       e.preventDefault();
       devTermToggle();
       return;

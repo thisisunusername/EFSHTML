@@ -339,8 +339,9 @@ function bindInput(){
   }
   document.addEventListener('keydown',function(e){
     var k=e.key.toLowerCase();
-    /* 反引号 / 波浪键：开关 DevTest 终端 */
-    if(e.key==='`' || e.key==='~'){
+    /* 右侧 Shift：开关 DevTest 终端（e.location===2 表示右 Shift） */
+    if(e.key==='Shift' && (e.location===2 || e.code==='ShiftRight')){
+      if(e.repeat) return;
       e.preventDefault();
       devTermToggle();
       return;

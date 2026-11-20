@@ -1200,7 +1200,7 @@ function askName(){
   v=String(v).trim();
   /* 旧版 DevTest:BypassGMMenu 这类前缀入口已废弃 */
   if(/^DevTest:/i.test(v)){
-    toast('DevTest 已改为终端指令：请在「终端」风格下按反引号键打开终端');
+    toast('DevTest 已改为终端指令：请在「终端」风格下按右侧 Shift 打开终端');
     return;
   }
   v=v.slice(0,12);
@@ -1210,7 +1210,7 @@ function askName(){
 }
 
 /* ================= DevTest 调试指令 =================
-   指令只能在「终端」主题下、通过 DevTest 终端（反引号键开关）输入。
+   指令只能在「终端」主题下、通过 DevTest 终端（右侧 Shift 开关）输入。
    输入时不带 DevTest: 前缀：例如 bypass on、gm open。
 */
 

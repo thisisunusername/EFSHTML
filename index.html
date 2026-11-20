@@ -590,6 +590,10 @@ var S = {
   stealthT:0,      /* 隐身针剩余秒数（30 秒，期间监控看不见） */
   speedMul:1,      /* 移动速度倍率 */
   stepT:0,         /* 当前一格移动的剩余时间（>0 表示正在滑动） */
+  stepLocked:false,/* 走完一格后锁定，必须松开按键才能再走 */
+  stepKey:'',      /* 触发这一步的按键 */
+  needEnemyTurn:false, /* 玩家走完一格 → 敌人该行动了 */
+  turnDone:false,
   stepDur:0.14,    /* 一格移动的时长 */
   stepFromX:0, stepFromY:0, stepToX:0, stepToY:0,
   flashLike:false,  /* 是否已经拿了手电筒（只能在一个地下室用） */
@@ -843,6 +847,7 @@ function startGame(diff){
   S.lives=(DIFF[S.diff]||DIFF.normal).lives; S.everSpotted=false; S.knifeKills=0;
   S.useT=0; S.useItem=''; S.colaT=0; S.stealthT=0;
   S.stepT=0; S.stepDur=0.14;
+  S.stepLocked=false; S.stepKey=''; S.needEnemyTurn=false; S.turnDone=false;
   S.flashLike=false; S.flashFloor=''; S.flashOn=false; S.usedFlashPick=false;
   S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
   S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
@@ -976,9 +981,9 @@ function movePlayer(dt){
   /* 正在喝可乐 / 打隐身针：3 秒内不能移动 */
   if(S.useT>0){ S.moving=false; return; }
 
-  /* ---------- 按格移动 ----------
-     每次只走一格：按下方向 → 校验目标格 → 平滑滑过去。
-     一直按住就连续一格一格地走。 */
+  /* ---------- 按格移动（一次一格，必须松开按键才能再走） ----------
+     按一下方向 → 校验目标格 → 平滑滑过去 → 停住。
+     按住不放不会连续走，必须松开再按。 */
   if(S.stepT>0){
     /* 正在滑向目标格 */
     S.stepT-=dt;
@@ -1000,6 +1005,17 @@ function movePlayer(dt){
   else if(input.right) mx+=1;
   else if(input.up)    my-=1;
   else if(input.down)  my+=1;
+
+  /* 上次走完一格后，必须松开那个方向的键才能再走 */
+  if(S.stepLocked){
+    if(mx===0 && my===0){
+      S.stepLocked=false;      /* 所有方向键都松开了 → 解锁 */
+    } else {
+      S.moving=false;          /* 还按着，不许走 */
+      return;
+    }
+  }
+
   if(mx===0&&my===0){ S.moving=false; return; }
 
   S.faceDir = my>0?'down':(my<0?'up':(mx>0?'right':'left'));
@@ -1012,6 +1028,9 @@ function movePlayer(dt){
   var canGo = CHEAT.noClip ? true : canStand(f, targetX, targetY);
   if(!canGo){ S.moving=false; return; }
 
+  /* 记录这一步是哪个按键触发的，松开后才能再走 */
+  S.stepKey = (mx!==0 ? (mx>0?'right':'left') : (my>0?'down':'up'));
+
   /* 开始一格移动 */
   S.stepFromX=S.px;  S.stepFromY=S.py;
   S.stepToX=targetX; S.stepToY=targetY;
@@ -1019,6 +1038,26 @@ function movePlayer(dt){
   if(S.stepDur<0.06) S.stepDur=0.06;
   S.stepT=S.stepDur;
   S.moving=true;
+  S.stepLocked=true;                     /* 必须松开按键才能走下一格 */
+  S.turnDone=true;                       /* 这一步结束 → 轮到敌人行动一回合 */
+  S.needEnemyTurn=true;
+}
+
+/* ================= 回合推进 =================
+   回合制：玩家每走一格算一回合，走完立刻轮到敌人动一次。
+   敌人每回合推进一个固定小步长（ENEMY_TURN），而不是跟着帧率连续跑。
+*/
+var ENEMY_TURN = 0.5;      /* 一回合里敌人推进的等效秒数 */
+
+function runEnemyTurn(){
+  if(S.mode!=='play') return;
+  S.needEnemyTurn=false;
+  /* 敌人行动一回合 */
+  updateNpcs(ENEMY_TURN);
+  if(S.mode!=='play') return;
+  /* 每回合结算一次是否被发现 / 被抓 */
+  checkCatch(ENEMY_TURN);
+  updateSeeHUD();
 }
 
 /* ================= NPC ================= */
@@ -1272,14 +1311,13 @@ function skipTurn(){
   if(S.mode!=='play') return;
   var r=roomAt(fl(),S.px,S.py);
   if(!r || !r.safe){ toast('只有在教室或厕所才能跳过回合'); return; }
-  var dt=1/60;
-  for(var k=0;k<45;k++){
-    updateNpcs(dt);
-    if(S.mode!=='play') return;
-    /* 跳回合时玩家不动，只判定贴身抓人 / 视野计时 */
-    checkCatch(dt);
-    if(S.mode!=='play') return;
-  }
+  /* 跳过回合 = 玩家原地不动，让敌人多走一个回合 */
+  S.needEnemyTurn=false;
+  updateNpcs(ENEMY_TURN);
+  if(S.mode!=='play') return;
+  checkCatch(ENEMY_TURN);
+  if(S.mode!=='play') return;
+  updateSeeHUD();
   toast('跳过一回合，老师 / 保安移动了');
 }
 
@@ -2529,8 +2567,8 @@ function loop(t){
     updateCameras(dt);
     movePlayer(dt);
     stairCheck();
-    updateNpcs(dt);
-    if(S.mode==='play') checkCatch(dt);
+    /* 回合制：敌人只在玩家走完一格后才行动一次 */
+    if(S.needEnemyTurn && S.stepT<=0) runEnemyTurn();
     if(S.msgT>0){
       S.msgT-=dt;
       if(S.msgT<=0){

@@ -224,8 +224,8 @@ function buildWorld(){
       patrol:[{x:2.5,y:8.5},{x:10.5,y:8.5},{x:18.5,y:8.5},{x:27.5,y:8.5},{x:4.5,y:13.5},{x:17.5,y:15.5}],
       objs:[
         {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
-        {t:'item', x:9.5,  y:2.5, id:'hammer'},
-        {t:'item', x:11.5, y:4.5, id:'wood'},
+        {t:'item', x:9.5,  y:2.5, id:'saw'},
+        {t:'item', x:10.5, y:4.5, id:'hammer'},
         {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:Math.PI, range:6.0},        /* 主任办公室静态监控 */
         {t:'item', x:17.5, y:4.5, id:'blueprint'},
         {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},

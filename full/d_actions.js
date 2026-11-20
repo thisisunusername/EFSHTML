@@ -11,8 +11,7 @@ function openShop(){
     {id:'stealth',   desc:'打一针：监控看不见你，被发现所需的 3 秒延长到 5 秒'},
     {id:'yellowkey', desc:'能打开一层的侧门（结局三）'},
     {id:'cola',      desc:'喝下去：移动速度提升 45%'},
-    {id:'knife',     desc:'能砍树取木头和制作图，也能按 E 捅人（25% 概率解决一名敌人）'},
-    {id:'saw',       desc:'砍校长的树必需，和刀一起用'},
+    {id:'knife',     desc:'可以雕刻，也能按 E 捅人（25% 概率解决一名敌人）'},
     {id:'torch',     desc:'手电筒：在任意地下室点亮（三层/四层/地下室），整局只能用一次'}
   ];
   /* 地狱难度没有手电筒 */
@@ -58,8 +57,7 @@ function applyShopPick(id){
   if(id==='stealth')      toast('拿到隐身针：点物品栏使用（要 3 秒，期间别动）');
   else if(id==='cola')    toast('拿到可乐：点物品栏喝（要 3 秒，期间别动）');
   else if(id==='yellowkey') toast('拿到黄色钥匙：可以去开一层的侧门了');
-else if(id==='knife')   toast('拿到小刀：能砍树、也能按 E 捅人（25% 概率）');
-  else if(id==='saw')     toast('拿到锯子：配合小刀就能砍校长的树');
+else if(id==='knife')   toast('拿到小刀：合成黑钥匙要用，也能按 E 捅人（25% 概率）');
   else if(id==='torch'){
     S.inv.torch=true; S.flashLike=true; S.flashFloor=''; S.flashOn=false;
     toast('拿到手电筒：在地下室点物品栏点亮，整局只能用一次');
@@ -196,13 +194,11 @@ function interact(){
   if(o.t==='shop'){ openShop(); return; }
   if(o.t==='craft'){ openCraft(); return; }
   if(o.t==='tree'){
-    if(S.inv.wood && S.inv.blueprint){ toast('这棵树已经被砍过了'); return; }
-    if(!S.inv.saw){ toast('需要锯子才能砍树'); return; }
-    if(!S.inv.knife){ toast('光有锯子不够，还得用小刀削 —— 需要小刀'); return; }
+    if(S.inv.wood){ toast('这棵树已经被锯过了'); return; }
+    if(!S.inv.saw){ toast('需要锯子才能锯树（工具房里有）'); return; }
     S.inv.wood=true;
-    S.inv.blueprint=true;
     updateHUD();
-    toast('锯倒并用刀削开了校长的树：获得木头 + 黑钥匙制作图');
+    toast('锯倒了校长的树，获得木头');
     return;
   }
   if(o.t==='switch'){

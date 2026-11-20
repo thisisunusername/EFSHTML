@@ -434,8 +434,9 @@ function loop(t){
     /* 敌人移动：回合制只在玩家走完一格后行动一次；经典模式每帧连续行动 */
     if(S.mode2==='classic'){
       updateNpcs(dt);
-    } else if(S.needEnemyTurn && S.stepT<=0){
-      runEnemyTurn();
+    } else {
+      if(S.needEnemyTurn && S.stepT<=0) runEnemyTurn();
+      tickEnemyAnim(dt);          /* 把敌人这一回合的移动演出来 */
     }
     /* 抓捕判定：每帧都要跑，站着不动也会被监控/视野抓到 */
     if(S.mode==='play') checkCatch(dt);

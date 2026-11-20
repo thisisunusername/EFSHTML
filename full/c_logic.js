@@ -32,6 +32,9 @@ var S = {
   stepLocked:false,/* 走完一格后锁定，必须松开按键才能再走 */
   stepKey:'',      /* 触发这一步的按键 */
   needEnemyTurn:false, /* 玩家走完一格 → 敌人该行动了 */
+  turnBusy:false,   /* 敌人这一回合还在演，玩家暂时不能走 */
+  enemyAnimT:0,     /* 敌人回合动画剩余时间 */
+  enemyFrom:null,
   mode2:'turn',    /* 玩法模式：turn 回合制 / classic 摇杆+全地图 */
   stepVel:0,
   turnDone:false,
@@ -255,7 +258,7 @@ function hintFor(){
     if(o.t==='stairs') return '按 E 前往 '+W[o.to].name;
     if(o.t==='stairWin')return '走近这里就能逃出去';
     if(o.t==='gate')   return '按 E 尝试打开'+o.label;
-    if(o.t==='tree')   return '按 E 砍树（需要锯子 + 小刀）';
+    if(o.t==='tree')   return '按 E 锯树（需要锯子）';
     if(o.t==='switch') return '按 E 拉闸';
     if(o.t==='cctv')   return '按 E 拉下监控总闸（全楼监控停摆）';
     if(o.t==='car')    return S.inv.hammer?'按 E 用锤子砸校长的车':'校长的车（需要锤子，砸了会掉木头）';
@@ -303,6 +306,7 @@ function startGame(diff){
   S.useT=0; S.useItem=''; S.colaT=0; S.stealthT=0;
   S.stepT=0; S.stepDur=0.14;
   S.stepLocked=false; S.stepKey=''; S.needEnemyTurn=false; S.turnDone=false;
+  S.turnBusy=false; S.enemyAnimT=0; S.enemyFrom=null;
   S.flashLike=false; S.flashFloor=''; S.flashOn=false; S.usedFlashPick=false;
   S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
   S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
@@ -437,6 +441,9 @@ function movePlayer(dt){
   /* 正在喝可乐 / 打隐身针：3 秒内不能移动 */
   if(S.useT>0){ S.moving=false; return; }
 
+  /* 回合制：敌人还在走这一回合，等它走完再轮到玩家 */
+  if(S.mode2!=='classic' && S.turnBusy){ S.moving=false; return; }
+
   /* ============ 经典模式：摇杆/按键连续移动，敌人也连续行动 ============ */
   if(S.mode2==='classic'){
     var cmx=0,cmy=0;
@@ -525,18 +532,74 @@ function movePlayer(dt){
 }
 
 /* ================= 回合推进 =================
-   回合制：玩家每走一格算一回合，走完立刻轮到敌人动一次。
+   回合制：玩家每走一格算一回合。敌人走完这一回合（含动画）后，才轮到玩家下一步。
    敌人每回合推进一个固定小步长（ENEMY_TURN），而不是跟着帧率连续跑。
 */
 var ENEMY_TURN = 0.5;      /* 一回合里敌人推进的等效秒数 */
+var ENEMY_ANIM = 0.22;     /* 敌人这一回合的过渡动画时长 */
 
 function runEnemyTurn(){
   if(S.mode!=='play') return;
   S.needEnemyTurn=false;
-  /* 敌人移动一回合（被抓判定由主循环每帧处理） */
+
+  /* 1) 记下每个敌人回合开始的位置与楼层 */
+  var froms=[];
+  for(var i=0;i<S.npcs.length;i++){
+    var n0=S.npcs[i];
+    froms.push({n:n0, x:n0.x, y:n0.y, floor:n0.floor});
+  }
+
+  /* 2) 立刻算出这一回合的新位置，并把目标坐标存起来 */
   updateNpcs(ENEMY_TURN);
-  if(S.mode!=='play') return;
+
+  /* 3) 把显示坐标倒退回起点，交给 tickEnemyAnim 插值演过去 */
+  for(var j=0;j<froms.length;j++){
+    var f0=froms[j], n=f0.n;
+    if(!n) continue;
+    if(n.floor!==f0.floor){
+      /* 这一回合换层了：直接显示在新楼层，不做插值 */
+      f0.skip=true;
+      continue;
+    }
+    f0.tx=n.x; f0.ty=n.y;      /* 真实目标 */
+    n.x=f0.x; n.y=f0.y;        /* 显示回到起点 */
+  }
+  S.enemyFrom=froms;
+  S.enemyAnimT=ENEMY_ANIM;
+  S.turnBusy=true;             /* 敌人演完之前，玩家不能走 */
+
   updateSeeHUD();
+}
+
+/* 每帧推进敌人回合动画：把显示坐标从起点插到目标 */
+function tickEnemyAnim(dt){
+  if(!S.turnBusy) return;
+  S.enemyAnimT -= dt;
+  var p = 1 - Math.max(0,S.enemyAnimT)/ENEMY_ANIM;
+  if(p>1) p=1;
+  if(p<0) p=0;
+  var ease = p*p*(3-2*p);           /* 平滑缓动 */
+  if(S.enemyFrom){
+    for(var i=0;i<S.enemyFrom.length;i++){
+      var f0=S.enemyFrom[i], n=f0.n;
+      if(!n || f0.skip) continue;
+      n.x = f0.x + (f0.tx - f0.x) * ease;
+      n.y = f0.y + (f0.ty - f0.y) * ease;
+    }
+  }
+  if(S.enemyAnimT<=0){
+    /* 收尾：精确落到目标点 */
+    if(S.enemyFrom){
+      for(var k=0;k<S.enemyFrom.length;k++){
+        var f1=S.enemyFrom[k], m=f1.n;
+        if(!m || f1.skip) continue;
+        m.x=f1.tx; m.y=f1.ty;
+      }
+    }
+    S.enemyAnimT=0;
+    S.enemyFrom=null;
+    S.turnBusy=false;              /* 动画结束，轮到玩家 */
+  }
 }
 
 /* ================= NPC ================= */
@@ -792,11 +855,14 @@ function skipTurn(){
   if(!r || !r.safe){ toast('只有在教室或厕所才能跳过回合'); return; }
   /* 跳过回合 = 玩家原地不动，让敌人多走一个回合 */
   S.needEnemyTurn=false;
-  updateNpcs(S.mode2==='classic' ? ENEMY_TURN*2 : ENEMY_TURN);
-  if(S.mode!=='play') return;
-  checkCatch(ENEMY_TURN);
-  if(S.mode!=='play') return;
-  updateSeeHUD();
+  if(S.mode2==='classic'){
+    updateNpcs(ENEMY_TURN*2);
+    checkCatch(ENEMY_TURN);
+    if(S.mode!=='play') return;
+    updateSeeHUD();
+  } else {
+    runEnemyTurn();          /* 走同一套回合流程（含动画与锁定） */
+  }
   toast('跳过一回合，老师 / 保安移动了');
 }
 

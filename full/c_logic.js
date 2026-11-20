@@ -118,8 +118,10 @@ function writeCookie(name,val,days){
   }catch(e){}
 }
 
+/* 解锁成就：GM 用过（本局）一律不给 */
 function unlockAch(id){
   if(!ACH[id] || ACH_OWNED[id]) return false;
+  if(cheatBlocksBoard()) return false;       /* 用过 GM → 不给任何成就 */
   ACH_OWNED[id]=true;
   achSave();                 /* 立刻写入 localStorage + cookie */
   var t=ACH[id];
@@ -150,6 +152,30 @@ function showAchPopup(id, col){
   box.style.transform='translateY(0)';
   clearTimeout(box._tm);
   box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
+}
+/* 成就页：主界面点「🏆 成就」打开，列出全部成就与解锁状态 */
+function openAchPage(){
+  var html='<div class="achList">';
+  for(var i=0;i<ACH_ORDER.length;i++){
+    var id=ACH_ORDER[i], a=ACH[id];
+    var has=!!ACH_OWNED[id];
+    var col = a.tier==='gold'?'#fbbf24':(a.tier==='red'?'#f43f5e':'#38bdf8');
+    html+='<div class="achRow'+(has?' got':'')+'">'+
+      '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
+        ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
+      '<div class="achTxt">'+
+        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b><br>'+
+        '<span class="achDesc">'+(has?a.desc:'尚未解锁')+'</span>'+
+      '</div>'+
+      '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
+        (a.tier==='gold'?'金':(a.tier==='red'?'红':'蓝'))+'</div>'+
+    '</div>';
+  }
+  html+='</div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:#8ea6c2;line-height:1.7">'+
+    '已解锁 '+achCount()+' / '+ACH_ORDER.length+
+    '　<span style="color:#ff8095">（用 GM 的那一局不给成就）</span></div>';
+  showPanel('🏆 成就', html);
 }
 /* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
 var UNLOCK_KEY='efs_clear_once';
@@ -191,8 +217,14 @@ function settleAch(endingN){
 }
 /* 砸车成就：砸的当下就给 */
 function settleCarAch(){
+  if(cheatBlocksBoard()) return;     /* 用过 GM → 砸车也不给成就 */
   unlockAch('car_any');
   if(S.diff==='hell') unlockAch('car_hell');
+}
+/* GM 面板一被打开，本局立即作废（不给成就 / 不记排行榜） */
+function cheatMarkUsed(){
+  CHEAT.banned=true;
+  cheatDisableBoard();
 }
 
 var input = {up:false,down:false,left:false,right:false};
@@ -1092,6 +1124,7 @@ function openCheatPanel(){
   var box=document.getElementById('cheatPanel');
   var ball=document.getElementById('gmBall');
   if(!box) return;
+  cheatMarkUsed();                         /* 一旦打开 GM，本局就不给成就/不记榜 */
   box.classList.remove('hidden');
   if(ball) ball.classList.add('hidden');     /* 展开时收起小球 */
   cheatRenderBox();

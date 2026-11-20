@@ -130,6 +130,14 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 .ctele button{padding:8px 4px;border-radius:9px;font-size:12.5px;
   background:rgba(90,60,140,.35);border:1px solid rgba(160,120,230,.5);color:#dcc8ff}
 .ctele button.on{background:rgba(120,80,200,.6);border-color:rgba(200,170,255,.8);color:#fff}
+.achList{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow-y:auto;padding-right:2px}
+.achRow{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;
+  background:rgba(24,34,48,.9);border:1px solid rgba(120,160,220,.16)}
+.achRow.got{background:rgba(30,44,62,.95);border-color:rgba(140,190,250,.32)}
+.achDot{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+.achTxt{flex:1;font-size:12.5px;line-height:1.5;min-width:0}
+.achDesc{font-size:10.5px;color:#8ea6c2}
+.achTag{font-size:10.5px;font-weight:700;flex:0 0 auto}
 
 .cwarn{margin-top:10px;font-size:10.5px;line-height:1.7;color:#ff9aa8}
 #stickWrap{position:absolute;left:14px;bottom:14px;width:140px;height:140px;pointer-events:auto;
@@ -261,6 +269,7 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
     <button class="bigbtn" id="startBtn" style="margin-top:14px">开始游戏</button>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="ghostbtn" id="boardBtn">🏆 排行榜</button>
+      <button class="ghostbtn" id="achBtn">🎖 成就</button>
       <button class="ghostbtn" id="nameBtn">✏️ 改昵称</button>
       <button class="ghostbtn" id="expBtn">⬇️ 导出</button>
     </div>
@@ -733,8 +742,10 @@ function writeCookie(name,val,days){
   }catch(e){}
 }
 
+/* 解锁成就：GM 用过（本局）一律不给 */
 function unlockAch(id){
   if(!ACH[id] || ACH_OWNED[id]) return false;
+  if(cheatBlocksBoard()) return false;       /* 用过 GM → 不给任何成就 */
   ACH_OWNED[id]=true;
   achSave();                 /* 立刻写入 localStorage + cookie */
   var t=ACH[id];
@@ -765,6 +776,30 @@ function showAchPopup(id, col){
   box.style.transform='translateY(0)';
   clearTimeout(box._tm);
   box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
+}
+/* 成就页：主界面点「🏆 成就」打开，列出全部成就与解锁状态 */
+function openAchPage(){
+  var html='<div class="achList">';
+  for(var i=0;i<ACH_ORDER.length;i++){
+    var id=ACH_ORDER[i], a=ACH[id];
+    var has=!!ACH_OWNED[id];
+    var col = a.tier==='gold'?'#fbbf24':(a.tier==='red'?'#f43f5e':'#38bdf8');
+    html+='<div class="achRow'+(has?' got':'')+'">'+
+      '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
+        ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
+      '<div class="achTxt">'+
+        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b><br>'+
+        '<span class="achDesc">'+(has?a.desc:'尚未解锁')+'</span>'+
+      '</div>'+
+      '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
+        (a.tier==='gold'?'金':(a.tier==='red'?'红':'蓝'))+'</div>'+
+    '</div>';
+  }
+  html+='</div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:#8ea6c2;line-height:1.7">'+
+    '已解锁 '+achCount()+' / '+ACH_ORDER.length+
+    '　<span style="color:#ff8095">（用 GM 的那一局不给成就）</span></div>';
+  showPanel('🏆 成就', html);
 }
 /* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
 var UNLOCK_KEY='efs_clear_once';
@@ -806,8 +841,14 @@ function settleAch(endingN){
 }
 /* 砸车成就：砸的当下就给 */
 function settleCarAch(){
+  if(cheatBlocksBoard()) return;     /* 用过 GM → 砸车也不给成就 */
   unlockAch('car_any');
   if(S.diff==='hell') unlockAch('car_hell');
+}
+/* GM 面板一被打开，本局立即作废（不给成就 / 不记排行榜） */
+function cheatMarkUsed(){
+  CHEAT.banned=true;
+  cheatDisableBoard();
 }
 
 var input = {up:false,down:false,left:false,right:false};
@@ -1707,6 +1748,7 @@ function openCheatPanel(){
   var box=document.getElementById('cheatPanel');
   var ball=document.getElementById('gmBall');
   if(!box) return;
+  cheatMarkUsed();                         /* 一旦打开 GM，本局就不给成就/不记榜 */
   box.classList.remove('hidden');
   if(ball) ball.classList.add('hidden');     /* 展开时收起小球 */
   cheatRenderBox();
@@ -2341,7 +2383,8 @@ function ending(n){
   if(n===6) extra='<br><br><span style="color:#c4a0ff">隐藏结局 · 仅地狱模式可触发</span>';
   document.getElementById('endDesc').innerHTML=e.desc+extra+
     '<br><br><span style="color:#8ea6c2;font-size:12px">难度：'+DIFF[S.diff].name+' · 被抓 '+S.catches+' 次 · 剩余命 '+(S.lives>0?S.lives:0)+'</span>'
-    +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+'</div>';
+    +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+
+      (cheatBlocksBoard()?' <span style="color:#ff8095">（用过 GM，本局不给成就）</span>':'')+'</div>';
   el.classList.remove('hidden');
   /* 通关（结局 2~5）才结算成就；结局一不算 */
   settleAch(n);
@@ -2477,6 +2520,8 @@ function bindInput(){
   document.getElementById('startBtn').addEventListener('click',function(){ startGame(S.diff); });
   var bb=document.getElementById('boardBtn');
   if(bb) bb.addEventListener('click',function(){ openBoard(); });
+  var ab=document.getElementById('achBtn');
+  if(ab) ab.addEventListener('click',function(){ openAchPage(); });
   var nb=document.getElementById('nameBtn');
   if(nb) nb.addEventListener('click',function(){ askName(); });
   var eb=document.getElementById('expBtn');

@@ -304,7 +304,8 @@ function ending(n){
   if(n===6) extra='<br><br><span style="color:#c4a0ff">隐藏结局 · 仅地狱模式可触发</span>';
   document.getElementById('endDesc').innerHTML=e.desc+extra+
     '<br><br><span style="color:#8ea6c2;font-size:12px">难度：'+DIFF[S.diff].name+' · 被抓 '+S.catches+' 次 · 剩余命 '+(S.lives>0?S.lives:0)+'</span>'
-    +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+'</div>';
+    +'<div style="margin-top:8px;font-size:11px;color:#8ea6c2">🏆 本局成就 '+achCount()+'/'+ACH_ORDER.length+
+      (cheatBlocksBoard()?' <span style="color:#ff8095">（用过 GM，本局不给成就）</span>':'')+'</div>';
   el.classList.remove('hidden');
   /* 通关（结局 2~5）才结算成就；结局一不算 */
   settleAch(n);
@@ -440,6 +441,8 @@ function bindInput(){
   document.getElementById('startBtn').addEventListener('click',function(){ startGame(S.diff); });
   var bb=document.getElementById('boardBtn');
   if(bb) bb.addEventListener('click',function(){ openBoard(); });
+  var ab=document.getElementById('achBtn');
+  if(ab) ab.addEventListener('click',function(){ openAchPage(); });
   var nb=document.getElementById('nameBtn');
   if(nb) nb.addEventListener('click',function(){ askName(); });
   var eb=document.getElementById('expBtn');

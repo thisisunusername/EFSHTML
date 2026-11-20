@@ -15,6 +15,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0e1519;color:#e8eef7;
 
 #hud{position:absolute;left:0;right:0;top:0;padding:8px 10px;display:flex;flex-direction:column;gap:6px;
   pointer-events:none;z-index:5}
+/* 物品栏里的可点道具要能接收点击：整体放行，只有道具本身可点 */
+#invRow{pointer-events:none}
+#invRow .chip.use{pointer-events:auto;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation}
+#invRow .chip.use:active{transform:scale(.94);background:rgba(60,130,220,.75)}
 .rowline{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chip{background:rgba(18,26,40,.82);border:1px solid rgba(120,160,220,.28);border-radius:999px;
   padding:3px 9px;font-size:12px;line-height:1.4;white-space:nowrap}
@@ -787,8 +792,20 @@ function updateHUD(){
     for(var c=0;c<chips.length;c++){
       (function(el){
         var id=el.getAttribute('data-use');
-        el.onclick=function(){ startUse(id); };
-        el.addEventListener('touchstart',function(ev){ ev.preventDefault(); startUse(id); },{passive:false});
+        var lastT=0;
+        el.onclick=function(){
+          /* 触摸后浏览器还会补发一次 click，这里去重 */
+          if(Date.now()-lastT<600) return;
+          startUse(id);
+        };
+        el.addEventListener('touchstart',function(ev){
+          ev.preventDefault();
+          lastT=Date.now();
+          el.classList.add('on');
+          startUse(id);
+        },{passive:false});
+        el.addEventListener('touchend',function(){ el.classList.remove('on'); });
+        el.addEventListener('touchcancel',function(){ el.classList.remove('on'); });
       })(chips[c]);
     }
   }

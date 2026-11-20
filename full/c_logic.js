@@ -206,8 +206,20 @@ function updateHUD(){
     for(var c=0;c<chips.length;c++){
       (function(el){
         var id=el.getAttribute('data-use');
-        el.onclick=function(){ startUse(id); };
-        el.addEventListener('touchstart',function(ev){ ev.preventDefault(); startUse(id); },{passive:false});
+        var lastT=0;
+        el.onclick=function(){
+          /* 触摸后浏览器还会补发一次 click，这里去重 */
+          if(Date.now()-lastT<600) return;
+          startUse(id);
+        };
+        el.addEventListener('touchstart',function(ev){
+          ev.preventDefault();
+          lastT=Date.now();
+          el.classList.add('on');
+          startUse(id);
+        },{passive:false});
+        el.addEventListener('touchend',function(){ el.classList.remove('on'); });
+        el.addEventListener('touchcancel',function(){ el.classList.remove('on'); });
       })(chips[c]);
     }
   }

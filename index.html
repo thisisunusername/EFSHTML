@@ -138,6 +138,8 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 .achTxt{flex:1;font-size:12.5px;line-height:1.5;min-width:0}
 .achDesc{font-size:10.5px;color:#8ea6c2}
 .achTag{font-size:10.5px;font-weight:700;flex:0 0 auto}
+.crow button.danger{background:rgba(180,40,60,.35);border-color:rgba(255,110,130,.6);color:#ffb3c0}
+.crow button.danger:active{background:rgba(210,50,75,.75)}
 
 .cwarn{margin-top:10px;font-size:10.5px;line-height:1.7;color:#ff9aa8}
 #stickWrap{position:absolute;left:14px;bottom:14px;width:140px;height:140px;pointer-events:auto;
@@ -1777,13 +1779,30 @@ function askName(){
    DevTest:BypassGMMenu=true|false    临时允许多用 GM 也给成就/记榜
    DevTest:OpenTheGMMenu=true|false   直接打开/关闭 GM 菜单（不消耗连点次数）
 */
-var DEV = { bypass:false, openGM:false };
+var DEV = { bypass:false, openGM:false, achPanel:false };
 
 function handleDevTest(raw){
   var txt=String(raw).trim();
+
+  /* DevTest:OpenGMMenuAddAchievement —— 在 GM 菜单里加「一键全成就」（可带 =true/false） */
+  var mAdd=txt.match(/^DevTest:OpenGMMenuAddAchievement\s*(?:=\s*(true|false))?$/i);
+  if(mAdd){
+    var on = (mAdd[1]===undefined) ? true : (mAdd[1].toLowerCase()==='true');
+    DEV.achPanel = on;
+    if(on){
+      CHEAT.opened=true;
+      openCheatPanel();
+      toast('DevTest：GM 菜单已加入「一键全成就」');
+    } else {
+      toast('DevTest：已移除「一键全成就」');
+      cheatRenderBox();
+    }
+    return;
+  }
+
   var m=txt.match(/^DevTest:(BypassGMMenu|OpenTheGMMenu)\s*=\s*(true|false)$/i);
   if(!m){
-    toast('DevTest 指令格式不对：DevTest:BypassGMMenu=true / DevTest:OpenTheGMMenu=true');
+    toast('DevTest 指令不对：BypassGMMenu / OpenTheGMMenu / OpenGMMenuAddAchievement');
     return;
   }
   var key=m[1].toLowerCase(), val=(m[2].toLowerCase()==='true');
@@ -1889,7 +1908,70 @@ function toggleCheatPanel(){
 }
 
 /* 单个道具开关：给一件就给一件，取消就收回 */
-/* 一键跳楼层：直接传送到指定楼层的坐标（优先用楼梯落点） */
+/* ================= GM 数据清理（都要确认两次） ================= */
+var pendingWipe = {};        /* {key:true} 记录哪个操作已经被点过一次确认 */
+
+/* 两步确认：第一次点按钮 → 变成「再点确认」，10 秒内不点就还原 */
+function wipeConfirm(key, label, action){
+  if(!pendingWipe[key]){
+    pendingWipe[key]=true;
+    toast('⚠ 再点一次「'+label+'」确认');
+    cheatRenderBox();
+    setTimeout(function(){
+      if(pendingWipe[key]){ pendingWipe[key]=false; if(typeof cheatRenderBox==='function') cheatRenderBox(); }
+    }, 10000);
+    return false;
+  }
+  /* 第二次确认 → 真正执行 */
+  pendingWipe[key]=false;
+  action();
+  return true;
+}
+
+/* 一键全成就（DevTest 解锁） */
+function cheatUnlockAllAch(){
+  var n=0;
+  for(var i=0;i<ACH_ORDER.length;i++){
+    var id=ACH_ORDER[i];
+    if(!ACH_OWNED[id]) n++;
+    ACH_OWNED[id]=true;
+    if(!ACH_COUNT[id] || ACH_COUNT[id]<1) ACH_COUNT[id]=1;
+  }
+  achSave();
+  renderAchChip();
+  toast('DevTest：已解锁全部成就（'+ACH_ORDER.length+' 个）');
+  cheatRenderBox();
+}
+
+/* 清除档案数据（昵称 / 结局解锁 / GM 标记等） */
+function wipeAllData(){
+  try{ localStorage.removeItem(ACH_KEY); }catch(e){}
+  var keys=['efs_name', ACH_KEY, 'efs_clear_once', 'efs_noboard', 'efs_board_v1'];
+  for(var i=0;i<keys.length;i++) writeCookie(keys[i], '', 0);
+  ACH_OWNED={}; ACH_COUNT={};
+  renderAchChip();
+  refreshEndingList();
+  toast('已清除全部本地数据');
+  cheatRenderBox();
+}
+
+/* 只清成就 */
+function wipeAchievements(){
+  try{ localStorage.removeItem(ACH_KEY); }catch(e){}
+  writeCookie(ACH_KEY,'',0);
+  ACH_OWNED={}; ACH_COUNT={};
+  renderAchChip();
+  toast('成就已清空');
+  cheatRenderBox();
+}
+
+/* 只清排行榜 */
+function wipeBoard(){
+  writeCookie(LB_KEY,'',0);
+  try{ localStorage.removeItem(LB_KEY); }catch(e){}
+  toast('排行榜已清空');
+  cheatRenderBox();
+}
 function cheatTeleport(floorKey){
   if(!W[floorKey]) return;
   var dest=null;
@@ -1988,6 +2070,25 @@ function cheatRenderBox(){
   }
   html+='</div>';
 
+  /* DevTest 解锁的额外功能 */
+  if(DEV.achPanel){
+    html+='<div class="csec">DevTest · 成就</div>';
+    html+='<div class="crow"><div><b>一键全成就</b><br>'+
+      '<span class="cdesc">立即解锁全部成就（含炫彩），次数记 1</span></div>'+
+      '<button data-ca="allach">全部解锁</button></div>';
+  }
+
+  html+='<div class="csec">数据清理（都要确认两次）</div>';
+  html+='<div class="crow"><div><b>清除存档数据</b><br>'+
+    '<span class="cdesc">昵称、GM 标记、结局解锁等 cookie 全清</span></div>'+
+    '<button data-ca="wipedata" class="danger">清除数据</button></div>';
+  html+='<div class="crow"><div><b>清除成就</b><br>'+
+    '<span class="cdesc">成就解锁状态与累计次数全部归零</span></div>'+
+    '<button data-ca="wipeach" class="danger">清除成就</button></div>';
+  html+='<div class="crow"><div><b>清除排行榜</b><br>'+
+    '<span class="cdesc">本机排行榜记录全部删除</span></div>'+
+    '<button data-ca="wipeboard" class="danger">清除排行</button></div>';
+
   html+='<div class="csec">道具（逐个开关）</div>';
   for(var i=0;i<CHEAT_ITEMS.length;i++){
     var id=CHEAT_ITEMS[i];
@@ -2009,6 +2110,10 @@ function cheatRenderBox(){
         var cf=b.getAttribute('data-cf');
         if(cf) cheatTeleport(cf);
         else if(ca==='gates') cheatAllGates();
+        else if(ca==='allach') cheatUnlockAllAch();
+        else if(ca==='wipedata') wipeConfirm('data','清除数据', wipeAllData);
+        else if(ca==='wipeach') wipeConfirm('ach','清除成就', wipeAchievements);
+        else if(ca==='wipeboard') wipeConfirm('board','清除排行', wipeBoard);
         else if(ck) cheatToggle(ck);
         else if(ci) cheatItem(ci);
       };

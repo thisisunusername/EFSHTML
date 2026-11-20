@@ -2454,7 +2454,7 @@ function devRunCommand(v){
     devTermLog('  close / exit            关闭终端');
     devTermLog('  bypass on|off           允许多用 GM 仍给成就与排行榜');
     devTermLog('  gm open|close           强制打开/关闭 GM 菜单');
-    devTermLog('  gm addach on|off        GM 菜单里加「一键全成就」');
+    devTermLog('  gm addach               GM 菜单里加「一键全成就」');
     devTermLog('  god on|off              无视伤害（老师/保安/监控都抓不到）');
     devTermLog('  tp <楼层>               传送到指定楼层（2F/1F/B1/B2/B3）');
     devTermLog('  tpobj <名称>            传送到本层指定对象旁（门/楼梯/监控…）');
@@ -2478,6 +2478,9 @@ function devRunCommand(v){
     devTermLog('[sudo] password for user: ','tl-err');
     return true;
   }
+  var on = (a1==='on'||a1==='true'||a1==='1');
+  var off= (a1==='off'||a1==='false'||a1==='0');
+
   /* ---- 权限闸门：以下指令必须 root ---- */
   if(!DEV.root){
     devTermLog('权限不足：「'+cmd+'」需要 root。执行 sudo -i 提权。','tl-err');
@@ -2554,8 +2557,11 @@ function devRunCommand(v){
     return true;
   }
 
-  var on = (a1==='on'||a1==='true'||a1==='1');
-  var off= (a1==='off'||a1==='false'||a1==='0');
+  if(cmd==='gm'){
+    if(a1==='open'){ CHEAT.opened=true; openCheatPanel(); devTermLog('GM 菜单已打开','tl-ok'); return true; }
+    if(a1==='close'){ closeCheatPanel(); collapseCheat(); devTermLog('GM 菜单已关闭','tl-ok'); return true; }
+    if(a1==='addach'){ DEV.achPanel=true; CHEAT.opened=true; openCheatPanel(); devTermLog('已加入「一键全成就」','tl-ok'); return true; }
+    devTermLog('用法：gm open|close|addach','tl-err'); return false;
   if(!on && !off){ devTermLog('用法：'+cmd+' on|off','tl-err'); return false; }
 
   if(cmd==='bypass'){
@@ -2563,11 +2569,6 @@ function devRunCommand(v){
     devTermLog(on?'已允许多用 GM 仍给成就与排行榜':'已恢复 GM 限制','tl-ok');
     return true;
   }
-  if(cmd==='gm'){
-    if(a1==='open'){ CHEAT.opened=true; openCheatPanel(); devTermLog('GM 菜单已打开','tl-ok'); return true; }
-    if(a1==='close'){ closeCheatPanel(); collapseCheat(); devTermLog('GM 菜单已关闭','tl-ok'); return true; }
-    if(a1==='addach'){ DEV.achPanel=true; CHEAT.opened=true; openCheatPanel(); devTermLog('已加入「一键全成就」','tl-ok'); return true; }
-    devTermLog('用法：gm open|close|addach','tl-err'); return false;
   }
   if(cmd==='god'){
     CHEAT.god=on;

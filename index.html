@@ -780,7 +780,8 @@ function refreshEndingList(){
   var el=document.getElementById('endMystery');
   if(!el) return;
   if(isEnding6Unlocked()){
-    el.innerHTML='<span style="color:#c4a0ff">隐藏结局 · 地下室的神秘电话</span>';
+    el.innerHTML='<span style="color:#c4a0ff">选择<b>地狱</b>难度 → 一路逃到<b>地下室</b> → 站在出口 EXIT 旁边<b>不动 5 秒</b> → '+
+      '弹出拨号界面 → 输入 <b>7777777</b> 拨打 → 与原作者对话 → 通关（隐藏结局）</span>';
     el.style.opacity='1';
   } else {
     el.textContent='？？？';

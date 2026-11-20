@@ -679,7 +679,29 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 #devTermInput:focus{outline:none}
 /* 软键盘弹出时面板可能被顶到看不见，给个最小高度兼垫层 */
 #devTerm{min-height:120px}
-#devTermInput{font-size:16px !important}  /* iOS 小于 16px 会自动缩放，Android 也避免异常 */
+#devTermInput{font-size:16px !important; caret-color:transparent}  /* 只读显示区，光标隐藏 */
+#devTermCursor{color:#5eff8f; font-weight:700; animation:dtBlink 1s steps(1) infinite; font-size:15px}
+@keyframes dtBlink{50%{opacity:0}}
+/* ===== 虚拟键盘：绕开系统输入法 ===== */
+#devKb{flex:0 0 auto; background:#04140a; border-top:1px solid #14532b;
+  padding:5px 4px calc(6px + env(safe-area-inset-bottom,0px));
+  display:flex; flex-direction:column; gap:4px;
+  user-select:none; -webkit-user-select:none; touch-action:manipulation}
+.dkRow{display:flex; gap:4px; justify-content:center}
+.dkKey{flex:1 1 0; min-width:0; height:36px; line-height:1;
+  background:#0a2114; border:1px solid #1f7a3f; border-radius:3px; color:#5eff8f;
+  font-family:"JetBrains Mono",Consolas,monospace; font-size:14px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  cursor:pointer; padding:0}
+.dkKey.w15{flex:1.5 1 0}
+.dkKey.w2{flex:2 1 0}
+.dkKey.w25{flex:2.5 1 0}
+.dkKey.space{flex:4 1 0; font-size:11px; color:#35a058}
+.dkKey.on,.dkKey:active{background:#5eff8f; color:#000; border-color:#5eff8f}
+.dkKey.warn{color:#ffd75e; border-color:#ffd75e}
+.dkKey.warn:active{background:#ffd75e; color:#000}
+.dkKey.dim{color:#2b7d45; border-color:#14532b; font-size:12px}
 </style>
 </head>
 <body>
@@ -825,8 +847,10 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
   <div id="devTermLog"></div>
   <div id="devTermRow">
     <span id="devTermPrompt">user@efs:~$</span>
-    <input id="devTermInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 help 查看指令">
+    <input id="devTermInput" readonly autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="点下方键盘输入">
+    <span id="devTermCursor"></span>
   </div>
+  <div id="devKb"></div>
 </div>
 <script>
 (function(){
@@ -2376,12 +2400,99 @@ function devUpdatePrompt(){
 }
 function devSetMask(on){
   var inp=document.getElementById('devTermInput');
-  if(!inp) return;
-  inp.type = on ? 'password' : 'text';
-  inp.value='';
-  inp.setAttribute('autocomplete', on ? 'new-password' : 'off');
-  inp.setAttribute('placeholder', on ? 'sudo 密码' : '输入 help 查看指令');
+  if(inp){
+    inp.setAttribute('placeholder', on ? 'sudo 密码（只用下方键盘输入）' : '点下方键盘输入');
+  }
+  if(typeof DEV_KB_BUF!=='undefined'){ DEV_KB_BUF=''; devKbSync(); }
 }
+/* ===== DevTest 虚拟键盘：完全绕开系统输入法 ===== */
+var DEV_KB_BUF = '';
+var DEV_KB_LAYOUT = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l','-'],
+  ['z','x','c','v','b','n','m','.','_','/'],
+  ['SHIFT','?','SPACE','TAB','BKSP','ENTER']
+];
+var DEV_KB_SHIFT = false;
+
+function devKbRender(){
+  var kb=document.getElementById('devKb');
+  if(!kb) return;
+  var html='';
+  for(var r=0;r<DEV_KB_LAYOUT.length;r++){
+    html+='<div class="dkRow">';
+    var row=DEV_KB_LAYOUT[r];
+    for(var c=0;c<row.length;c++){
+      var kk=row[c];
+      var lbl=kk, cls='dkKey';
+      if(kk==='SHIFT'){ lbl='SH'; cls+=' w15'+(DEV_KB_SHIFT?' on':''); }
+      else if(kk==='SPACE'){ lbl='空格'; cls+=' space'; }
+      else if(kk==='TAB'){ lbl='TAB'; cls+=' w15 dim'; }
+      else if(kk==='BKSP'){ lbl='DEL'; cls+=' w15 warn'; }
+      else if(kk==='ENTER'){ lbl='回车'; cls+=' w2'; }
+      else if(kk==='?'){ cls+=' w15'; }
+      else if(DEV_KB_SHIFT && /^[a-z]$/.test(kk)){ lbl=kk.toUpperCase(); }
+      html+='<button type="button" class="'+cls+'" data-k="'+kk+'">'+lbl+'</button>';
+    }
+    html+='</div>';
+  }
+  kb.innerHTML=html;
+}
+
+function devKbSync(){
+  var inp=document.getElementById('devTermInput');
+  var mask=!!(typeof DEV!=='undefined' && DEV && DEV.sudoAsk);
+  if(inp) inp.value = mask ? new Array(DEV_KB_BUF.length+1).join('*') : DEV_KB_BUF;
+  var cur=document.getElementById('devTermCursor');
+  if(cur) cur.textContent=(DEV_KB_BUF.length?'':'>')+'\u2588';
+}
+function devKbPress(kk){
+  if(kk==='SHIFT'){ DEV_KB_SHIFT=!DEV_KB_SHIFT; devKbRender(); return; }
+  if(kk==='BKSP'){ DEV_KB_BUF=DEV_KB_BUF.slice(0,-1); devKbSync(); return; }
+  if(kk==='TAB'){ DEV_KB_BUF+=' '; devKbSync(); return; }
+  if(kk==='SPACE'){ DEV_KB_BUF+=' '; devKbSync(); return; }
+  if(kk==='ENTER'){ devKbSubmit(); return; }
+  var ch=kk;
+  if(DEV_KB_SHIFT && /^[a-z]$/.test(ch)) ch=ch.toUpperCase();
+  DEV_KB_BUF+=ch;
+  if(DEV_KB_SHIFT && /^[a-z]$/i.test(ch)){ DEV_KB_SHIFT=false; devKbRender(); }
+  devKbSync();
+}
+function devKbSubmit(){
+  var v=DEV_KB_BUF;
+  DEV_KB_BUF='';
+  devKbSync();
+  if(v && v.trim()) devTermSubmit(v);
+}
+function devKbBind(){
+  var kb=document.getElementById('devKb');
+  if(!kb) return;
+  devKbRender();
+  devKbSync();
+  /* 用 pointerdown 而不是 click：触摸更跟手，且不会被 body 的 touch-action 吃掉 */
+  kb.addEventListener('pointerdown',function(e){
+    var t=e.target;
+    while(t && t!==kb && !t.getAttribute('data-k')) t=t.parentNode;
+    if(!t || t===kb) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var kk=t.getAttribute('data-k');
+    if(kk) devKbPress(kk);
+  },{passive:false});
+  /* 旧内核不支持 pointerdown 时回退 click */
+  if(!window.PointerEvent){
+    kb.addEventListener('click',function(e){
+      var t=e.target;
+      while(t && t!==kb && !t.getAttribute('data-k')) t=t.parentNode;
+      if(!t || t===kb) return;
+      e.preventDefault(); e.stopPropagation();
+      var kk=t.getAttribute('data-k');
+      if(kk) devKbPress(kk);
+    });
+  }
+}
+
 function devIsTerminalStyle(){
   return !!(typeof THEME!=='undefined' && THEME && THEME.style==='terminal');
 }
@@ -2402,6 +2513,7 @@ function devTermOpen(){
     return false;
   }
   t.classList.remove('hidden');
+  devKbBind();
   var inp=document.getElementById('devTermInput');
   if(inp){
     /* display 生效后再聚焦，否则部分内核 focus 无效 */
@@ -2421,6 +2533,7 @@ function devTermClose(){
   var t=document.getElementById('devTerm');
   if(t) t.classList.add('hidden');
   DEV.root=false; DEV.sudoAsk=false; DEV.sudoFail=0;
+  if(typeof DEV_KB_BUF!=='undefined'){ DEV_KB_BUF=''; devKbSync(); }
   devSetMask(false); devUpdatePrompt();
 }
 function devTermToggle(){

@@ -1228,12 +1228,99 @@ function devUpdatePrompt(){
 }
 function devSetMask(on){
   var inp=document.getElementById('devTermInput');
-  if(!inp) return;
-  inp.type = on ? 'password' : 'text';
-  inp.value='';
-  inp.setAttribute('autocomplete', on ? 'new-password' : 'off');
-  inp.setAttribute('placeholder', on ? 'sudo 密码' : '输入 help 查看指令');
+  if(inp){
+    inp.setAttribute('placeholder', on ? 'sudo 密码（只用下方键盘输入）' : '点下方键盘输入');
+  }
+  if(typeof DEV_KB_BUF!=='undefined'){ DEV_KB_BUF=''; devKbSync(); }
 }
+/* ===== DevTest 虚拟键盘：完全绕开系统输入法 ===== */
+var DEV_KB_BUF = '';
+var DEV_KB_LAYOUT = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l','-'],
+  ['z','x','c','v','b','n','m','.','_','/'],
+  ['SHIFT','?','SPACE','TAB','BKSP','ENTER']
+];
+var DEV_KB_SHIFT = false;
+
+function devKbRender(){
+  var kb=document.getElementById('devKb');
+  if(!kb) return;
+  var html='';
+  for(var r=0;r<DEV_KB_LAYOUT.length;r++){
+    html+='<div class="dkRow">';
+    var row=DEV_KB_LAYOUT[r];
+    for(var c=0;c<row.length;c++){
+      var kk=row[c];
+      var lbl=kk, cls='dkKey';
+      if(kk==='SHIFT'){ lbl='SH'; cls+=' w15'+(DEV_KB_SHIFT?' on':''); }
+      else if(kk==='SPACE'){ lbl='空格'; cls+=' space'; }
+      else if(kk==='TAB'){ lbl='TAB'; cls+=' w15 dim'; }
+      else if(kk==='BKSP'){ lbl='DEL'; cls+=' w15 warn'; }
+      else if(kk==='ENTER'){ lbl='回车'; cls+=' w2'; }
+      else if(kk==='?'){ cls+=' w15'; }
+      else if(DEV_KB_SHIFT && /^[a-z]$/.test(kk)){ lbl=kk.toUpperCase(); }
+      html+='<button type="button" class="'+cls+'" data-k="'+kk+'">'+lbl+'</button>';
+    }
+    html+='</div>';
+  }
+  kb.innerHTML=html;
+}
+
+function devKbSync(){
+  var inp=document.getElementById('devTermInput');
+  var mask=!!(typeof DEV!=='undefined' && DEV && DEV.sudoAsk);
+  if(inp) inp.value = mask ? new Array(DEV_KB_BUF.length+1).join('*') : DEV_KB_BUF;
+  var cur=document.getElementById('devTermCursor');
+  if(cur) cur.textContent=(DEV_KB_BUF.length?'':'>')+'\u2588';
+}
+function devKbPress(kk){
+  if(kk==='SHIFT'){ DEV_KB_SHIFT=!DEV_KB_SHIFT; devKbRender(); return; }
+  if(kk==='BKSP'){ DEV_KB_BUF=DEV_KB_BUF.slice(0,-1); devKbSync(); return; }
+  if(kk==='TAB'){ DEV_KB_BUF+=' '; devKbSync(); return; }
+  if(kk==='SPACE'){ DEV_KB_BUF+=' '; devKbSync(); return; }
+  if(kk==='ENTER'){ devKbSubmit(); return; }
+  var ch=kk;
+  if(DEV_KB_SHIFT && /^[a-z]$/.test(ch)) ch=ch.toUpperCase();
+  DEV_KB_BUF+=ch;
+  if(DEV_KB_SHIFT && /^[a-z]$/i.test(ch)){ DEV_KB_SHIFT=false; devKbRender(); }
+  devKbSync();
+}
+function devKbSubmit(){
+  var v=DEV_KB_BUF;
+  DEV_KB_BUF='';
+  devKbSync();
+  if(v && v.trim()) devTermSubmit(v);
+}
+function devKbBind(){
+  var kb=document.getElementById('devKb');
+  if(!kb) return;
+  devKbRender();
+  devKbSync();
+  /* 用 pointerdown 而不是 click：触摸更跟手，且不会被 body 的 touch-action 吃掉 */
+  kb.addEventListener('pointerdown',function(e){
+    var t=e.target;
+    while(t && t!==kb && !t.getAttribute('data-k')) t=t.parentNode;
+    if(!t || t===kb) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var kk=t.getAttribute('data-k');
+    if(kk) devKbPress(kk);
+  },{passive:false});
+  /* 旧内核不支持 pointerdown 时回退 click */
+  if(!window.PointerEvent){
+    kb.addEventListener('click',function(e){
+      var t=e.target;
+      while(t && t!==kb && !t.getAttribute('data-k')) t=t.parentNode;
+      if(!t || t===kb) return;
+      e.preventDefault(); e.stopPropagation();
+      var kk=t.getAttribute('data-k');
+      if(kk) devKbPress(kk);
+    });
+  }
+}
+
 function devIsTerminalStyle(){
   return !!(typeof THEME!=='undefined' && THEME && THEME.style==='terminal');
 }
@@ -1254,6 +1341,7 @@ function devTermOpen(){
     return false;
   }
   t.classList.remove('hidden');
+  devKbBind();
   var inp=document.getElementById('devTermInput');
   if(inp){
     /* display 生效后再聚焦，否则部分内核 focus 无效 */
@@ -1273,6 +1361,7 @@ function devTermClose(){
   var t=document.getElementById('devTerm');
   if(t) t.classList.add('hidden');
   DEV.root=false; DEV.sudoAsk=false; DEV.sudoFail=0;
+  if(typeof DEV_KB_BUF!=='undefined'){ DEV_KB_BUF=''; devKbSync(); }
   devSetMask(false); devUpdatePrompt();
 }
 function devTermToggle(){

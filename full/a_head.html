@@ -679,7 +679,29 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
 #devTermInput:focus{outline:none}
 /* 软键盘弹出时面板可能被顶到看不见，给个最小高度兼垫层 */
 #devTerm{min-height:120px}
-#devTermInput{font-size:16px !important}  /* iOS 小于 16px 会自动缩放，Android 也避免异常 */
+#devTermInput{font-size:16px !important; caret-color:transparent}  /* 只读显示区，光标隐藏 */
+#devTermCursor{color:#5eff8f; font-weight:700; animation:dtBlink 1s steps(1) infinite; font-size:15px}
+@keyframes dtBlink{50%{opacity:0}}
+/* ===== 虚拟键盘：绕开系统输入法 ===== */
+#devKb{flex:0 0 auto; background:#04140a; border-top:1px solid #14532b;
+  padding:5px 4px calc(6px + env(safe-area-inset-bottom,0px));
+  display:flex; flex-direction:column; gap:4px;
+  user-select:none; -webkit-user-select:none; touch-action:manipulation}
+.dkRow{display:flex; gap:4px; justify-content:center}
+.dkKey{flex:1 1 0; min-width:0; height:36px; line-height:1;
+  background:#0a2114; border:1px solid #1f7a3f; border-radius:3px; color:#5eff8f;
+  font-family:"JetBrains Mono",Consolas,monospace; font-size:14px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  cursor:pointer; padding:0}
+.dkKey.w15{flex:1.5 1 0}
+.dkKey.w2{flex:2 1 0}
+.dkKey.w25{flex:2.5 1 0}
+.dkKey.space{flex:4 1 0; font-size:11px; color:#35a058}
+.dkKey.on,.dkKey:active{background:#5eff8f; color:#000; border-color:#5eff8f}
+.dkKey.warn{color:#ffd75e; border-color:#ffd75e}
+.dkKey.warn:active{background:#ffd75e; color:#000}
+.dkKey.dim{color:#2b7d45; border-color:#14532b; font-size:12px}
 </style>
 </head>
 <body>
@@ -825,7 +847,9 @@ body.theme-material .abtn:active{background:#e8e8e8; color:#141414}
   <div id="devTermLog"></div>
   <div id="devTermRow">
     <span id="devTermPrompt">user@efs:~$</span>
-    <input id="devTermInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 help 查看指令">
+    <input id="devTermInput" readonly autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="点下方键盘输入">
+    <span id="devTermCursor"></span>
   </div>
+  <div id="devKb"></div>
 </div>
 <script>

@@ -168,12 +168,14 @@ function achTotalTimes(){
   var n=0; for(var k in ACH) n+=achCountOf(k);
   return n;
 }
+/* 地狱只有 1 条命，这两个成就条件不成立，不给 */
+var HELL_BANNED_ACH = { no_alert:true, survivor:true };
 
 function unlockAch(id){
   if(!ACH[id]) return false;
   if(cheatBlocksBoard()) return false;       /* 用过 GM → 不给任何成就 */
-  /* 地狱只有 1 条命，"没被发现"不成立，不给这个成就 */
-  if(id==='no_alert' && S.diff==='hell') return false;
+  if(S.diff==='hell' && HELL_BANNED_ACH[id]) return false;
+
 
   var first = !ACH_OWNED[id];                /* 是否首次解锁 */
   ACH_OWNED[id]=true;
@@ -243,7 +245,9 @@ function openAchPage(){
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
       '<div class="achTxt">'+
         '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
-        '<span class="achDesc">'+(has?a.desc:'尚未解锁')+'</span>'+
+        '<span class="achDesc">'+(has?a.desc:'尚未解锁')+
+          (HELL_BANNED_ACH[id]?' <span style="color:#ff8095">（地狱不给）</span>':'')+
+        '</span>'+
       '</div>'+
       '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
         achTierName(a.tier)+'</div>'+ 

@@ -10,7 +10,7 @@ OUT=index.html
 {
   cat full/a_head.html
   printf '(function(){\n'
-  printf "'use strict';\n"
+# b_world.js 自带 'use strict';，这里不再重复输出
   cat full/b_world.js;   printf '\n'
   cat full/c_logic.js;   printf '\n'
   cat full/d_actions.js; printf '\n'

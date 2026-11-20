@@ -2171,11 +2171,41 @@ function bindInput(){
       closeCheatPanel();
     },{passive:false});
   }
-  /* GM 小球：点一下重新展开面板 */
+  /* GM 小球：可拖动，轻点展开面板 */
   var gb=document.getElementById('gmBall');
   if(gb){
-    gb.addEventListener('click',function(){ toggleCheatPanel(); });
-    gb.addEventListener('touchstart',function(e){ e.preventDefault(); toggleCheatPanel(); },{passive:false});
+    var gDrag=false, gMoved=false, gSX=0, gSY=0, gOX=0, gOY=0;
+    function gStart(e){
+      var t=e.touches? e.touches[0] : e;
+      gDrag=true; gMoved=false;
+      gSX=t.clientX; gSY=t.clientY;
+      var r=gb.getBoundingClientRect();
+      gOX=r.left; gOY=r.top;
+      gb.style.right='auto'; gb.style.bottom='auto';
+      gb.style.left=gOX+'px'; gb.style.top=gOY+'px';
+    }
+    function gMoveH(e){
+      if(!gDrag) return;
+      var t=e.touches? e.touches[0] : e;
+      var dx=t.clientX-gSX, dy=t.clientY-gSY;
+      if(Math.abs(dx)+Math.abs(dy)>6) gMoved=true;
+      gb.style.left=(gOX+dx)+'px';
+      gb.style.top =(gOY+dy)+'px';
+      if(e.cancelable) e.preventDefault();
+    }
+    function gEnd(e){
+      if(!gDrag) return;
+      gDrag=false;
+      /* 没怎么移动 = 当成点击，展开面板 */
+      if(!gMoved) toggleCheatPanel();
+    }
+    gb.addEventListener('mousedown',gStart);
+    gb.addEventListener('touchstart',gStart,{passive:true});
+    document.addEventListener('mousemove',gMoveH);
+    document.addEventListener('touchmove',gMoveH,{passive:false});
+    document.addEventListener('mouseup',gEnd);
+    document.addEventListener('touchend',gEnd);
+    document.addEventListener('touchcancel',gEnd);
   }
   var cp=document.getElementById('cheatPanel');
   var ch=document.getElementById('cheatHead');

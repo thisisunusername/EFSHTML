@@ -442,193 +442,181 @@ body.theme-material .achDesc{color:var(--m3-on-surface-var)}
    无描边靠背景层次区分、强调色克制。
    与 Material 平行共存：只靠 body.theme-miuix 前缀隔离，互不干扰。
    铁律同前：底子/表面/圆角/描边/文字层级跟风，语义色一律保留。
+   关键：本风格靠结构与轮廓区分，不靠微调色值。
 */
 body.theme-miuix #startScr.overlay{
   background:#000;
   background-image:none;
-  padding:26px 18px 30px; gap:12px;
+  padding:30px 20px 34px; gap:18px;
   font-family:"MiSans","Noto Sans SC",-apple-system,"PingFang SC",system-ui,sans-serif;
 }
 body.theme-miuix #startScr h1{
-  font-size:27px; letter-spacing:0; color:var(--m3-on-surface);
-  text-shadow:none; font-weight:600; margin:4px 0 0; line-height:1.25;
+  font-size:32px; letter-spacing:-.8px; color:#fff;
+  text-shadow:none; font-weight:700; margin:6px 0 0; line-height:1.18;
 }
 body.theme-miuix #startScr .sub{
-  color:var(--m3-on-surface-var); font-size:13px; line-height:1.62; letter-spacing:0;
+  color:var(--m3-on-surface-var); font-size:12.5px; line-height:1.72; letter-spacing:.2px;
 }
-/* Miuix Card：纯填充、无描边、超大圆角 */
+/* Miuix Card：纯黑底上的实心卡片，无阴影无描边，靠明暗分层 */
 body.theme-miuix #startScr .card{
-  background:var(--m3-surface-1);
-  border:none; border-radius:20px;
-  padding:18px 18px; font-size:12.5px; color:var(--m3-on-surface-var); line-height:1.85;
+  background:#141414;
+  border:none; border-radius:26px;
+  padding:20px 22px; font-size:12.5px; color:#b8b8b8; line-height:1.95;
   box-shadow:none;
 }
-body.theme-miuix #startScr .card b{color:var(--m3-primary); font-weight:600}
-/* 分段按钮：Miuix 分段选择器（内凹底 + 滑块） */
-body.theme-miuix #startScr .diffs{gap:6px}
+body.theme-miuix #startScr .card b{color:#fff; font-weight:600}
+/* 分段按钮：Miuix 胶囊分段，选中为白色实心（HyperOS 强对比） */
+body.theme-miuix #startScr .diffs{gap:10px}
 body.theme-miuix #startScr .dbtn{
-  background:var(--m3-surface-1);
+  background:#141414;
   border:none;
-  color:var(--m3-on-surface);
-  border-radius:16px;
-  font-size:14px; font-weight:500; letter-spacing:0;
-  padding:13px 8px; line-height:1.4;
+  color:#b8b8b8;
+  border-radius:999px;
+  font-size:13.5px; font-weight:500; letter-spacing:.2px;
+  padding:13px 10px; line-height:1.4;
   box-shadow:none;
 }
 body.theme-miuix #startScr .dbtn small{
-  color:var(--m3-on-surface-var); font-size:11px; margin-top:3px; letter-spacing:0;
+  color:#8a8a8a; font-size:10.5px; margin-top:4px; letter-spacing:.2px;
 }
 body.theme-miuix #startScr .dbtn.on{
-  background:var(--m3-primary);
-  color:var(--m3-on-primary);
-  font-weight:600;
+  background:#fff;
+  color:#000;
+  font-weight:700;
 }
-body.theme-miuix #startScr .dbtn.on small{color:var(--m3-on-primary); opacity:.82}
+body.theme-miuix #startScr .dbtn.on small{color:#333; opacity:1; font-weight:500}
 body.theme-miuix #startScr .dbtn.hell{
-  background:var(--m3-surface-1); color:var(--m3-error);
+  background:#141414; color:var(--m3-error);
 }
 body.theme-miuix #startScr .dbtn.hell.on{
   background:var(--m3-error); color:var(--m3-on-error);
 }
-body.theme-miuix #startScr .dbtn.hell.on small{color:var(--m3-on-error); opacity:.85}
-/* 主按钮：Miuix 胶囊主按钮 */
+body.theme-miuix #startScr .dbtn.hell.on small{color:var(--m3-on-error); opacity:1}
+/* 主按钮：纯白胶囊，HyperOS 标志性主操作 */
 body.theme-miuix #startScr .bigbtn{
-  background:var(--m3-primary); color:var(--m3-on-primary);
-  border:none; border-radius:999px; padding:15px 40px;
-  font-size:15px; font-weight:600; letter-spacing:0;
+  background:#fff; color:#000;
+  border:none; border-radius:999px; padding:16px 46px;
+  font-size:15px; font-weight:700; letter-spacing:.3px;
   box-shadow:none;
-  margin-top:16px; width:100%; max-width:340px;
 }
-body.theme-miuix #startScr .bigbtn:active{transform:scale(.97); filter:brightness(.94)}
-/* 次按钮：Miuix 淡色胶囊 */
+body.theme-miuix #startScr .bigbtn:active{background:#d8d8d8; transform:scale(.985)}
 body.theme-miuix #startScr .ghostbtn{
-  background:var(--m3-surface-2); color:var(--m3-on-surface);
-  border:none; border-radius:999px; padding:11px 18px;
-  font-size:12.5px; font-weight:500; box-shadow:none;
+  background:transparent; color:#8a8a8a;
+  border:none; border-radius:999px; padding:12px 26px;
+  font-size:13px; font-weight:500; letter-spacing:.2px;
+  box-shadow:none;
 }
-body.theme-miuix #startScr .ghostbtn:active{transform:scale(.96); background:var(--m3-surface-3)}
-/* 底部制作名单 */
+body.theme-miuix #startScr .ghostbtn:active{background:#1c1c1c; color:#fff}
 body.theme-miuix #startScr .credits{
-  color:var(--m3-on-surface-var); opacity:.55; font-size:10.5px; margin-top:16px;
+  color:#6a6a6a; font-size:11px; letter-spacing:.2px; line-height:1.8; margin-top:6px;
 }
-body.theme-miuix #startScr .credits .cl{color:var(--m3-primary)}
-body.theme-miuix #startScr .credits a{color:var(--m3-primary)}
-/* 主题悬浮球：无描边圆形 */
+body.theme-miuix .credits .cl{color:#8a8a8a}
+body.theme-miuix .credits a{color:#fff; text-decoration:none; border-bottom:none}
+/* ===== 主题面板 ===== */
 body.theme-miuix .themeFab{
-  background:var(--m3-surface-2); border:none; color:var(--m3-primary);
+  background:#1c1c1c; color:#fff; border:none; border-radius:999px;
   box-shadow:none;
 }
-/* 主题面板：大圆角浮层 */
-body.theme-miuix .tbox{
-  background:var(--m3-surface-1); border:none; border-radius:24px;
-  box-shadow:none;
+body.theme-miuix #themePanel .tbox, body.theme-miuix .tbox{
+  background:#0a0a0a; border:none; border-radius:30px;
+  padding:24px 20px; box-shadow:none;
 }
-body.theme-miuix .tbox h3{color:var(--m3-on-surface); font-weight:600; letter-spacing:0}
-body.theme-miuix .tlabel{color:var(--m3-on-surface-var); letter-spacing:0}
+body.theme-miuix .tbox h3{
+  color:#fff; font-size:17px; font-weight:700; letter-spacing:-.2px; margin-bottom:16px;
+}
+body.theme-miuix .tlabel{
+  color:#6a6a6a; font-size:11px; letter-spacing:.6px; text-transform:none; margin:16px 0 8px;
+}
 body.theme-miuix .tsty{
-  background:var(--m3-surface-2); border:none;
-  border-radius:16px; color:var(--m3-on-surface); font-weight:500;
+  background:#161616; border:none; border-radius:18px;
+  color:#b8b8b8; padding:12px 14px; font-size:13px; font-weight:500; letter-spacing:.2px;
 }
-body.theme-miuix .tsty small{color:var(--m3-on-surface-var)}
+body.theme-miuix .tsty small{color:#6a6a6a; font-size:10.5px; margin-top:3px}
 body.theme-miuix .tsty.on{
-  background:var(--m3-primary); border:none;
-  color:var(--m3-on-primary); font-weight:600;
+  background:#fff; color:#000; font-weight:700;
 }
-body.theme-miuix .tsty.on small{color:var(--m3-on-primary); opacity:.82}
-body.theme-miuix #themeNowName{color:var(--m3-on-surface-var)}
+body.theme-miuix .tsty.on small{color:#444; font-weight:500}
+body.theme-miuix #themeNowName{color:#8a8a8a; font-size:11.5px; letter-spacing:.3px}
 body.theme-miuix .tbtns button{
-  background:var(--m3-surface-2); border:none; color:var(--m3-on-surface);
-  border-radius:999px; font-weight:500;
+  background:#161616; color:#b8b8b8; border:none; border-radius:999px;
+  padding:11px 24px; font-size:13px; font-weight:500; box-shadow:none;
 }
 body.theme-miuix .tbtns button.prim{
-  background:var(--m3-primary); color:var(--m3-on-primary); font-weight:600;
+  background:#fff; color:#000; font-weight:700;
 }
-/* ===== GM / 作弊菜单：Miuix（作弊红色语义保留） ===== */
+/* ===== GM 菜单 ===== */
+body.theme-miuix #gmBall{
+  background:#1c1c1c; color:#fff; border:none; border-radius:999px; box-shadow:none;
+}
+body.theme-miuix #gmBall:active{background:#2a2a2a}
 body.theme-miuix #cheatPanel{
-  background:var(--m3-surface-1); border:none;
-  border-radius:24px;
-  box-shadow:none;
+  background:#0a0a0a; border:none; border-radius:30px; box-shadow:none;
 }
 body.theme-miuix #cheatHead{
-  background:var(--m3-surface-1); border-bottom:none;
-  border-radius:24px 24px 0 0;
-  padding:14px 16px;
+  color:#fff; font-size:15px; font-weight:700; border-bottom:none; padding-bottom:12px;
 }
-body.theme-miuix #cheatHead b{
-  color:var(--m3-error); font-weight:600; letter-spacing:0;
-}
+body.theme-miuix #cheatHead b{color:#fff; font-weight:700}
 body.theme-miuix #cheatClose{
-  background:var(--m3-surface-2); border:none;
-  color:var(--m3-on-surface-var); border-radius:999px; font-weight:500;
+  background:#1c1c1c; color:#8a8a8a; border:none; border-radius:999px; box-shadow:none;
 }
-body.theme-miuix #cheatClose:active{background:var(--m3-surface-3)}
-body.theme-miuix #cheatBody{padding:6px 16px 16px}
+body.theme-miuix #cheatClose:active{background:#2a2a2a; color:#fff}
+body.theme-miuix #cheatBody{color:#b8b8b8}
 body.theme-miuix .csec{
-  color:var(--m3-on-surface-var); font-weight:600; letter-spacing:0;
-  margin:14px 0 6px;
+  color:#6a6a6a; font-size:11px; letter-spacing:.6px; margin:16px 0 8px; border:none;
 }
 body.theme-miuix .crow{
-  border-bottom:none;
-  border-radius:16px;
-  padding:10px 12px; margin:2px 0;
-  background:var(--m3-surface-2);
-  color:var(--m3-on-surface);
+  background:#161616; border:none; border-radius:18px; padding:12px 14px;
+  color:#b8b8b8; font-size:13px;
 }
-body.theme-miuix .crow:active{background:var(--m3-surface-3)}
-body.theme-miuix .cdesc{color:var(--m3-on-surface-var)}
+body.theme-miuix .crow:active{background:#222}
 body.theme-miuix .crow button{
-  background:transparent;
-  border:none;
-  color:var(--m3-error);
-  border-radius:999px; font-weight:600; padding:7px 14px;
+  background:#262626; color:#d8d8d8; border:none; border-radius:999px;
+  padding:8px 16px; font-size:12px; font-weight:500; box-shadow:none;
 }
-body.theme-miuix .crow button:active{background:rgba(242,184,181,.12)}
+body.theme-miuix .crow button:active{background:#333}
 body.theme-miuix .crow button.on{
-  background:var(--m3-success); color:#0d2a16;
+  background:#fff; color:#000; font-weight:700;
 }
 body.theme-miuix .crow button.danger{
-  background:var(--m3-error); color:var(--m3-on-error);
+  background:var(--m3-error-container); color:#fff;
 }
-body.theme-miuix .crow button.danger:active{filter:brightness(1.1)}
+body.theme-miuix .crow button.danger:active{background:#a32b23}
 body.theme-miuix .ctele button{
-  background:var(--m3-surface-2); border:none;
-  color:var(--m3-on-surface); border-radius:999px;
+  background:#161616; color:#b8b8b8; border:none; border-radius:999px;
+  padding:11px 20px; font-size:12.5px; box-shadow:none;
 }
 body.theme-miuix .ctele button.on{
-  background:var(--m3-primary); color:var(--m3-on-primary); font-weight:600;
+  background:#fff; color:#000; font-weight:700;
 }
-body.theme-miuix .cwarn{color:var(--m3-on-surface-var)}
+body.theme-miuix .cwarn{color:var(--m3-error); font-size:12px; letter-spacing:.2px}
 body.theme-miuix #cheatTag{
-  color:var(--m3-error); border:none;
-  border-radius:999px; padding:2px 8px; background:var(--m3-surface-2);
+  background:#262626; color:#8a8a8a; border:none; border-radius:999px;
+  font-size:10.5px; padding:3px 10px;
 }
-body.theme-miuix #gmBall{
-  background:var(--m3-error); border:none; color:var(--m3-on-error);
-  box-shadow:none; font-weight:700;
-}
-body.theme-miuix #gmBall:active{transform:scale(.92); filter:brightness(1.1)}
-/* ===== 面板 / 列表 / 成就 / 排行榜：Miuix ===== */
+body.theme-miuix .cdesc{color:#6a6a6a}
+/* ===== 面板 / 成就 / 排行榜 ===== */
 body.theme-miuix .pbox{
-  background:var(--m3-surface-1);border:none;border-radius:24px;
-  padding:18px 16px;box-shadow:none}
-body.theme-miuix .pbox h3{color:var(--m3-on-surface);font-weight:600;letter-spacing:0}
+  background:#0a0a0a; border:none; border-radius:30px; box-shadow:none; padding:24px 20px;
+}
+body.theme-miuix .pbox h3{color:#fff; font-size:16px; font-weight:700; letter-spacing:-.2px}
 body.theme-miuix .pitem{
-  background:var(--m3-surface-2);border:none;border-radius:16px;
-  padding:11px 13px}
+  background:#161616; border:none; border-radius:18px; padding:14px 16px; color:#b8b8b8;
+}
 body.theme-miuix .pitem button{
-  background:var(--m3-primary);color:var(--m3-on-primary);
-  border:none;border-radius:999px;font-weight:600}
-body.theme-miuix .pitem button:disabled{opacity:.35}
+  background:#fff; color:#000; border:none; border-radius:999px;
+  padding:9px 20px; font-size:12.5px; font-weight:700; box-shadow:none;
+}
+body.theme-miuix .pitem button:disabled{background:#262626; color:#5a5a5a}
 body.theme-miuix #panelClose{
-  background:var(--m3-surface-2);color:var(--m3-on-surface);
-  border:none;border-radius:999px}
-body.theme-miuix .achList{gap:7px}
+  background:#1c1c1c; color:#8a8a8a; border:none; border-radius:999px; box-shadow:none;
+}
+body.theme-miuix .achList{gap:9px}
 body.theme-miuix .achRow{
-  background:var(--m3-surface-2);border:none;border-radius:16px;
-  padding:10px 12px}
+  background:#141414;border:none;border-radius:20px;
+  padding:12px 14px}
 body.theme-miuix .achRow.got{
-  background:var(--m3-surface-1)}
-body.theme-miuix .achDesc{color:var(--m3-on-surface-var)}
+  background:#1c1c1c}
+body.theme-miuix .achDesc{color:#6a6a6a}
 </style>
 </head>
 <body>

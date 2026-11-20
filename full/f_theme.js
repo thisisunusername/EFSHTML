@@ -361,29 +361,26 @@ function themeUiColors(){
   var h=themeHue(hex), s=themeSat(hex);
   /* ===== Miuix：纯黑底 + 卡片分层，不靠饰边靠背景层次 ===== */
   if(THEME.style==='miuix'){
-    var mxSat=Math.min(s, 0.12);
-    var mxAcc=Math.max(s, 0.38);
-    var mxr=function(hx, a){
-      var v=themeHexToRgb(hx);
-      return 'rgba('+v[0]+','+v[1]+','+v[2]+','+a+')';
-    };
     return {
       m3:false,
       mx:true,
-      title:themeTone(h, Math.min(mxAcc,0.40), 94, 1),
-      text:themeTone(h, mxSat, 95, 1),
-      sub:themeTone(h, mxSat, 74, 1),
-      dim:themeTone(h, mxSat, 60, 1),
-      faint:themeTone(h, mxSat, 42, 1),
-      accent:themeTone(h, Math.min(mxAcc,0.52), 84, 1),
-      gold:themeTone(h+40, Math.min(Math.max(s,0.48),0.60), 82, 1),
-      warn:themeTone(h-150, Math.min(Math.max(s,0.44),0.58), 80, 1),
-      line:mxr(themeTone(h, mxSat, 36, 1), 0.30),
-      rowBg:mxr(themeTone(h, mxSat, 10, 1), 1),
-      rowGot:mxr(themeTone(h, mxSat, 16, 1), 1),
-      rowBorder:mxr(themeTone(h, mxSat, 40, 1), 0.14),
-      rowGotBorder:mxr(themeTone(h, Math.min(mxAcc,0.30), 66, 1), 0.34),
-      dotOff:mxr(themeTone(h, mxSat, 50, 1), 0.30)
+      /* 文字层：Miuix 用中性白，不携入色相；靠字重与明度差拉层级 */
+      title:'#ffffff',
+      text:'#e8e8e8',
+      sub:'#9a9a9a',
+      dim:'#6a6a6a',
+      faint:'#3a3a3a',
+      /* 强调色只取纯色相，饱和度拉满（HyperOS 单色强调） */
+      accent:themeTone(h, Math.min(Math.max(s,0.62),0.78), 62, 1),
+      gold:themeTone(h+40, 0.70, 64, 1),
+      warn:themeTone(h-150, 0.66, 62, 1),
+      /* 表面层：中性灰阶，不染色，纯靠明暗分层 */
+      line:'rgba(255,255,255,0.10)',
+      rowBg:'#141414',
+      rowGot:'#1c1c1c',
+      rowBorder:'rgba(255,255,255,0.06)',
+      rowGotBorder:themeTone(h, Math.min(Math.max(s,0.62),0.78), 62, 0.55),
+      dotOff:'rgba(255,255,255,0.16)'
     };
   }
   var ns=Math.min(s, 0.16);

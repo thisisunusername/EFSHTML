@@ -726,16 +726,31 @@ function achLoad(){
   if(!raw){ raw=readCookie(ACH_KEY); }
   if(raw){
     try{
-      var arr=JSON.parse(raw);
-      for(var i=0;i<arr.length;i++){ if(ACH[arr[i]]) ACH_OWNED[arr[i]]=true; }
+      var data=JSON.parse(raw);
+      if(data && !Array.isArray(data) && typeof data==='object'){
+        /* 新格式：{ id: 次数 } */
+        for(var k in data){
+          if(!ACH[k]) continue;
+          var n=parseInt(data[k],10)||0;
+          if(n>0){ ACH_OWNED[k]=true; ACH_COUNT[k]=n; }
+        }
+      } else if(data && data.length){
+        /* 旧格式：["id","id"] → 视为各 1 次 */
+        for(var i=0;i<data.length;i++){
+          if(ACH[data[i]]){ ACH_OWNED[data[i]]=true; ACH_COUNT[data[i]]=1; }
+        }
+      }
     }catch(e){}
   }
   return ACH_OWNED;
 }
 function achSave(){
-  var arr=[];
-  for(var k in ACH_OWNED) if(ACH_OWNED[k] && ACH[k]) arr.push(k);
-  var raw=JSON.stringify(arr);
+  var obj={};
+  for(var k in ACH){
+    var n=achCountOf(k);
+    if(n>0) obj[k]=n;
+  }
+  var raw=JSON.stringify(obj);
   try{ localStorage.setItem(ACH_KEY, raw); }catch(e){}
   writeCookie(ACH_KEY, raw, 3650);      /* 10 年 */
 }
@@ -759,39 +774,84 @@ function writeCookie(name,val,days){
 }
 
 /* 解锁成就：GM 用过（本局）一律不给 */
+/* ================= 成就存储 =================
+   ACH_OWNED[id]  = true 表示已解锁（兼容旧数据）
+   ACH_COUNT[id]  = 获得次数（>=1）
+*/
+var ACH_COUNT = {};
+
+function achCountOf(id){
+  if(ACH_COUNT[id]) return ACH_COUNT[id];
+  return ACH_OWNED[id] ? 1 : 0;      /* 旧数据只有 true，视为 1 次 */
+}
+function achTotalUnlocked(){
+  var n=0; for(var k in ACH) if(achCountOf(k)>0) n++;
+  return n;
+}
+function achTotalTimes(){
+  var n=0; for(var k in ACH) n+=achCountOf(k);
+  return n;
+}
+
 function unlockAch(id){
-  if(!ACH[id] || ACH_OWNED[id]) return false;
+  if(!ACH[id]) return false;
   if(cheatBlocksBoard()) return false;       /* 用过 GM → 不给任何成就 */
+  /* 地狱只有 1 条命，"没被发现"不成立，不给这个成就 */
+  if(id==='no_alert' && S.diff==='hell') return false;
+
+  var first = !ACH_OWNED[id];                /* 是否首次解锁 */
   ACH_OWNED[id]=true;
-  achSave();                 /* 立刻写入 localStorage + cookie */
+  ACH_COUNT[id]=achCountOf(id)+1;            /* 累计次数 +1 */
+  achSave();
+
   var t=ACH[id];
   var col = achColor(t.tier);
-  toast('🏆 成就解锁：'+t.name+'（'+t.desc+'）');
-  showAchPopup(id, col);
+  var times = ACH_COUNT[id];
+  if(first){
+    toast('🏆 成就解锁：'+t.name+'（'+t.desc+'）');
+  } else {
+    toast('🏆 '+t.name+' ×'+times);
+  }
+  queueAchPopup(id, col, first, times);
   renderAchChip();
   return true;
 }
-function achCount(){
-  var n=0; for(var k in ACH_OWNED) if(ACH_OWNED[k]) n++;
-  return n;
-}
+function achCount(){ return achTotalUnlocked(); }
 function renderAchChip(){
   var el=document.getElementById('achChip');
   if(!el) return;
   el.textContent='🏆 '+achCount()+'/'+ACH_ORDER.length;
 }
 /* 成就弹窗：跟 toast 不同，它会停 3 秒并高亮 */
-function showAchPopup(id, col){
+/* 成就弹出队列：多个成就依次显示，不会互相覆盖 */
+var achQueue=[], achPopping=false;
+
+function queueAchPopup(id, col, first, times){
+  achQueue.push({id:id, col:col, first:first, times:times});
+  if(!achPopping) nextAchPopup();
+}
+function nextAchPopup(){
+  if(!achQueue.length){ achPopping=false; return; }
+  achPopping=true;
+  var item=achQueue.shift();
+  showAchPopup(item.id, item.col, item.first, item.times);
+  clearTimeout(achQueue._tm);
+  achQueue._tm=setTimeout(function(){ nextAchPopup(); }, 2500);   /* 每条显示 2.5 秒 */
+}
+
+function showAchPopup(id, col, first, times){
   var box=document.getElementById('achPop');
   if(!box) return;
   var t=ACH[id];
-  box.innerHTML='<span style="font-size:20px">🏆</span> <b style="color:'+col+'">'+t.name+'</b><br>'+
-    '<span style="font-size:11px;color:#b6c9dd">'+t.desc+'</span>';
+  var head = first ? '成就解锁' : '成就再次达成';
+  var badge = (times>1) ? ' <span style="color:'+col+';font-weight:700">×'+times+'</span>' : '';
+  var remain = achQueue.length ? '<br><span style="font-size:10px;color:#7d90a5">还有 '+achQueue.length+' 个成就待显示…</span>' : '';
+  box.innerHTML='<span style="font-size:20px">🏆</span> <b style="color:'+col+'">'+t.name+'</b>'+badge+
+    '<br><span style="font-size:10px;color:'+col+';opacity:.8">'+head+'</span>'+
+    '<br><span style="font-size:11px;color:#b6c9dd">'+t.desc+'</span>'+remain;
   box.style.borderColor=col;
   box.style.opacity='1';
   box.style.transform='translateY(0)';
-  clearTimeout(box._tm);
-  box._tm=setTimeout(function(){ box.style.opacity='0'; box.style.transform='translateY(-8px)'; }, 3200);
 }
 /* 成就页：主界面点「🏆 成就」打开，列出全部成就与解锁状态 */
 function openAchPage(){
@@ -799,12 +859,14 @@ function openAchPage(){
   for(var i=0;i<ACH_ORDER.length;i++){
     var id=ACH_ORDER[i], a=ACH[id];
     var has=!!ACH_OWNED[id];
+    var times=achCountOf(id);
     var col = achColor(a.tier);
+    var timesTag = times>1 ? ' <span style="color:'+col+';font-size:11px;font-weight:700">×'+times+'</span>' : '';
     html+='<div class="achRow'+(has?' got':'')+'">'+
       '<div class="achDot" style="background:'+(has?col:'rgba(120,140,160,.25)')+
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
       '<div class="achTxt">'+
-        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b><br>'+
+        '<b style="color:'+(has?col:'#6f8298')+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
         '<span class="achDesc">'+(has?a.desc:'尚未解锁')+'</span>'+
       '</div>'+
       '<div class="achTag" style="color:'+(has?col:'#4b5a68')+'">'+
@@ -813,7 +875,8 @@ function openAchPage(){
   }
   html+='</div>';
   html+='<div style="margin-top:8px;font-size:11px;color:#8ea6c2;line-height:1.7">'+
-    '已解锁 '+achCount()+' / '+ACH_ORDER.length+
+    '已解锁 <b style="color:#9fe6ff">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
+    '　累计达成 <b style="color:#fbbf24">'+achTotalTimes()+'</b> 次'+
     '　<span style="color:#ff8095">（用 GM 的那一局不给成就）</span></div>';
   showPanel('🏆 成就', html);
 }

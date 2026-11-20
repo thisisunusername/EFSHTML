@@ -204,17 +204,55 @@ function renderAchChip(){
 /* 成就弹出队列：多个成就依次显示，不会互相覆盖 */
 var achQueue=[], achPopping=false;
 
+var ACH_SHOW_MS = 2500;   /* 每条成就显示多久 */
+
 function queueAchPopup(id, col, first, times){
   achQueue.push({id:id, col:col, first:first, times:times});
   if(!achPopping) nextAchPopup();
+  else syncAchRemain();   /* 正在弹的时候又来了新的：顺手更新「还有 N 个」 */
 }
 function nextAchPopup(){
-  if(!achQueue.length){ achPopping=false; return; }
+  clearTimeout(achQueue._tm);
+  achQueue._tm=null;
+  if(!achQueue.length){
+    /* 队列空了：把最后一条收掉（这一步以前漏了，导致最后一个弹窗一直挂着） */
+    achPopping=false;
+    hideAchPopup();
+    return;
+  }
   achPopping=true;
   var item=achQueue.shift();
   showAchPopup(item.id, item.col, item.first, item.times);
+  achQueue._tm=setTimeout(function(){ nextAchPopup(); }, ACH_SHOW_MS);   /* 每条显示 2.5 秒 */
+}
+/* 只更新「还有 N 个成就待显示」这一行，不动当前弹窗内容 */
+function syncAchRemain(){
+  var box=document.getElementById('achPop');
+  if(!box) return;
+  if(!box.innerHTML) return;
+  var txt = achQueue.length ? '<br><span style="font-size:10px;color:#7d90a5">还有 '+achQueue.length+' 个成就待显示…</span>' : '';
+  /* 用标记切掉旧的一行再拼新的，避免依赖 getElementById */
+  var MARK='<br><span style="font-size:10px;color:#7d90a5">还有 ';
+  var i=box.innerHTML.indexOf(MARK);
+  var base = (i>=0) ? box.innerHTML.slice(0, i) : box.innerHTML;
+  if(txt) box.innerHTML = base + txt;
+  else if(i>=0) box.innerHTML = base;
+}
+/* 淡出成就弹窗 */
+function hideAchPopup(){
+  var box=document.getElementById('achPop');
+  if(!box) return;
+  box.style.opacity='0';
+  box.style.transform='translateY(-8px)';
+  box.innerHTML='';
+}
+/* 清空队列（重开一局时调用） */
+function resetAchPopup(){
+  achQueue.length=0;
   clearTimeout(achQueue._tm);
-  achQueue._tm=setTimeout(function(){ nextAchPopup(); }, 2500);   /* 每条显示 2.5 秒 */
+  achQueue._tm=null;
+  achPopping=false;
+  hideAchPopup();
 }
 
 function showAchPopup(id, col, first, times){
@@ -466,6 +504,7 @@ function startGame(diff){
   var es=document.getElementById('endScr');   if(es) es.classList.add('hidden');
   hidePanel();
   if(typeof refreshPadMode==='function') refreshPadMode();
+  if(typeof resetAchPopup==='function') resetAchPopup();   /* 清掉上一局残留的成就弹窗 */
   updateHUD();
   toast('任务：找一条路逃出学校');
 }

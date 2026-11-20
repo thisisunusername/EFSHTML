@@ -1234,6 +1234,76 @@ function devSetMask(on){
   if(typeof DEV_KB_BUF!=='undefined'){ DEV_KB_BUF=''; devKbSync(); }
 }
 /* ===== DevTest 虚拟键盘：完全绕开系统输入法 ===== */
+/* ================= 快速加入地图：joinmap =================
+   用法：joinmap [diff=easy|normal|hard|hell] [style=classic|material|terminal]
+                  [color=black|white|blue|green|orange|purple|red|cyan|yellow|<数字>]
+   例：joinmap diff=ez style=terminal color=terminal
+*/
+var JOINMAP_DIFF_ALIAS = {
+  ez:'easy', e:'easy', easy:'easy', 简单:'easy',
+  nm:'normal', n:'normal', normal:'normal', 普通:'normal',
+  hd:'hard', h:'hard', hard:'hard', 困难:'hard',
+  hl:'hell', hell:'hell', 地狱:'hell'
+};
+var JOINMAP_COLOR = {
+  black:0, white:15, grey:7, gray:7,
+  red:32, orange:40, yellow:48, green:64,
+  cyan:80, blue:88, purple:104, pink:112,
+  terminal:64
+};
+function joinmapDiff(v){
+  var k=String(v||'').toLowerCase();
+  return JOINMAP_DIFF_ALIAS[k] || null;
+}
+function joinmapColor(v){
+  var k=String(v||'').toLowerCase();
+  if(JOINMAP_COLOR[k]!==undefined) return JOINMAP_COLOR[k];
+  var n=parseInt(k,10);
+  if(!isNaN(n) && n>=0 && n<256) return n;
+  return null;
+}
+function joinmapParse(args){
+  var o={ diff:null, style:null, color:null, colorSet:false, err:'', extra:[] };
+  for(var i=0;i<args.length;i++){
+    var seg=String(args[i]||'');
+    if(!seg) continue;
+    var eq=seg.indexOf('=');
+    if(eq<0){ o.extra.push(seg); continue; }
+    var key=seg.slice(0,eq).toLowerCase();
+    var val=seg.slice(eq+1);
+    if(key==='diff'||key==='d'){
+      var d=joinmapDiff(val);
+      if(!d){ o.err='难度不支持：'+val+'（easy/normal/hard/hell，可简写 ez/nm/hd/hl）'; return o; }
+      o.diff=d;
+    } else if(key==='style'||key==='st'||key==='s'){
+      var st=String(val).toLowerCase();
+      if(st!=='classic' && st!=='material' && st!=='terminal' && st!=='term'){
+        o.err='风格不支持：'+val+'（classic/material/terminal）'; return o;
+      }
+      o.style=(st==='term')?'terminal':st;
+    } else if(key==='color'||key==='c'){
+      var cc=joinmapColor(val);
+      if(cc===null){ o.err='颜色不支持：'+val+'（可写颜色名或 0~255 数字）'; return o; }
+      o.color=cc; o.colorSet=true;
+    } else {
+      o.err='未知参数：'+key+'（可用 diff / style / color）'; return o;
+    }
+  }
+  return o;
+}
+function joinmapExec(o){
+  /* 先应用主题，再开新局，避免开局后主题重绘打断 */
+  if(o.style){ THEME.style=o.style; }
+  if(o.colorSet){ THEME.color=o.color; }
+  else if(o.style==='terminal'){ THEME.color=JOINMAP_COLOR.terminal; }
+  if(o.style || o.colorSet){ themeSave(); themeApply(); }
+  startGame(o.diff||'normal');
+  var dc=(DIFF[S.diff]||DIFF.normal).name;
+  var nm={classic:'原版',material:'Material',terminal:'终端'}[THEME.style]||THEME.style;
+  devTermLog('已加入地图 · 难度 '+dc+' · 风格 '+nm+' · 色号 '+THEME.color,'tl-ok');
+  toast('已加入地图：'+dc);
+}
+
 var DEV_KB_BUF = '';
 var DEV_KB_LAYOUT = [
   ['1','2','3','4','5','6','7','8','9','0'],
@@ -1411,6 +1481,9 @@ function devRunCommand(v){
     devTermLog('  gm open|close           强制打开/关闭 GM 菜单');
     devTermLog('  gm addach               GM 菜单里加「一键全成就」');
     devTermLog('  god on|off              无视伤害（老师/保安/监控都抓不到）');
+    devTermLog('  joinmap [参数]          快速开新局进地图（可带主题）');
+    devTermLog('      例：joinmap diff=ez style=terminal color=terminal');
+    devTermLog('      diff=easy|normal|hard|hell  style=classic|material|terminal');
     devTermLog('  tp <楼层>               传送到指定楼层（2F/1F/B1/B2/B3）');
     devTermLog('  tpobj <名称>            传送到本层指定对象旁（门/楼梯/监控…）');
     devTermLog('  item <物品>             直接给一件道具（key/redkey/blueprint…）');
@@ -1443,6 +1516,12 @@ function devRunCommand(v){
   }
 
   /* ---- 带参数 / 无参数指令（先于 on|off 分支处理） ---- */
+  if(cmd==='joinmap'){
+    var jm=joinmapParse(parts.slice(1));
+    if(jm.err){ devTermLog(jm.err,'tl-err'); return true; }
+    joinmapExec(jm);
+    return true;
+  }
   if(cmd==='tp'){
     var f=String(parts[1]||'').toUpperCase();
     if(!W[f]){ devTermLog('楼层不存在：'+f+'（可用 2F/1F/B1/B2/B3）','tl-err'); return true; }
@@ -1820,6 +1899,19 @@ function cheatRenderBox(){
     '<span class="cdesc">三个电闸一次全部拉下、打开电子门</span></div>'+
     '<button data-ca="gates">全部拉闸</button></div>';
 
+  /* 快速加入地图（joinmap 快捷入口） */
+  html+='<div class="csec">快速加入地图</div>';
+  html+='<div class="ctele">';
+  var jmDiffs=[['easy','简单'],['normal','普通'],['hard','困难'],['hell','地狱']];
+  for(var jd=0;jd<jmDiffs.length;jd++){
+    html+='<button data-cj="diff='+jmDiffs[jd][0]+'">'+jmDiffs[jd][1]+'</button>';
+  }
+  html+='</div>';
+  html+='<div class="ctele">';
+  html+='<button data-cj="style=terminal color=terminal">终端主题开局</button>';
+  html+='<button data-cj="style=material">Material 开局</button>';
+  html+='<button data-cj="style=classic">原版开局</button>';
+  html+='</div>';
   /* 一键跳楼层 */
   html+='<div class="csec">一键跳楼层</div>';
   html+='<div class="ctele">';
@@ -1869,7 +1961,13 @@ function cheatRenderBox(){
         var ci=b.getAttribute('data-ci');
         var ca=b.getAttribute('data-ca');
         var cf=b.getAttribute('data-cf');
-        if(cf) cheatTeleport(cf);
+        var cj=b.getAttribute('data-cj');
+        if(cj){
+          var jo=joinmapParse(String(cj).split(' '));
+          if(jo.err){ toast(jo.err); }
+          else { closeCheatPanel(); collapseCheat(); joinmapExec(jo); }
+        }
+        else if(cf) cheatTeleport(cf);
         else if(ca==='gates') cheatAllGates();
         else if(ca==='allach') cheatUnlockAllAch();
         else if(ca==='wipedata') wipeConfirm('data','清除数据', wipeAllData);

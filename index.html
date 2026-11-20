@@ -37,16 +37,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0f16;color:#e8eef7;
 #toast.show{opacity:1}
 
 #pad{position:absolute;left:0;right:0;bottom:0;height:200px;z-index:8;pointer-events:none}
-#dpad{position:absolute;left:14px;bottom:14px;width:140px;height:140px;pointer-events:auto;
+#dpad{position:absolute;left:12px;bottom:14px;width:152px;height:152px;pointer-events:auto;
   touch-action:none;user-select:none;-webkit-user-select:none}
-#stickBase{position:absolute;inset:0;border-radius:50%;background:rgba(26,38,56,.78);
-  border:1px solid rgba(120,170,235,.34);box-shadow:inset 0 0 22px rgba(0,0,0,.45)}
-#stickKnob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;
-  border-radius:50%;background:radial-gradient(circle at 38% 32%,#6fb4ff,#2b5f9e);
-  border:1px solid rgba(160,210,255,.6);box-shadow:0 3px 12px rgba(0,0,0,.45);
-  transition:transform .07s ease-out}
-#stickBase::after{content:'';position:absolute;left:50%;top:50%;width:120px;height:120px;
-  margin:-60px 0 0 -60px;border-radius:50%;border:1px dashed rgba(140,190,240,.16)}
+.btn{position:absolute;background:rgba(30,44,66,.9);border:1px solid rgba(120,170,235,.4);
+  color:#dceaff;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:700;transition:transform .05s,background .1s}
+.btn.on{background:rgba(70,140,230,.9);transform:scale(.94)}
+.btn.up{left:51px;top:0;width:50px;height:50px}
+.btn.left{left:0;top:51px;width:50px;height:50px}
+.btn.right{left:102px;top:51px;width:50px;height:50px}
+.btn.down{left:51px;top:102px;width:50px;height:50px}
 #actions{position:absolute;right:12px;bottom:16px;display:flex;flex-direction:column;gap:10px;
   align-items:flex-end;pointer-events:auto}
 .abtn{width:64px;height:64px;border-radius:50%;background:rgba(30,44,66,.92);
@@ -103,6 +103,28 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 .pitem button:disabled{opacity:.38}
 #panelClose{padding:9px;border-radius:10px;border:1px solid rgba(140,170,210,.3);
   background:rgba(32,44,62,.9);color:#c9d8ea;font-size:13px}
+#cheatPanel{position:absolute;left:50%;top:90px;transform:translateX(-50%);width:min(320px,88vw);
+  max-height:70vh;overflow-y:auto;z-index:70;background:rgba(14,10,18,.97);
+  border:1px solid rgba(244,63,94,.55);border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.6)}
+#cheatPanel.hidden{display:none}
+#cheatHead{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
+  background:rgba(60,16,26,.9);border-bottom:1px solid rgba(244,63,94,.35);
+  border-radius:13px 13px 0 0;cursor:move;touch-action:none;user-select:none}
+#cheatHead b{color:#ff8fa3;font-size:13px;letter-spacing:1px}
+#cheatClose{background:rgba(244,63,94,.22);border:1px solid rgba(244,63,94,.5);color:#ffb3c0;
+  border-radius:8px;padding:2px 10px;font-size:12px}
+#cheatBody{padding:8px 12px 12px}
+.csec{font-size:11.5px;color:#ff8fa3;margin:8px 0 4px;letter-spacing:1px}
+.crow{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 0;border-bottom:1px solid rgba(244,63,94,.12);font-size:12.5px;color:#e8f2ff}
+.cdesc{font-size:10.5px;color:#8ea6c2}
+.crow button{min-width:56px;padding:5px 10px;border-radius:8px;font-size:12px;
+  background:rgba(244,63,94,.16);border:1px solid rgba(244,63,94,.45);color:#ffc2cc}
+.crow button.on{background:rgba(34,197,94,.22);border-color:rgba(34,197,94,.6);color:#9df5b8}
+.cwarn{margin-top:10px;font-size:10.5px;line-height:1.7;color:#ff9aa8}
+#cheatTag{position:absolute;right:10px;top:8px;z-index:65;font-size:10px;letter-spacing:1px;
+  color:#ff9aa8;border:1px solid rgba(244,63,94,.5);border-radius:6px;padding:1px 6px;display:none}
+
 </style>
 </head>
 <body>
@@ -124,10 +146,20 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
 
   <div id="toast"></div>
   <div id="achPop"></div>
+  <div id="cheatTag"></div>
+
+  <div id="cheatPanel" class="hidden">
+    <div id="cheatHead"><b>CHEAT MENU</b><button id="cheatClose">关闭</button></div>
+    <div id="cheatBody"></div>
+  </div>
+
 
   <div id="pad">
     <div id="dpad">
-      <div id="stickBase"><div id="stickKnob"></div></div>
+      <div class="btn up"    data-dir="up">▲</div>
+      <div class="btn left"  data-dir="left">◀</div>
+      <div class="btn right" data-dir="right">▶</div>
+      <div class="btn down"  data-dir="down">▼</div>
     </div>
     <div id="actions">
       <div class="abtn" id="btnE"><span>✋</span>行动</div>
@@ -308,7 +340,7 @@ function buildWorld(){
       objs:[
         {t:'item', x:12.5, y:2.5, id:'flag'},                                      /* 老师工作牌 */
         {t:'switch', x:25.5, y:2.5, id:'sw1', label:'二层电闸'},
-        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:5.0},                    /* 大门旁的监控 */
+        {t:'camera', x:2.5, y:12.5, dir:0, cone:Math.PI, range:7.5},                  /* 大门旁静态监控 */
         {t:'gate', x:4.5, y:16.5, kind:'main', label:'大门'},
         {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:'下楼'}
       ]
@@ -344,7 +376,8 @@ function buildWorld(){
       patrol:[{x:4.5,y:7.5},{x:12.5,y:8.5},{x:19.5,y:7.5},{x:28.5,y:8.5},{x:3.5,y:13.5},{x:19.5,y:12.5}],
       objs:[
         {t:'shop', x:4.5, y:3.5},
-        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:5.5},               /* 小卖部旁的监控 */
+        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:Math.PI, range:7.5},
+        /* 静态监控：不旋转，大范围覆盖小卖部这一片 */
         {t:'gate', x:12.5, y:6.5, kind:'office', label:'校长办公室门（权限锁）'},
         {t:'item', x:12.5, y:3.5, id:'redkey'},                                       /* 红钥匙 */
         {t:'gate', x:12.5, y:16.5, kind:'side', label:'侧门'},
@@ -385,8 +418,8 @@ function buildWorld(){
         {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:'下四层'},
         {t:'cctv', x:10.5, y:2.5, label:'监控总闸'},
         {t:'switch', x:22.5, y:2.5, id:'sw2', label:'三层电闸'},
-        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.45, range:5.5},
-        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.45, range:5.5},
+        {t:'camera', x:10.5, y:8.5, dir:0,       cone:Math.PI, range:6.5},
+        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:Math.PI, range:6.5},
         {t:'car', x:7.5, y:13.5, label:'校长的车'},
         {t:'gate', x:20.5, y:13.5, kind:'elec', label:'电子门'},
         {t:'gate', x:25.5, y:13.5, kind:'wall', label:'电子门后的砖墙'}
@@ -427,7 +460,7 @@ function buildWorld(){
         {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
         {t:'item', x:9.5,  y:2.5, id:'hammer'},
         {t:'item', x:11.5, y:4.5, id:'wood'},
-        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:4.5},           /* 主任办公室里的监控 */
+        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:Math.PI, range:6.0},        /* 主任办公室静态监控 */
         {t:'item', x:17.5, y:4.5, id:'blueprint'},
         {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},
         {t:'craft', x:4.5, y:13.5},
@@ -654,6 +687,7 @@ function showAchPopup(id, col){
 /* 通关时统一结算成就 */
 function settleAch(endingN){
   if(!(endingN>=2 && endingN<=5)) return;
+  if(!boardAllowed()) return;   /* 作弊：不给成就 */
   var d=DIFF[S.diff]||DIFF.normal;
   unlockAch('clear_any');
   if(S.diff==='hard') unlockAch('clear_hard');
@@ -941,10 +975,10 @@ function movePlayer(dt){
 
   /* 分轴移动 + 贴墙滑动 */
   var nx=S.px+mx*sp;
-  if(canStand(f,nx,S.py)) S.px=nx;
+  if(CHEAT.noClip){ S.px=nx; } else if(canStand(f,nx,S.py)) S.px=nx;
 
   var ny=S.py+my*sp;
-  if(canStand(f,S.px,ny)) S.py=ny;
+  if(CHEAT.noClip){ S.py=ny; } else if(canStand(f,S.px,ny)) S.py=ny;
 
   /* 只有真的动了才算行走：撞墙时避免走路动画和镜头抖动 */
   var dx=S.px-ox, dy=S.py-oy;
@@ -1045,7 +1079,9 @@ function updateNpcs(dt){
       /* 想去别的楼层：先走到对应楼梯 */
       var curIdx=chainIdx(n.floor), wantIdx=chainIdx(n.plan);
       if(wantIdx<0) wantIdx=curIdx;
-      if(n.plan!==n.floor && curIdx>=0 && wantIdx!==curIdx){
+      if(n.stairCd>0) n.stairCd-=dt;
+      if(n.stairCd>0){ n.stairGo=null; }        /* 冷却期内不碰楼梯 */
+      else if(n.plan!==n.floor && curIdx>=0 && wantIdx!==curIdx){
         var st=stairToward(n.floor, wantIdx);
         if(st){
           n.stairGo=st;
@@ -1063,7 +1099,8 @@ function updateNpcs(dt){
           n.lastX=n.x; n.lastY=n.y;
           n.stairGo=null;
           n.ri=0; n.idleT=0;
-          /* 换层后重新给个目标，避免刚上来又原路返回 */
+          /* 换层后强制冷却一段时间，避免刚上来又原路返回 / 蹲在楼梯口来回传 */
+          n.stairCd=2.5+Math.random()*2.0;
           n.plan=n.floor;
           n.planT=(d.replan||9)+Math.random()*6;
           continue;
@@ -1109,6 +1146,7 @@ function updateNpcs(dt){
 /* 规则说明见文件顶部 SEE_LIMIT */
 function checkCatch(dt){
   if(S.mode!=='play') return;
+  if(CHEAT.god){ S.seeT=0; S.seenBy=''; return; }   /* 作弊：无视伤害 */
   dt = dt || 0;
 
   /* 刚被送回来的短暂保护，避免同一个敌人立刻再抓一次 */
@@ -1261,26 +1299,10 @@ function camerasWatcher(){
   return null;
 }
 /* 监控会缓慢转向玩家（跟踪），这样"有监控的路"确实有压力 */
+/* 监控是静态的：不转、不扫，直接把整个区域照住 */
 function updateCameras(dt){
-  if(S.camsOff) return;
-  var f=fl(); if(!f) return;
-  for(var i=0;i<f.objs.length;i++){
-    var c=f.objs[i];
-    if(c.t!=='camera') continue;
-    c.sweep=(c.sweep||0)+dt;
-    var base=(c.baseDir!==undefined? c.baseDir : c.dir);
-    var dx=S.px-c.x, dy=S.py-c.y;
-    var dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist<c.range*1.2){
-      var want=Math.atan2(dy,dx);
-      var diff=want-c.dir;
-      while(diff>Math.PI) diff-=Math.PI*2;
-      while(diff<-Math.PI) diff+=Math.PI*2;
-      c.dir += diff*0.55*dt;        /* 慢慢转：太快像抽搐，看不清也没法躲 */
-    } else {
-      c.dir = base + Math.sin(c.sweep*0.35)*0.5;   /* 没人就慢慢左右扫 */
-    }
-  }
+  /* 什么都不做：监控方向固定，靠 cameraSees 的锥形范围覆盖一片区域 */
+  return;
 }
 
 /* ================= 排行榜（只存本地 cookie） =================
@@ -1311,6 +1333,7 @@ function boardSave(list){
 /* 记录一次通关成绩 */
 function reportClear(endingN){
   if(!(endingN>=2 && endingN<=5)) return;
+  if(!boardAllowed()){ cheatDisableBoard(); return; }   /* 作弊：不记录成绩 */
   var list=boardLoad();
   var name=readCookie(NAME_KEY)||'无名同学';
   var rec={name:name, diff:S.diff, time:Math.round(S.time*100)/100,
@@ -1388,6 +1411,159 @@ function exportScores(){
   }catch(e){
     toast('导出失败：'+e.message);
   }
+}
+/* ================= 作弊菜单 =================
+   触发：连点标题「Escape From the School on HTML」7 次。
+   规则：本局开启作弊 → 立刻关闭排行榜、不记录成绩、不给成就。
+   每次进入页面只能开一次，重进页面要重新触发。
+*/
+var CHEAT = {
+  opened:false,      /* 本次页面是否已经触发过（只限一次） */
+  on:false,          /* 作弊是否生效 */
+  noClip:false,      /* 穿墙 */
+  god:false,         /* 无视伤害 */
+  tapCount:0,
+  tapTimer:null
+};
+
+/* 可单独开关的道具清单 */
+var CHEAT_ITEMS = ['flag','redkey','yellowkey','saw','hammer','wood','knife','blueprint','blackkey','torch'];
+
+function cheatTap(){
+  if(CHEAT.opened){ toast('本页面已经触发过作弊了，刷新后再试'); return; }
+  CHEAT.tapCount++;
+  if(CHEAT.tapTimer) clearTimeout(CHEAT.tapTimer);
+  CHEAT.tapTimer=setTimeout(function(){ CHEAT.tapCount=0; }, 1200);
+  if(CHEAT.tapCount>=7){
+    CHEAT.tapCount=0;
+    CHEAT.opened=true;
+    openCheatPanel();
+  }
+}
+
+function openCheatPanel(){
+  var box=document.getElementById('cheatPanel');
+  if(!box) return;
+  box.classList.remove('hidden');
+  cheatRenderBox();
+}
+
+/* 单个道具开关：给一件就给一件，取消就收回 */
+function cheatToggle(key){
+  CHEAT[key]=!CHEAT[key];
+  if(key==='noClip'||key==='god') CHEAT.on=(CHEAT.noClip||CHEAT.god);
+  if(cheatBlocksBoard()) cheatDisableBoard();   /* 一开作弊就锁排行榜 */
+  updateCheatTag();
+  cheatRenderBox();
+}
+
+function cheatItem(id){
+  if(!S.inv) S.inv={};
+  if(S.inv[id]){
+    S.inv[id]=false;
+    if(id==='torch'){ S.flashLike=false; }
+    toast('收回：'+ITEM[id].name);
+  } else {
+    S.inv[id]=true;
+    if(id==='flag') S.tookFlag=true;
+    if(id==='torch'){ S.flashLike=true; S.flashFloor=''; S.flashOn=false; }
+    toast('给予：'+ITEM[id].name);
+  }
+  cheatDisableBoard();      /* 用过作弊道具同样锁排行榜 */
+  updateHUD();
+  cheatRenderBox();
+}
+
+function cheatRenderBox(){
+  var body=document.getElementById('cheatBody');
+  if(!body) return;
+
+  function sw(key,label,on,desc){
+    return '<div class="crow"><div><b>'+label+'</b><br>'+
+      '<span class="cdesc">'+desc+'</span></div>'+
+      '<button data-ck="'+key+'" class="'+(on?'on':'')+'">'+(on?'已开':'关闭')+'</button></div>';
+  }
+
+  var html='<div class="csec">功能</div>';
+  html+=sw('noClip','穿墙',CHEAT.noClip,'无视墙壁，直接走过去');
+  html+=sw('god','无视伤害',CHEAT.god,'老师 / 保安 / 监控都抓不到你');
+
+  html+='<div class="csec">道具（逐个开关）</div>';
+  for(var i=0;i<CHEAT_ITEMS.length;i++){
+    var id=CHEAT_ITEMS[i];
+    var has=!!(S.inv && S.inv[id]);
+    html+='<div class="crow"><div>'+ITEM[id].icon+' <b>'+ITEM[id].name+'</b></div>'+
+      '<button data-ci="'+id+'" class="'+(has?'on':'')+'">'+(has?'已给':'给予')+'</button></div>';
+  }
+
+  html+='<div class="cwarn">⚠ 开启作弊会关闭排行榜：成绩和成就都不记录。<br>本页面只能触发一次，刷新后需重新连点标题。</div>';
+  body.innerHTML=html;
+
+  var bs=body.querySelectorAll('button');
+  for(var k=0;k<bs.length;k++){
+    (function(b){
+      b.onclick=function(){
+        var ck=b.getAttribute('data-ck');
+        var ci=b.getAttribute('data-ci');
+        if(ck) cheatToggle(ck);
+        else if(ci) cheatItem(ci);
+      };
+    })(bs[k]);
+  }
+}
+
+function updateCheatTag(){
+  var t=document.getElementById('cheatTag');
+  if(!t) return;
+  var any=CHEAT.noClip||CHEAT.god;
+  if(any){ t.style.display=''; t.textContent='CHEAT'; }
+  else t.style.display='none';
+}
+
+function closeCheatPanel(){
+  var box=document.getElementById('cheatPanel');
+  if(box) box.classList.add('hidden');
+}
+
+/* 作弊是否拦截排行榜 */
+function cheatBlocksBoard(){ return CHEAT.noClip||CHEAT.god; }
+
+/* 作弊开启时清空并锁住排行榜 */
+function cheatDisableBoard(){
+  writeCookie(LB_KEY, '[]', 1);
+  writeCookie('efs_noboard','1', 1);
+}
+function boardAllowed(){
+  return !cheatBlocksBoard() && readCookie('efs_noboard')!=='1';
+}
+
+/* 面板拖动 */
+function makeDraggable(el, handle){
+  var sx=0, sy=0, ox=0, oy=0, dragging=false;
+  function down(e){
+    var t=e.touches? e.touches[0] : e;
+    dragging=true;
+    sx=t.clientX; sy=t.clientY;
+    var r=el.getBoundingClientRect();
+    ox=r.left; oy=r.top;
+    el.style.left=ox+'px'; el.style.top=oy+'px';
+    el.style.transform='none';
+    e.preventDefault();
+  }
+  function move(e){
+    if(!dragging) return;
+    var t=e.touches? e.touches[0] : e;
+    el.style.left=(ox+t.clientX-sx)+'px';
+    el.style.top =(oy+t.clientY-sy)+'px';
+    e.preventDefault();
+  }
+  function up(){ dragging=false; }
+  handle.addEventListener('mousedown',down);
+  handle.addEventListener('touchstart',down,{passive:false});
+  document.addEventListener('mousemove',move);
+  document.addEventListener('touchmove',move,{passive:false});
+  document.addEventListener('mouseup',up);
+  document.addEventListener('touchend',up);
 }
 /* ================= 商店 / 制作 / 门 ================= */
 function hidePanel(){ document.getElementById('panel').classList.add('hidden'); }
@@ -1719,62 +1895,20 @@ function bindInput(){
     else if(k==='d'||k==='arrowright') input.right=false;
   });
 
-  /* 虚拟摇杆：按住拖动，按方向给 input，同时把摇杆头推出去 */
-  var baseEl=document.getElementById('stickBase');
-  var knobEl=document.getElementById('stickKnob');
-  var stickId=null, baseC=null;
-  function stickCenter(){
-    if(!baseEl || !baseEl.getBoundingClientRect) return {x:0,y:0};
-    var r=baseEl.getBoundingClientRect();
-    return {x:r.left+r.width/2, y:r.top+r.height/2, rad:r.width/2};
-  }
-  function stickMove(cx,cy){
-    var c=baseC||stickCenter();
-    var dx=cx-c.x, dy=cy-c.y;
-    var d=Math.sqrt(dx*dx+dy*dy);
-    var maxR=(c.rad||60)*0.82;
-    if(d>maxR && d>0){ dx=dx/d*maxR; dy=dy/d*maxR; d=maxR; }
-    if(knobEl){ knobEl.style.transform='translate('+dx+'px,'+dy+'px)'; }
-    /* 死区，避免手抖：超过 18% 才算方向 */
-    var dead=(c.rad||60)*0.18;
-    if(d<dead){ input.up=input.down=input.left=input.right=false; return; }
-    var ang=Math.atan2(dy,dx);
-    /* 用向量投影判断方向更直观：X 轴控制左右、Y 轴控制上下 */
-    var nx=dx/maxR, ny=dy/maxR;
-    input.right = nx> 0.32;
-    input.left  = nx<-0.32;
-    input.down  = ny> 0.32;
-    input.up    = ny<-0.32;
-  }
-  function stickEnd(){
-    stickId=null; baseC=null;
-    input.up=input.down=input.left=input.right=false;
-    if(knobEl) knobEl.style.transform='translate(0,0)';
-  }
-  if(baseEl){
-    baseEl.addEventListener('touchstart',function(ev){
-      ev.preventDefault();
-      var t=ev.changedTouches[0]; if(!t) return;
-      stickId=t.identifier; baseC=stickCenter();
-      stickMove(t.clientX,t.clientY);
-    },{passive:false});
-    baseEl.addEventListener('touchmove',function(ev){
-      ev.preventDefault();
-      for(var i=0;i<ev.changedTouches.length;i++){
-        var t=ev.changedTouches[i];
-        if(t.identifier===stickId){ stickMove(t.clientX,t.clientY); break; }
-      }
-    },{passive:false});
-    baseEl.addEventListener('touchend',function(ev){ ev.preventDefault(); stickEnd(); },{passive:false});
-    baseEl.addEventListener('touchcancel',function(ev){ ev.preventDefault(); stickEnd(); },{passive:false});
-    /* 桌面端用鼠标也能拖 */
-    baseEl.addEventListener('mousedown',function(ev){
-      ev.preventDefault(); baseC=stickCenter();
-      stickMove(ev.clientX,ev.clientY);
-      var mv=function(e){ stickMove(e.clientX,e.clientY); };
-      var up=function(){ stickEnd(); document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
-      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
-    });
+  /* 虚拟方向键：上下左右四个按钮 */
+  var btns=document.querySelectorAll('#dpad .btn');
+  for(var i=0;i<btns.length;i++){
+    (function(b){
+      var dir=b.getAttribute('data-dir');
+      function on(ev){ ev.preventDefault(); input[dir]=true; b.classList.add('on'); }
+      function off(ev){ if(ev) ev.preventDefault(); input[dir]=false; b.classList.remove('on'); }
+      b.addEventListener('touchstart',on,{passive:false});
+      b.addEventListener('touchend',off,{passive:false});
+      b.addEventListener('touchcancel',off,{passive:false});
+      b.addEventListener('mousedown',on);
+      b.addEventListener('mouseup',off);
+      b.addEventListener('mouseleave',off);
+    })(btns[i]);
   }
 
   var bE=document.getElementById('btnE');
@@ -1807,6 +1941,15 @@ function bindInput(){
   if(nb) nb.addEventListener('click',function(){ askName(); });
   var eb=document.getElementById('expBtn');
   if(eb) eb.addEventListener('click',function(){ exportScores(); });
+
+  /* 作弊：连点标题 7 次打开 */
+  var h1=document.querySelector('h1');
+  if(h1) h1.addEventListener('click',function(){ cheatTap(); });
+  var cc=document.getElementById('cheatClose');
+  if(cc) cc.addEventListener('click',function(){ closeCheatPanel(); });
+  var cp=document.getElementById('cheatPanel');
+  var ch=document.getElementById('cheatHead');
+  if(cp && ch) makeDraggable(cp, ch);
   document.getElementById('againBtn').addEventListener('click',function(){ startGame(S.diff); });
   document.getElementById('backMenuBtn').addEventListener('click',function(){
     S.mode='menu';
@@ -1916,13 +2059,22 @@ function buildMapCache(f, px){
   var g = c.getContext('2d');
   var sx = w/f.w, sy = h/f.h;
 
-  for(var y=0;y<f.h;y++){
-    for(var x=0;x<f.w;x++){
-      if(f.g[y][x]===1) continue;
-      g.fillStyle = ((x+y)%2===0) ? '#1e2e3d' : '#1a2836';
-      g.fillRect(x*sx, y*sy, sx+0.7, sy+0.7);
-    }
-  }
+for(var y=0;y<f.h;y++){
+     for(var x=0;x<f.w;x++){
+       if(f.g[y][x]===1) continue;
+       g.fillStyle = ((x+y)%2===0) ? '#1e2e3d' : '#1a2836';
+       g.fillRect(x*sx, y*sy, sx+0.7, sy+0.7);
+     }
+   }
+   /* 地面格线：把地砖一格一格分清楚（跳过一回合时按格计算才看得懂） */
+   g.strokeStyle='rgba(120,180,235,.13)';
+   g.lineWidth=1;
+   for(var gy=0;gy<=f.h;gy++){
+     g.beginPath(); g.moveTo(0, Math.round(gy*sy)+.5); g.lineTo(w, Math.round(gy*sy)+.5); g.stroke();
+   }
+   for(var gx=0;gx<=f.w;gx++){
+     g.beginPath(); g.moveTo(Math.round(gx*sx)+.5, 0); g.lineTo(Math.round(gx*sx)+.5, h); g.stroke();
+   }
   for(var i=0;i<f.rooms.length;i++){
     var r=f.rooms[i];
     g.fillStyle = r.safe==='class' ? 'rgba(60,160,255,.11)'

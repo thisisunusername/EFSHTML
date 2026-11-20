@@ -148,6 +148,7 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
       <div class="chip" id="lifeChip">❤ <b id="lifeN">2</b></div>
       <div class="chip" id="swChip" style="display:none">电闸 <b id="swN">0</b>/3</div>
       <div class="chip" id="achChip">🏆 0/11</div>
+      <div class="chip" id="modeChip">回合</div>
     </div>
     <div class="rowline" id="invRow"></div>
     <div id="seeWrap"><div id="seeBar"></div><span id="seeTxt">被发现 0.0s / 3s</span></div>
@@ -199,6 +200,11 @@ h1{font-size:23px;margin:6px 0 0;letter-spacing:3px;color:#9fe6ff;text-shadow:0 
       <b>可乐</b>喝 3 秒（不能动）→ 加速 45%，持续 10 秒；<b>隐身针</b>打 3 秒 → 30 秒内监控看不见、被发现要 5 秒<br>
       <b>小刀</b>：按 E 捅身边敌人，25% 概率直接解决掉他<br>
       <b>手电筒</b>：在三层 / 四层 / 地下室任一地下层点物品栏使用，整层照亮，<b>整局只能用一次</b>（地狱没有）
+    </div>
+    <p class="sub" style="margin-top:8px">玩法模式</p>
+    <div class="diffs" style="max-width:340px">
+      <div class="dbtn on" data-mode="turn">回 合 制<small>按一下走一格</small></div>
+      <div class="dbtn" data-mode="classic">摇杆 + 全地图<small>连续移动 · 全图可见</small></div>
     </div>
     <p class="sub" style="margin-top:8px">选择难度</p>
     <div class="diffs">
@@ -593,6 +599,8 @@ var S = {
   stepLocked:false,/* 走完一格后锁定，必须松开按键才能再走 */
   stepKey:'',      /* 触发这一步的按键 */
   needEnemyTurn:false, /* 玩家走完一格 → 敌人该行动了 */
+  mode2:'turn',    /* 玩法模式：turn 回合制 / classic 摇杆+全地图 */
+  stepVel:0,
   turnDone:false,
   stepDur:0.14,    /* 一格移动的时长 */
   stepFromX:0, stepFromY:0, stepToX:0, stepToY:0,
@@ -741,6 +749,8 @@ function updateHUD(){
   var ln=document.getElementById('lifeN'); if(ln) ln.textContent=(S.lives>0?S.lives:0);
   var lc=document.getElementById('lifeChip');
   if(lc) lc.style.color = (S.lives<=1)? '#ff8095':'';
+  var mc=document.getElementById('modeChip');
+  if(mc) mc.textContent = (S.mode2==='classic') ? '经典' : '回合';
   renderAchChip();
 
   var swN=0; for(var k in S.sw) if(S.sw[k]) swN++;
@@ -980,6 +990,31 @@ function movePlayer(dt){
 
   /* 正在喝可乐 / 打隐身针：3 秒内不能移动 */
   if(S.useT>0){ S.moving=false; return; }
+
+  /* ============ 经典模式：摇杆/按键连续移动，敌人也连续行动 ============ */
+  if(S.mode2==='classic'){
+    var cmx=0,cmy=0;
+    if(input.left)  cmx-=1;
+    if(input.right) cmx+=1;
+    if(input.up)    cmy-=1;
+    if(input.down)  cmy+=1;
+    if(cmx===0&&cmy===0){ S.moving=false; return; }
+    var clen=Math.sqrt(cmx*cmx+cmy*cmy);
+    cmx/=clen; cmy/=clen;
+    var csp=PLAYER_SPEED*(S.speedMul||1)*dt;
+    var cox=S.px, coy=S.py;
+    var cnx=S.px+cmx*csp;
+    if(CHEAT.noClip){ S.px=cnx; } else if(canStand(f,cnx,S.py)) S.px=cnx;
+    var cny=S.py+cmy*csp;
+    if(CHEAT.noClip){ S.py=cny; } else if(canStand(f,S.px,cny)) S.py=cny;
+    var cdx=S.px-cox, cdy=S.py-coy;
+    S.moving=(Math.abs(cdx)+Math.abs(cdy))>0.0005;
+    S.faceDir = cmy>0?'down':(cmy<0?'up':(cmx>0?'right':'left'));
+    if(S.moving) S.walkPhase += csp*3.4;
+    return;
+  }
+
+  /* ============ 回合制：按一下走一格，必须松开才能再走 ============ */
 
   /* ---------- 按格移动（一次一格，必须松开按键才能再走） ----------
      按一下方向 → 校验目标格 → 平滑滑过去 → 停住。
@@ -1311,7 +1346,7 @@ function skipTurn(){
   if(!r || !r.safe){ toast('只有在教室或厕所才能跳过回合'); return; }
   /* 跳过回合 = 玩家原地不动，让敌人多走一个回合 */
   S.needEnemyTurn=false;
-  updateNpcs(ENEMY_TURN);
+  updateNpcs(S.mode2==='classic' ? ENEMY_TURN*2 : ENEMY_TURN);
   if(S.mode!=='play') return;
   checkCatch(ENEMY_TURN);
   if(S.mode!=='play') return;
@@ -2016,7 +2051,7 @@ function bindInput(){
   document.getElementById('panelClose').addEventListener('click',hidePanel);
 
   /* 难度选择 */
-  var ds=document.querySelectorAll('.dbtn');
+  var ds=document.querySelectorAll('.dbtn[data-diff]');
   for(var j=0;j<ds.length;j++){
     (function(d){
       d.addEventListener('click',function(){
@@ -2025,6 +2060,17 @@ function bindInput(){
         S.diff=d.getAttribute('data-diff');
       });
     })(ds[j]);
+  }
+  /* 玩法模式切换 */
+  var ms=document.querySelectorAll('.dbtn[data-mode]');
+  for(var q=0;q<ms.length;q++){
+    (function(d){
+      d.addEventListener('click',function(){
+        for(var k=0;k<ms.length;k++) ms[k].classList.remove('on');
+        d.classList.add('on');
+        S.mode2=d.getAttribute('data-mode');
+      });
+    })(ms[q]);
   }
   document.getElementById('startBtn').addEventListener('click',function(){ startGame(S.diff); });
   var bb=document.getElementById('boardBtn');
@@ -2229,6 +2275,13 @@ function computeView(){
 
   /* 视口大约显示 18 格：回合制下要能看清敌人的走位 */
   var tiles = 18;
+  /* 经典模式 = 全地图可见：按整张地图大小算缩放 */
+  if(S.mode2==='classic'){
+    scale = Math.min(CW/(f.w+2), viewH/(f.h+2));
+    scale = Math.max(8, Math.min(scale, 34));
+    S._scale = scale;
+    return f;
+  }
   scale = Math.min(CW/tiles, viewH/tiles);
   scale = Math.max(12, Math.min(scale, 34));
   S._scale = scale;
@@ -2565,8 +2618,12 @@ function loop(t){
     updateCameras(dt);
     movePlayer(dt);
     stairCheck();
-    /* 敌人移动：回合制，只在玩家走完一格后行动一次 */
-    if(S.needEnemyTurn && S.stepT<=0) runEnemyTurn();
+    /* 敌人移动：回合制只在玩家走完一格后行动一次；经典模式每帧连续行动 */
+    if(S.mode2==='classic'){
+      updateNpcs(dt);
+    } else if(S.needEnemyTurn && S.stepT<=0){
+      runEnemyTurn();
+    }
     /* 抓捕判定：每帧都要跑，站着不动也会被监控/视野抓到 */
     if(S.mode==='play') checkCatch(dt);
     if(S.msgT>0){

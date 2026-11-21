@@ -118,7 +118,7 @@ code = code.replace(/^\s*import[^\n]*\n/gm,'');
 const sandboxParamNames=['THREE','__exportBag'];
 let fn;
 try{
-  fn=new Function('THREE', code+'\n;return {P,SHOP_ITEMS,buildShop,buyItem,bagAdd,bagTake,bagUsed,bagFree,toggleBag,buildBag,useItem,damageP,refreshHUD,setTabs:function(){},};');
+  fn=new Function('THREE', code+'\n;return {P,SHOP_ITEMS,buildShop,buyItem,bagAdd,bagTake,bagUsed,bagFree,pouchUsed,pouchFree,stashAdd,stashTake,stashPut,toggleBag,buildBag,buildStash,toggleStash,useItem,damageP,refreshHUD,settleExfil,settleDeath,};');
 }catch(e){
   console.error('COMPILE_FAIL:',e.message); process.exit(1);
 }
@@ -131,77 +131,90 @@ try{
 }
 console.log('模块加载 OK');
 
-const {P,SHOP_ITEMS,buyItem,buildShop,bagUsed,bagFree,buildBag,useItem,damageP}=api;
+const {P,SHOP_ITEMS,buyItem,buildShop,buildBag,buildStash,
+       pouchUsed,pouchFree,stashTake,stashPut,useItem,damageP,
+       settleExfil,settleDeath}=api;
 
 function ok(cond,msg){ console.log((cond?'  ✅ ':'  ❌ ')+msg); if(!cond) global.__fail=1; }
 
-// 1. 初始状态
-console.log('\n[1] 初始状态');
-ok(P.bagCap===24,'背包容量 24');
-ok(bagUsed()===0,'背包为空');
-ok(Object.keys(SHOP_ITEMS).length>=20,'商品数 '+Object.keys(SHOP_ITEMS).length+' >= 20');
-const cats=new Set(Object.values(SHOP_ITEMS).map(i=>i.cat));
-ok(['med','tool','ammo','bag','helmet','armor'].every(c=>cats.has(c)),'六大分类齐全: '+[...cats].join(','));
+/* ========== 1. 仓库与背包必须是两个独立容器 ========== */
+console.log('\n[1] 仓库 / 背包 分离');
+P.stash={}; P.pouch={}; P.ammo.cash=100000;
+ok(P.stash!==P.pouch, 'stash 和 pouch 是两个不同对象');
+ok(typeof P.stash==='object' && typeof P.pouch==='object', '两者都存在');
 
-// 2. 购买医疗包
-console.log('\n[2] 购买医疗包');
-P.ammo.cash=100000;
+/* ========== 2. 商店买东西进仓库，不占局内背包 ========== */
+console.log('\n[2] 商店购买 → 进仓库');
 buyItem('med');
-ok(P.bag.med===1,'医疗包进背包 ×'+P.bag.med);
-ok(bagUsed()===1,'占用 1 格');
+ok(P.stash.med===1, '仓库里有 1 个医疗包（stash.med='+P.stash.med+'）');
+ok(!(P.pouch.med>0), '局内背包里没有（买的东西不直接进包）');
+ok(pouchUsed()===0, '局内背包占用 0 格');
 
-// 3. 买头盔 -> 直接装备
-console.log('\n[3] 购买头盔（应直接装备，不占背包格）');
-const before=bagUsed();
-buyItem('helm_med');
-ok(P.equip.helmet==='helm_med','头盔已装备: '+P.equip.helmet);
-ok(P.helmetDur===120,'头盔耐久 120');
-ok(bagUsed()===before,'不进背包，格子数不变');
+/* ========== 3. 仓库装包：受背包容量限制 ========== */
+console.log('\n[3] 仓库 → 出击背包');
+P.bagCap=2;
+P.stash={med:5, bandage:5, grenade:5};
+P.pouch={};
+stashTake('med');
+stashTake('bandage');
+ok(pouchUsed()===2, '装了 2 格：'+pouchUsed());
+const r=stashTake('grenade');
+ok(r===false, '第 3 件被拒绝（容量 2 格已满）');
+ok(!(P.pouch.grenade>0), '确实没装进去');
+ok(P.stash.grenade===5, '仓库里的手雷没被扣掉');
 
-// 4. 买护甲
-console.log('\n[4] 购买护甲');
-buyItem('vest_light');
-ok(P.equip.armorVest==='vest_light','护甲已装备: '+P.equip.armorVest);
-ok(P.vestDur===80,'护甲耐久 80');
+/* ========== 4. 背包放回仓库 ========== */
+console.log('\n[4] 出击背包 → 仓库');
+stashPut('med');
+ok(!(P.pouch.med>0), '背包里的医疗包已取出');
+ok(P.stash.med===5, '回到仓库（stash.med='+P.stash.med+'）');
+ok(pouchUsed()===1, '现在只占 1 格');
 
-// 5. 换背包 -> 容量变化
-console.log('\n[5] 换背包提升容量');
-buyItem('bp_large');
-ok(P.bagCap===48,'容量 24 → '+P.bagCap);
-
-// 6. 买子弹
-console.log('\n[6] 购买子弹');
-const r0=P.ammo.rifle||0;
-buyItem('ammo_rifle');
-ok((P.ammo.rifle||0)===r0+60,'步枪弹 +60 → '+P.ammo.rifle);
-
-// 7. 护甲减伤
-console.log('\n[7] 护甲减伤验证');
-P.hp=100;
-damageP(50);
-console.log('     受伤 50 之后 hp='+P.hp.toFixed(1)+' vestDur='+P.vestDur.toFixed(1));
-ok(P.hp>50,'有减伤，实际掉血少于 50');
-ok(P.hp<100,'确实掉血了');
-ok(P.vestDur<80,'护甲耐久被消耗');
-
-// 8. 使用医疗包回血
-console.log('\n[8] 使用医疗包');
-const hp0=P.hp;
+/* ========== 5. 局内使用只动 pouch，不动 stash ========== */
+console.log('\n[5] 局内使用物品');
+P.pouch={med:2}; P.stash={med:10}; P.hp=50;
+const stashBefore=P.stash.med;
 useItem('med');
-ok(P.hp>hp0,'回血 '+hp0.toFixed(1)+' → '+P.hp.toFixed(1));
-ok(!(P.bag.med>0),'医疗包已消耗');
+ok(P.pouch.med===1, '背包里医疗包 2 → 1');
+ok(P.stash.med===stashBefore, '仓库里的 10 个完全没动');
+ok(P.hp>50, '回血生效：50 → '+P.hp.toFixed(1));
 
-// 9. 背包满
-console.log('\n[9] 背包容量上限');
-P.bag={}; P.bagCap=4;
-for(let i=0;i<8;i++) buyItem('bandage');
-const used=bagUsed();
-ok(used<=4,'背包未超容量: '+used+'/4');
+/* ========== 6. 阵亡：背包和装备全丢，仓库安全 ========== */
+console.log('\n[6] 阵亡结算');
+P.pouch={med:3, bandage:2, grenade:1};
+P.stash={med:10, bandage:5};
+P.equip={helmet:'helm_med', armorVest:'vest_light', backpack:'bp_large'};
+P.helmetDur=120; P.vestDur=80; P.bagCap=48;
+const lost=settleDeath();
+ok(lost===3, '丢失 3 种背包物品');
+ok(Object.keys(P.pouch).length===0, '局内背包清空');
+ok(P.equip.helmet===null && P.equip.armorVest===null && P.equip.backpack===null, '装备全部掉光');
+ok(P.bagCap===0, '背包容量归 0（没背包了）');
+ok(P.stash.med===10 && P.stash.bandage===5, '✅ 仓库完好无损（med=10, bandage=5）');
 
-// 10. 渲染不崩
-console.log('\n[10] 商店/背包渲染');
-try{ buildShop(); ok(true,'buildShop 渲染无异常'); }catch(e){ ok(false,'buildShop 抛错: '+e.message); }
-try{ buildBag(); ok(true,'buildBag 渲染无异常'); }catch(e){ ok(false,'buildBag 抛错: '+e.message); }
+/* ========== 7. 撤离：背包物资全部带回仓库 ========== */
+console.log('\n[7] 撤离结算');
+P.stash={med:10}; P.pouch={bandage:4, grenade:2};
+settleExfil();
+ok(Object.keys(P.pouch).length===0, '局内背包清空');
+ok(P.stash.bandage===4, '绷带带回仓库（×4）');
+ok(P.stash.grenade===2, '手雷带回仓库（×2）');
+ok(P.stash.med===10, '原有仓库物品保留（med=10）');
+
+/* ========== 8. 护甲减伤仍然有效 ========== */
+console.log('\n[8] 护甲减伤');
+P.equip={helmet:'helm_heavy', armorVest:'vest_heavy', backpack:'bp_small'};
+P.helmetDur=220; P.vestDur=260; P.hp=100;
+damageP(50);
+console.log('     受伤 50 后 hp='+P.hp.toFixed(1)+' vestDur='+P.vestDur.toFixed(1));
+ok(P.hp>60, '重甲减伤明显（实际掉血 '+(100-P.hp).toFixed(1)+'）');
+ok(P.vestDur<260, '护甲耐久被消耗');
+
+/* ========== 9. 渲染不崩 ========== */
+console.log('\n[9] 三个面板渲染');
+try{ buildShop(); ok(true,'buildShop 正常'); }catch(e){ ok(false,'buildShop 抛错: '+e.message); }
+try{ buildBag();  ok(true,'buildBag 正常');  }catch(e){ ok(false,'buildBag 抛错: '+e.message); }
+try{ buildStash();ok(true,'buildStash 正常');}catch(e){ ok(false,'buildStash 抛错: '+e.message); }
 
 if(global.__fail){ console.log('\n❌ 有测试失败'); process.exit(1); }
-console.log('\nSHOP_BAG_OK: 商店/背包/护甲全部通过');
+console.log('\nSHOP_BAG_OK: 仓库/背包分离、购买、容量、阵亡掉装、撤离带回 全部通过');

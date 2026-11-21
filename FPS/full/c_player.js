@@ -10,10 +10,16 @@ const P={
      bag 是按 id 聚合的物品表：{ itemId: 数量 }。
      装备栏单独存 id，护甲/头盔提供减伤和额外血量（见 dmgPlayer）。
      背包有容量上限，买太多就会卡住提示「背包已满」。 */
-  bag:{},                 // { 'med': 3, 'ammo_pistol': 60, ... }
-  bagCap:24,              // 背包容量（格）
-  equip:{ helmet:null, armorVest:null, backpack:'pouch' },  // 装备中的 id
-  helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣耐久）
+  /* 【搜打撤双层容器】这一刻开始，仓库和背包必须分开：
+     stash —— 局外仓库，容量无限，安全区里随便存，阵亡不掉
+     pouch —— 局内背包，装什么带什么，容量由背包装备决定，阵亡全丢
+     原来的 P.bag 把两者混成一个，导致「蹲局里还能买到所有东西」，
+     完全不像搜打撤。现在彻底拆开。 */
+  stash:{ med:2, ammo_pistol:2, bandage:3 },  // 局外仓库（新手初始物资）
+  pouch:{},                // 局内背包 { itemId: 数量 }
+  bagCap:24,               // 局内背包容量（由背包装备决定）
+  equip:{ helmet:null, armorVest:null, backpack:'bp_small' },  // 出击装备
+  helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
   speed:6, sprint:10,
   onGround:true,
   shooting:false, reload:false, reloadT:0,

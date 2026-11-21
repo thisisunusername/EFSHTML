@@ -118,6 +118,7 @@ function bindUI(){
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
   const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
+  const stashBtn=$('btnStash'); if(stashBtn) stashBtn.onclick=()=>{ sfxUI(); toggleStash(); };
   /* 【局内背包入口】HUD 右上角的「🎒 背包」可直接点开 */
   const bagBtn=$('bagBtn');
   if(bagBtn) bagBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); toggleBag(); };
@@ -210,9 +211,12 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
       activeId=1;
       window.__evtStart=(window.__evtStart||0)+1;
       window.__lastStart=[cx|0,cy|0];
-      /* 摇杆放在按下位置，用 translate(-50%,-50%) 精确居中 */
-      joyBase.style.left=cx+'px';
-      joyBase.style.top=cy+'px';
+      /* 【摇杆固定】底座位置写死在 CSS 里（左下角），
+         绝不再随手指按下的位置移动。
+         以前这里执行 joyBase.style.left=cx / top=cy，
+         摇杆会「跳到」你按下的地方，看起来像可以拖着到处跑，
+         而且会跑到右侧按钮区里，造成穿模。
+         现在只让摇杆头（joyStick）在底座内偏移，底座不动。 */
       joyBase.style.display='block';
       joyStick.style.transform='translate(-50%,-50%)';
       P.joyX=0; P.joyY=0;
@@ -238,11 +242,8 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     const endJoy=()=>{
       activeId=null; joyTid=null; P.joyX=0; P.joyY=0;
       if(window.__joyTouch) window.__joyTouch.active=false;
+      /* 只把摇杆头弹回中心，底座永远留在 CSS 定的左下角 */
       joyStick.style.transform='translate(-50%,-50%)';
-      /* 松开后回到常驻位置（左下角），而不是隐藏——
-         常驻可见才能一眼确认摇杆是否真的在工作。 */
-      joyBase.style.left='110px';
-      joyBase.style.top='calc(100% - 110px)';
     };
 
     /* 【多指触控的核心修复】
@@ -495,29 +496,39 @@ let shopTab='med';   // 当前商店标签页
 let bagTab='all';    // 当前背包筛选
 
 /* 背包占用格数：数量 1 个占 1 格，子弹按堆叠算 1 格 */
-function bagUsed(){
+/* 局内背包占用格数（只有 pouch 算容量，stash 无限） */
+function pouchUsed(){
   let n=0;
-  for(const k in P.bag){ if(P.bag[k]>0) n++; }
+  for(const k in P.pouch){ if(P.pouch[k]>0) n++; }
   return n;
 }
-function bagFree(){ return P.bagCap - bagUsed(); }
+function pouchFree(){ return P.bagCap - pouchUsed(); }
+/* 兼容旧名字 */
+function bagUsed(){ return pouchUsed(); }
+function bagFree(){ return pouchFree(); }
 
-/* 给背包加物品，返回是否成功（容量不足则失败） */
+/* 往局内背包塞东西（局内拾取用），容量不足返回 false */
 function bagAdd(id, cnt){
   if(!cnt) cnt=1;
-  if(!P.bag[id] || P.bag[id]<=0){
-    if(bagFree()<=0) return false;   // 新物品占新格
-    P.bag[id]=0;
+  if(!P.pouch[id] || P.pouch[id]<=0){
+    if(pouchFree()<=0) return false;   // 新物品占新格
+    P.pouch[id]=0;
   }
-  P.bag[id]+=cnt;
+  P.pouch[id]+=cnt;
   return true;
 }
-/* 从背包扣物品 */
+/* 从局内背包扣东西 */
 function bagTake(id, cnt){
   if(!cnt) cnt=1;
-  if(!P.bag[id] || P.bag[id]<cnt) return false;
-  P.bag[id]-=cnt;
-  if(P.bag[id]<=0) delete P.bag[id];
+  if(!P.pouch[id] || P.pouch[id]<cnt) return false;
+  P.pouch[id]-=cnt;
+  if(P.pouch[id]<=0) delete P.pouch[id];
+  return true;
+}
+/* 往局外仓库塞东西（购买/撤离带回用），容量无限 */
+function stashAdd(id, cnt){
+  if(!cnt) cnt=1;
+  P.stash[id]=(P.stash[id]||0)+cnt;
   return true;
 }
 
@@ -549,22 +560,22 @@ function buildShop(){
     const it=SHOP_ITEMS[id];
     if(it.cat!==shopTab) continue;
     any=true;
-    const owned = (P.bag[id]>0) ? P.bag[id] : 0;
+    const owned = (P.stash[id]>0) ? P.stash[id] : 0;
     const eqTag = equipTagOf(id);
     h+='<div class="item'+(P.ammo.cash<it.price?' locked':'')+'">'
       +'<div class="ic">'+it.icon+'</div>'
       +'<div class="info"><div class="n">'+it.name+(eqTag?' <span class="owned">已装备</span>':'')+'</div>'
       +'<div class="d">'+it.desc+'</div></div>'
-      +(owned?'<div class="owned">×'+owned+'</div>':'')
+      +(owned?'<div class="owned">仓库×'+owned+'</div>':'')
       +'<div class="price">¥'+it.price+'</div>'
       +'<button class="btn sm" data-buy="'+id+'">购买</button>'
       +'</div>';
   }
   if(!any) h+='<div class="d" style="text-align:center;padding:14px">暂无商品</div>';
   h+='</div>';
-  /* 底部：容量 + 关闭 */
+  /* 底部：说明 + 关闭 */
   h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
-    +'<div class="d">背包 '+bagUsed()+'/'+P.bagCap+' 格</div>'
+    +'<div class="d">买到的物品进仓库 · 出击前在仓库里装包</div>'
     +'<button class="btn ghost" id="closeShop">关闭</button></div>';
   h+='</div>';
   s.innerHTML=h;
@@ -584,13 +595,15 @@ function equipTagOf(id){
   return (e.helmet===id)||(e.armorVest===id)||(e.backpack===id);
 }
 
-/* 购买逻辑：扣钱 → 装备类直接穿上 → 其余进背包 */
+/* 购买逻辑：扣钱 → 装备类直接穿上 → 其余进「局外仓库」
+   【关键】商店是局外功能，买的东西一律进 stash，不占局内背包格子。
+   出击前要去仓库把物资装进背包，这才是搜打撤的整备流程。 */
 function buyItem(id){
   const it=SHOP_ITEMS[id]; if(!it) return;
   if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); return; }
 
   const cat=it.cat;
-  /* 装备类：不进背包，直接替换装备位 */
+  /* 装备类：直接穿戴（等同买完立刻装备），也记一份进仓库 */
   if(cat==='helmet'){
     P.ammo.cash-=it.price;
     P.equip.helmet=id; P.helmetDur=it.dur;
@@ -604,27 +617,127 @@ function buyItem(id){
   if(cat==='bag'){
     P.ammo.cash-=it.price;
     P.equip.backpack=id; P.bagCap=it.cap;
-    sfxBuy(); toast('背包装备成功，容量 '+it.cap); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); return;
   }
 
-  /* 其余物品进背包，先查容量 */
-  if(bagFree()<=0 && !(P.bag[id]>0)){ sfxDeny(); toast('背包已满'); return; }
-
+  /* 消耗品/子弹：全部进仓库，仓库容量无限 */
+  P.ammo.cash-=it.price;
+  stashAdd(id,1);
   if(cat==='ammo'){
-    P.ammo.cash-=it.price;
-    /* 子弹直接进弹匣储备（P.ammo[类型]），同时记一格背包 */
-    bagAdd(id,1);
     const key=it.ammo;
     P.ammo[key]=(P.ammo[key]||0)+it.count;
-    sfxBuy(); toast(it.name+' +'+it.count); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast(it.name+' +'+it.count+' → 仓库');
+  }else{
+    sfxBuy(); toast('买下 '+it.name+' → 仓库');
   }
-
-  P.ammo.cash-=it.price;
-  bagAdd(id,1);
-  sfxBuy(); toast('购买 '+it.name); refreshHUD(); buildShop(); return;
+  refreshHUD(); buildShop(); return;
 }
 
-/* ---- 背包（局内 Tab / B 打开） ---- */
+/* ============ 局外仓库 / 局内背包 ============
+   搜打撤的两层容器，必须完全分开：
+
+   ┌─ 局外（主菜单）──────────────────────────┐
+   │  仓库 stash：容量无限，安全，死亡不掉      │
+   │  在这里整备：把装备穿上、把物资塞进背包     │
+   └──────────────────────────────────────┘
+   ┌─ 局内（进游戏）──────────────────────────┐
+   │  背包 pouch：容量 = 背包装备给的格子       │
+   │  Tab / B 打开，能用的只有包里这点东西      │
+   │  撤离成功 → 并入 stash；阵亡 → 全部丢失     │
+   └──────────────────────────────────────┘ */
+
+/* ---- 仓库（局外） ---- */
+function toggleStash(){
+  const el=$('stash'); if(!el) return;
+  const opening = el.style.display!=='flex';
+  if(opening){ buildStash(); el.style.display='flex'; }
+  else el.style.display='none';
+}
+function closeStash(){ const el=$('stash'); if(el) el.style.display='none'; }
+
+/* 仓库里的东西搬到出击背包 */
+function stashTake(id, n){
+  const cnt = n||(P.stash[id]||0);
+  if(!(P.stash[id]>0)) return false;
+  const move = Math.min(cnt, P.stash[id]);
+  /* 出击包按格算：新物品要占一格 */
+  if(!(P.pouch[id]>0) && pouchUsed()>=P.bagCap){ toast('出击背包已满（'+P.bagCap+' 格）'); sfxDeny(); return false; }
+  P.stash[id]-=move;
+  if(P.stash[id]<=0) delete P.stash[id];
+  P.pouch[id]=(P.pouch[id]||0)+move;
+  sfxPickup(); return true;
+}
+/* 出击背包里的东西放回仓库 */
+function stashPut(id, n){
+  if(!(P.pouch[id]>0)) return false;
+  const move = Math.min(n||P.pouch[id], P.pouch[id]);
+  P.pouch[id]-=move;
+  if(P.pouch[id]<=0) delete P.pouch[id];
+  P.stash[id]=(P.stash[id]||0)+move;
+  sfxPickup(); return true;
+}
+
+function buildStash(){
+  const el=$('stash'); if(!el) return;
+  let h='<div class="box" style="max-width:660px">';
+  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
+    +'<h1 style="margin:0">🏠 仓库</h1>'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+
+  /* 装备栏：出击时真正带进局的三件 */
+  h+='<div class="tabs"><span class="tab on" style="cursor:default">出击装备</span></div>';
+  h+='<div class="grid">';
+  h+=cellOf(P.equip.helmet,'头盔','🪖');
+  h+=cellOf(P.equip.armorVest,'护甲','🦺');
+  h+=cellOf(P.equip.backpack,'背包','🎒');
+  h+='</div>';
+
+  /* 两栏：仓库 ↔ 出击背包 */
+  h+='<div class="stashrow" style="margin-top:10px">';
+
+  /* 左：仓库 */
+  h+='<div class="stashcol"><div class="tabs"><span class="tab on" style="cursor:default">📦 仓库</span></div><div class="grid">';
+  let n=0;
+  for(const id in P.stash){
+    if(!(P.stash[id]>0)) continue;
+    const it=SHOP_ITEMS[id]; if(!it) continue;
+    n++;
+    h+='<div class="cell" data-out="'+id+'"><div class="ci">'+it.icon+'</div>'
+      +'<div class="cn">'+it.name+'</div><div class="cq">×'+P.stash[id]+'</div></div>';
+  }
+  if(!n) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:10px">仓库是空的</div>';
+  h+='</div></div>';
+
+  /* 右：出击背包 */
+  h+='<div class="stashcol"><div class="tabs"><span class="tab on" style="cursor:default">🎒 出击背包 '+pouchUsed()+'/'+P.bagCap+'</span></div><div class="grid">';
+  let m=0;
+  for(const id in P.pouch){
+    if(!(P.pouch[id]>0)) continue;
+    const it=SHOP_ITEMS[id]; if(!it) continue;
+    m++;
+    h+='<div class="cell" data-in="'+id+'"><div class="ci">'+it.icon+'</div>'
+      +'<div class="cn">'+it.name+'</div><div class="cq">×'+P.pouch[id]+'</div></div>';
+  }
+  if(!m) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:10px">点左边的物品装进来</div>';
+  h+='</div></div>';
+
+  h+='</div>';
+  h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
+    +'<div class="d">点仓库物品 → 装进背包 · 点背包物品 → 放回仓库</div>'
+    +'<button class="btn ghost" id="closeStash">关闭</button></div>';
+  h+='</div>';
+  el.innerHTML=h;
+
+  el.querySelectorAll('[data-out]').forEach(c=>{
+    c.onclick=()=>{ if(stashTake(c.getAttribute('data-out'))) buildStash(); };
+  });
+  el.querySelectorAll('[data-in]').forEach(c=>{
+    c.onclick=()=>{ if(stashPut(c.getAttribute('data-in'))) buildStash(); };
+  });
+  const cs=$('closeStash'); if(cs) cs.onclick=()=>{ sfxUI(); closeStash(); };
+}
+
+/* ---- 局内背包 ---- */
 function toggleBag(){
   const b=$('bag'); if(!b) return;
   const opening = b.style.display!=='flex';
@@ -638,9 +751,9 @@ function buildBag(){
   let h='<div class="box" style="max-width:600px">';
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
     +'<h1 style="margin:0">🎒 背包</h1>'
-    +'<div class="d">'+bagUsed()+'/'+P.bagCap+' 格</div></div>';
+    +'<div class="d">'+pouchUsed()+'/'+P.bagCap+' 格</div></div>';
 
-  /* 装备栏 */
+  /* 身上装备（局内可查看，不能更换） */
   h+='<div class="tabs"><span class="tab on" style="cursor:default">装备中</span></div>';
   h+='<div class="grid">';
   h+=cellOf(P.equip.helmet, '头盔', '🪖');
@@ -648,25 +761,26 @@ function buildBag(){
   h+=cellOf(P.equip.backpack, '背包', '🎒');
   h+='</div>';
 
-  /* 物品栏 */
-  h+='<div class="tabs" style="margin-top:10px"><span class="tab on" style="cursor:default">物品</span></div>';
+  /* 局内只有 pouch 里的东西 */
+  h+='<div class="tabs" style="margin-top:10px"><span class="tab on" style="cursor:default">携带物品</span></div>';
   h+='<div class="grid">';
   let cnt=0;
-  for(const id in P.bag){
-    if(!(P.bag[id]>0)) continue;
+  for(const id in P.pouch){
+    if(!(P.pouch[id]>0)) continue;
     const it=SHOP_ITEMS[id]; if(!it) continue;
     cnt++;
-    h+='<div class="cell" data-use="'+id+'">'
+    const usable = (it.heal || id==='grenade' || id==='flashbang' || id==='smoke');
+    h+='<div class="cell'+(usable?'':' lk2')+'" data-use="'+id+'">'
       +'<div class="ci">'+it.icon+'</div>'
       +'<div class="cn">'+it.name+'</div>'
-      +'<div class="cq">×'+P.bag[id]+'</div>'
+      +'<div class="cq">×'+P.pouch[id]+'</div>'
       +'</div>';
   }
-  if(!cnt) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:14px">背包是空的</div>';
+  if(!cnt) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:14px">背包是空的（仓库里塞点东西再出击）</div>';
   h+='</div>';
 
   h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
-    +'<div class="d">点击物品使用 / 消耗</div>'
+    +'<div class="d">点击使用 · 撤离才能带回仓库</div>'
     +'<button class="btn ghost" id="closeBag">关闭</button></div>';
   h+='</div>';
   b.innerHTML=h;
@@ -681,66 +795,49 @@ function cellOf(id, label, fb){
   if(!id) return '<div class="cell"><div class="ci" style="opacity:.25">'+fb+'</div><div class="cn">'+label+'</div><div class="cq lk">空</div></div>';
   const it=SHOP_ITEMS[id];
   let extra='';
-  if(it.dur){
+  if(it&&it.dur){
     const cur = (it.cat==='helmet')?P.helmetDur:P.vestDur;
     if(cur>0) extra=' <span class="lk">'+Math.round(cur)+'</span>';
   }
-  return '<div class="cell eq"><div class="ci">'+(it?it.icon:fb)+'</div><div class="cn">'+(it?it.name:label)+extra+'</div><div class="cq">'+(label)+'</div></div>';
+  return '<div class="cell eq"><div class="ci">'+(it?it.icon:fb)+'</div><div class="cn">'+(it?it.name:label)+extra+'</div><div class="cq">'+label+'</div></div>';
 }
 
-/* 使用背包里的物品 */
+/* 使用背包（pouch）里的物品 */
 function useItem(id){
   const it=SHOP_ITEMS[id]; if(!it) return;
-  if(!(P.bag[id]>0)){ sfxDeny(); return; }
+  if(!(P.pouch[id]>0)){ sfxDeny(); return; }
   if(it.heal){
     if(P.hp>=100){ sfxDeny(); toast('生命已满'); return; }
-    bagTake(id,1);
+    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
     P.hp=Math.min(100,P.hp+it.heal);
     sfxPickup(); toast(it.name+' +'+it.heal+' HP');
     refreshHUD(); buildBag(); return;
   }
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
-    bagTake(id,1); sfxPickup(); toast('已投掷 '+it.name); buildBag(); return;
+    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    sfxPickup(); toast('已投掷 '+it.name); buildBag(); return;
   }
-  toast(it.name+' 暂时无法直接使用'); sfxDeny();
+  toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
 
-/* ---- 拾取/互动（E） ---- */
-function interact(){
-  let best=null, bd=2.2;
-  for(const l of loots){
-    if(l.taken) continue;
-    const d=Math.hypot(P.pos.x-l.x,P.pos.z-l.z);
-    if(d<bd){ bd=d; best=l; }
+/* ---- 撤离 / 阵亡 结算 ---- */
+/* 撤离成功：局内背包 + 身上装备全部并回仓库 */
+function settleExfil(){
+  let gained=0;
+  for(const id in P.pouch){
+    if(P.pouch[id]>0){ P.stash[id]=(P.stash[id]||0)+P.pouch[id]; gained+=P.pouch[id]; }
   }
-  if(best){
-    best.taken=true; best.mesh.visible=false;
-    /* 【拾取写入背包】搜打撤的核心是「捡到的东西要能带走」，
-       所以所有拾取都先过 bagAdd（容量满会失败并提示）。 */
-    switch(best.type){
-      case 'ammo':
-        if(bagFree()<=0 && !(P.bag.ammo_pistol>0)){ toast('背包已满'); sfxDeny(); best.taken=false; best.mesh.visible=true; return; }
-        bagAdd('ammo_pistol',1);
-        P.ammo.ammo+=30; P.ammo.pistol=(P.ammo.pistol||0)+30;
-        toast('拾取 弹药 +30'); break;
-      case 'med':
-        if(bagFree()<=0 && !(P.bag.med>0)){ toast('背包已满'); sfxDeny(); best.taken=false; best.mesh.visible=true; return; }
-        bagAdd('med',1); P.inv.med++;
-        toast('拾取 医疗包'); break;
-      case 'cash': P.ammo.cash+=200; toast('拾取 现金 +200'); break;
-      case 'gun':
-        P.inv.gun=true; P.ammo.gun=120; P.ammo.rifle=(P.ammo.rifle||0)+120;
-        toast('拾取 步枪！'); break;
-      case 'helmet':
-        if(bagFree()<=0){ toast('背包已满'); return; }
-        bagAdd('helm_light',1); toast('拾取 战术头盔'); break;
-      case 'vest':
-        if(bagFree()<=0){ toast('背包已满'); return; }
-        bagAdd('vest_light',1); toast('拾取 轻型护甲'); break;
-    }
-    sfxPickup();
-    refreshHUD();
-  }
+  P.pouch={};
+  /* 装备也一起"带回"，保留在 equip 里继续用 */
+  toast('撤离成功！带回 '+gained+' 件物品');
+}
+/* 阵亡：局内背包和装备全部丢失（搜打撤的风险） */
+function settleDeath(){
+  const lost=Object.keys(P.pouch).length;
+  P.pouch={};
+  P.equip={ helmet:null, armorVest:null, backpack:null };
+  P.helmetDur=0; P.vestDur=0; P.bagCap=0;
+  return lost;
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindUI);

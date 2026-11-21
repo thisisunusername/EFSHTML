@@ -89,7 +89,13 @@ function damageP(n){
 }
 function onDeath(){
   sfxDeath();
-  const info=$('deathInfo'); if(info) info.textContent='击杀 '+(enemies.filter(e=>!e.alive).length)+' 名敌人 · 现金 ¥'+P.ammo.cash;
+  /* 【阵亡结算】搜打撤的风险机制：
+     你带进局的背包物资和身上的头盔/护甲，全都丢了。
+     仓库里的东西不受影响（那是安全区）。 */
+  const lost = (typeof settleDeath==='function') ? settleDeath() : 0;
+  const info=$('deathInfo');
+  if(info) info.textContent='击杀 '+(enemies.filter(e=>!e.alive).length)+' 名敌人 · 现金 ¥'+P.ammo.cash
+    +' · 丢失背包物品 '+lost+' 种、装备全部掉光';
   const d=$('death'); if(d) d.style.display='flex';
 }
 
@@ -169,9 +175,21 @@ function checkExfil(){
   if(d<3){
     exfiled=true;
     sfxExfil();
+    /* 【撤离结算】局内背包里的所有东西并回仓库，
+       身上的头盔/护甲/背包继续保留可以用。 */
+    const before={};
+    if(typeof P.pouch==='object'){ for(const k in P.pouch) before[k]=P.pouch[k]; }
+    if(typeof settleExfil==='function') settleExfil();
+    let msg='';
+    for(const k in before){
+      const it=(typeof SHOP_ITEMS==='object')?SHOP_ITEMS[k]:null;
+      msg+=(it?it.icon+' '+it.name+' ×'+before[k]+'　':'');
+    }
     toast('✅ 成功撤离！');
     // 用死亡面板显示撤离结算
-    const info=$('deathInfo'); if(info) info.textContent='✅ 撤离成功 · 现金 ¥'+P.ammo.cash;
+    const info=$('deathInfo');
+    if(info) info.textContent='✅ 撤离成功 · 现金 ¥'+P.ammo.cash
+      +(msg?' · 带回：'+msg:' · 背包是空的');
     const h=$('death'); if(h) h.style.display='flex';
     const h2=h&&h.querySelector('h2'); if(h2) h2.textContent='✅ 撤离成功';
   }

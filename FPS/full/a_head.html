@@ -121,7 +121,7 @@
      这些层完整盖住 —— 功能其实跑了，但屏幕上什么都看不见，
      表现就是「点了没反应」。
      现在给它完整的全屏遮罩 + 足够高的层级 + 可滚动内容区。 */
-  #shop, #bag{ position:fixed; inset:0; z-index:210; display:none;
+  #shop, #bag, #stash{ position:fixed; inset:0; z-index:210; display:none;
     align-items:center; justify-content:center; padding:16px;
     background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px); }
@@ -169,6 +169,11 @@
   .cell .cn{ font-size:9.5px; color:#b8c0d0; text-align:center; line-height:1.2;
     max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cell .cq{ position:absolute; right:4px; bottom:3px; font-size:10px; font-weight:800; color:#ffd54a; }
+  /* 【仓库双栏】左仓库 / 右出击背包，中间留一点缝 */
+  .stashrow{ display:flex; gap:10px; align-items:flex-start; }
+  .stashcol{ flex:1 1 0; min-width:0; }
+  .stashcol .grid{ max-height:34vh; overflow-y:auto; }
+  .cell.lk2{ opacity:.5; }
   .cell .lk{ position:absolute; top:4px; right:5px; font-size:9px; }
   #death{ position:fixed; inset:0; z-index:90; background:rgba(120,10,10,.6); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
   #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
@@ -332,6 +337,7 @@
     <div class="row">
       <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
       <button class="btn ghost" id="btnShop">🛒 商店</button>
+      <button class="btn ghost" id="btnStash">🏠 仓库</button>
     </div>
     <div class="row">
       <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
@@ -343,7 +349,9 @@
 </div>
 <!-- 商店 -->
 <div id="shop" style="display:none"></div>
-<!-- 背包（局内 Tab / B 打开） -->
+<!-- 局外仓库 -->
+<div id="stash" style="display:none"></div>
+<!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
 <!-- 死亡界面 -->
 <div id="death">

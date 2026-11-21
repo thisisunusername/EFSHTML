@@ -28,6 +28,7 @@ function toast(t){
 function showTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='block';
   const az=$('actZone'); if(az) az.style.display='block';
+  window.__joyEnabled=true;   // 允许 document 兜底监听接管左半屏
   const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
 }
 /* 主菜单/死亡界面时把摇杆和操作按钮收起来。
@@ -36,6 +37,8 @@ function showTouchUI(){
 function hideTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='none';
   const az=$('actZone'); if(az) az.style.display='none';
+  window.__joyEnabled=false;
+  if(window.__joyTouch) window.__joyTouch.active=false;
 }
 function bindUI(){
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
@@ -198,6 +201,27 @@ function bindUI(){
     };
     joyZone.addEventListener('touchend',e=>{ softEnd(); },{passive:true});
     joyZone.addEventListener('touchcancel',e=>{ endJoy(); },{passive:true});
+    /* 【全局兜底】有些 WebView 里 #joyZone 的 touch 事件会被
+       其它覆盖层吃掉（canvas、#grade、#grain、甚至系统手势区）。
+       这里在 document 上再挂一份：只要触点落在左半屏、
+       且当前没有摇杆在拖，就照样启动摇杆。
+       优先走 #joyZone 的正常路径，它没收到才由这里接手。 */
+    document.addEventListener('touchstart',e=>{
+      if(activeId!==null) return;
+      if(!window.__joyEnabled) return;    // 还没进游戏（菜单界面）不接管
+      const t=e.changedTouches[0]; if(!t) return;
+      if(t.clientX > window.innerWidth*0.5) return;   // 右半屏归视角
+      startJoy(t.clientX,t.clientY);
+    }, {passive:true});
+    document.addEventListener('touchmove',e=>{
+      if(activeId===null) return;
+      const t=e.changedTouches[0]; if(!t) return;
+      moveJoy(t.clientX,t.clientY);
+    }, {passive:true});
+    document.addEventListener('touchend',e=>{
+      if(activeId===null) return;
+      softEnd();
+    }, {passive:true});
 
     /* 桌面调试用：鼠标拖左半屏也能触发摇杆，方便在电脑上验证移动逻辑 */
     joyZone.addEventListener('mousedown',e=>{
@@ -219,45 +243,60 @@ function bindUI(){
     sprintBtn.addEventListener('touchend',()=>{ P.sprinting=false; });
   }
   const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
-  // 开镜：按住生效，松开还原（同时兼容 pointer 与 touch）
+/* 开镜：改成「切换」模式。
+     以前是按住生效，手机上一个手指要一直压着开镜键，
+     根本没法同时用摇杆移动、也没法开火 —— 手感完全不可用。
+     现在点一下开镜、再点一下关闭，状态机单一，不会出现
+     touchstart 触发 pointerdown 又触发 pointerleave 导致反复开关。 */
   const aimBtn=$('btnAim');
+  const setAim=(on)=>{
+    P.aiming=!!on;
+    if(aimBtn){
+      if(P.aiming) aimBtn.classList.add('active');
+      else aimBtn.classList.remove('active');
+    }
+    const tip=$('htip');
+    if(tip) tip.textContent = P.aiming ? '🔭 开镜中 · 再点一次退出' : '📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
+  };
   if(aimBtn){
-    const aimOn=e=>{ P.aiming=true; aimBtn.classList.add('active'); if(e&&e.preventDefault) e.preventDefault(); };
-    const aimOff=e=>{ P.aiming=false; aimBtn.classList.remove('active'); };
-    aimBtn.addEventListener('touchstart',aimOn,{passive:false});
-    aimBtn.addEventListener('touchend',aimOff,{passive:true});
-    aimBtn.addEventListener('touchcancel',aimOff,{passive:true});
-    aimBtn.addEventListener('pointerdown',aimOn);
-    aimBtn.addEventListener('pointerup',aimOff);
-    aimBtn.addEventListener('pointercancel',aimOff);
-    aimBtn.addEventListener('pointerleave',aimOff);
+    const toggle=(e)=>{
+      setAim(!P.aiming);
+      if(e&&e.preventDefault) e.preventDefault();
+      if(e&&e.stopPropagation) e.stopPropagation();
+    };
+    aimBtn.addEventListener('touchstart',toggle,{passive:false});
+    /* 桌面/鼠标调试用；pointerup 之类不再参与，避免同一次点击被处理两遍 */
+    aimBtn.addEventListener('mousedown',e=>{ if(e.button===0) toggle(e); });
+    /* 换弹时自动退出开镜，否则换弹动画和 FOV 会互相打架 */
   }
-  // 键盘右键也可开镜（桌面端）
-  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ P.aiming=true; if(aimBtn) aimBtn.classList.add('active'); } });
-  addEventListener('mouseup',e=>{ if(e.button===2){ P.aiming=false; if(aimBtn) aimBtn.classList.remove('active'); } });
+  window.__setAim=setAim;
+  // 键盘右键也可开镜（桌面端，按住式）
+  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ if(window.__setAim) window.__setAim(true); } });
+  addEventListener('mouseup',e=>{ if(e.button===2){ if(window.__setAim) window.__setAim(false); } });
 
   // 触屏视角拖拽（屏幕右半区，整屏监听，不依赖按钮）
   const viewLayer=$('viewLayer');
   if(viewLayer){
-    let vId=null, vx=0, vy=0;
+    /* 视角拖拽：只用「第一个落在右半屏的触点」。
+       以前按 identifier 严格配对，WebView 里 identifier 偶尔会对不上，
+       表现就是视角偶尔卡住。现在改成记录一个独立标记，
+       touchend 时检查是不是自己那根手指（位置配对容错更大）。 */
+    let vx=0, vy=0, vOn=false;
     viewLayer.addEventListener('touchstart',e=>{
-      if(vId!==null) return;
-      const t=e.changedTouches[0];
-      vId=t.identifier; vx=t.clientX; vy=t.clientY;
+      if(vOn) return;
+      const t=e.changedTouches[0]; if(!t) return;
+      vOn=true; vx=t.clientX; vy=t.clientY;
     }, {passive:true});
     viewLayer.addEventListener('touchmove',e=>{
-      for(const t of e.changedTouches){
-        if(t.identifier!==vId) continue;
-        P.yaw-=(t.clientX-vx)*0.005;
-        P.pitch-=(t.clientY-vy)*0.005;
-        const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
-        vx=t.clientX; vy=t.clientY;
-      }
+      if(!vOn) return;
+      const t=e.changedTouches[0]; if(!t) return;
+      P.yaw-=(t.clientX-vx)*0.005;
+      P.pitch-=(t.clientY-vy)*0.005;
+      const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
+      vx=t.clientX; vy=t.clientY;
     }, {passive:true});
-    viewLayer.addEventListener('touchend',e=>{
-      for(const t of e.changedTouches) if(t.identifier===vId) vId=null;
-    }, {passive:true});
-    viewLayer.addEventListener('touchcancel',()=>{ vId=null; }, {passive:true});
+    viewLayer.addEventListener('touchend',()=>{ vOn=false; }, {passive:true});
+    viewLayer.addEventListener('touchcancel',()=>{ vOn=false; }, {passive:true});
   }
 }
 

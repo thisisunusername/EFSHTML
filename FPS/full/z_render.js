@@ -7,6 +7,10 @@ function safeCall(fn,arg){
   try{ fn(arg); }
   catch(e){
     const k=fn.name||'anon';
+    /* 把最后一次错误暴露到调试面板上：
+       如果 updP 每帧都抛错，玩家当然一动不动，
+       而以前这个异常只在控制台里，屏幕上完全看不出来。 */
+    window.__lastErr=k+':'+(e&&e.message?e.message.slice(0,40):'?');
     if(!__errOnce[k]){ __errOnce[k]=true; console.error('['+k+'] 出错（后续同类错误已静音）：',e); }
   }
 }
@@ -50,6 +54,12 @@ function animate(){
   requestAnimationFrame(animate);
   if(!ready) return;
   const dt=Math.min(clock.getDelta(),0.05);
+  /* 心跳统计：如果 frames 不涨，说明 animate 根本没在跑
+     （WebView 后台、异常中断、或 ready 一直为 false），
+     这是「怎么拖都不动」的另一种可能原因，直接显示出来好判断。 */
+  window.__frames=(window.__frames||0)+1;
+  window.__lastDt=dt;
+  window.__fps=Math.round(1/Math.max(dt,0.001));
 
   /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
      否则会出现「场景/枪/人物全黑」这种整屏停摆。 */

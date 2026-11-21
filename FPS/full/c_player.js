@@ -50,23 +50,24 @@ function updP(dt){
 
   let mx=0,mz=0;
   if(f)mz-=1; if(b)mz+=1; if(l)mx-=1; if(r)mx+=1;
-  // 虚拟摇杆输入（移动端，挂在 P 上避免跨模块变量问题）
-  if(P.joyX||P.joyY){
-    mx=P.joyX; mz=P.joyY;
-  }
-  /* 【双保险】直接读取 joyZone 上正在生效的触点。
-     某些 Android WebView 里 pointermove 的 pointerId 与 pointerdown 不一致，
-     导致 P.joyX 永远是 0、怎么拖都不动。这里绕过 pointerId 匹配，
-     直接问浏览器「左半屏现在有几个手指按着、在哪」，
-     只要发现按下点与当前点的位移，就照样驱动移动，不依赖事件配对。 */
-  if(!mx && !mz && window.__joyTouch && window.__joyTouch.active){
-    const t=window.__joyTouch;
-    let dx=t.cx-t.sx, dy=t.cy-t.sy;
-    const max=48, d=Math.hypot(dx,dy);
-    if(d>2){
-      if(d>max){ dx*=max/d; dy*=max/d; }
-      mx=dx/max; mz=dy/max;
-    }
+  /* 【摇杆输入 —— 单一数据源】
+     以前这里有两条路：先读 P.joyX，再读 window.__joyTouch 做「双保险」，
+     两套逻辑并存导致出问题时无法判断是哪条路喂的值，
+     调试面板上还会显示 P.joyX=0 而实际在用 __joyTouch（或反过来）。
+     现在只从 window.__joyTouch 读：它是 touchmove 直接写入的原始触点，
+     不依赖任何事件配对，也不受模块作用域影响。
+     位移按 max=48px 归一化到 -1~1，死区 2px。 */
+  const jt=window.__joyTouch;
+  if(jt && jt.active){
+    let dx=jt.cx-jt.sx, dy=jt.cy-jt.sy;
+    const jmax=48;
+    let d=Math.hypot(dx,dy);
+    if(d>jmax){ dx*=jmax/d; dy*=jmax/d; d=jmax; }
+    if(d>2){ mx=dx/jmax; mz=dy/jmax; }
+    /* 同步回 P，方便 HUD 和其它系统读取；不是输入源 */
+    P.joyX=mx; P.joyY=mz;
+  }else{
+    P.joyX=0; P.joyY=0;
   }
 
   /* 开镜：按住开镜键时 FOV 收紧，松开还原。
@@ -116,13 +117,16 @@ function updP(dt){
   }
   if(window.__dbgEl){
     const t=window.__joyTouch||{};
+    const j=window.__joyTouch||{};
+    const jd=(j.active&&j.sx!=null)?Math.round(Math.hypot(j.cx-j.sx,j.cy-j.sy)):0;
     window.__dbgEl.textContent=
       'EVT start='+(window.__evtStart||0)+' move='+(window.__evtMove||0)+'\n'+
-      'joy='+(P.joyX||0).toFixed(2)+','+(P.joyY||0).toFixed(2)+'\n'+
+      'joy='+(P.joyX||0).toFixed(2)+','+(P.joyY||0).toFixed(2)+' d='+jd+'\n'+
       'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
-      'pos='+P.pos.x.toFixed(1)+','+P.pos.z.toFixed(1)+'\n'+
-      'MS '+JSON.stringify(window.__lastStart||0)+'→'+JSON.stringify(window.__lastMove||0)+'\n'+
-      'touch='+(t.active?'Y':'N');
+      'pos='+P.pos.x.toFixed(2)+','+P.pos.y.toFixed(2)+','+P.pos.z.toFixed(2)+'\n'+
+      'FPS '+(window.__fps||0)+' dt='+(window.__lastDt||0).toFixed(3)+
+      ' frames='+(window.__frames||0)+'\n'+
+      'touch='+(t.active?'Y':'N')+' ERR:'+(window.__lastErr||'-');
   }
 }
 
@@ -132,26 +136,38 @@ function moveAndCollide(dt){
   const nz=P.pos.z+P.vel.z*dt;
   let ny=P.pos.y+P.vel.y*dt;
   const r=0.4; // 玩家半径
-
+  /* 玩家可站立高度：P.pos.y 就是眼睛高度（1.6），
+     所以身体占 [ny-1.6, ny] 这一段，而不是 [ny, ny+1.6]。
+     以前写成 ny+1.6，等于把判定盒整段抬到头顶以上，
+     站在地面板上时永远和「地面」这个碰撞体相交。 */
+  const feetY=ny-1.6, headY=ny;
   // 地面
   P.onGround=false;              // 先假设离地，落地时再置 true
   if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
-
+  const canBlock=(m)=>{
+    if(!m.geometry) return false;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) return false;
+    const halfH=(bb.max.y-bb.min.y)/2;
+    const top=m.position.y+halfH;
+    /* 顶面低于脚下 35cm 的（地面、操场、走廊地板、马路）不参与侧面碰撞，
+       否则站在地板上会被判定为「卡在实体内部」，分轴推进时每一帧都被推回原位。 */
+    if(top < feetY+0.35) return false;
+    return true;
+  };
   /* 分轴推进：先试 X，再试 Z。
      整体一起判定的写法在角落里会把两轴一起弹回原位，
      表现就是「贴着墙走不动」甚至「一出生就动不了」。
      分轴的好处是被挡住时还能沿墙滑行，手感也顺。 */
   let px=P.pos.x, pz=P.pos.z;
-
   // ---- X 轴 ----
   let tx=nx, blockedX=false;
   for(const m of colliders){
-    if(!m.geometry) continue;
-    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    const bb=m.geometry.boundingBox; if(!bb) continue;
+    if(!canBlock(m)) continue;
+    const bb=m.geometry.boundingBox;
     const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
     const mx=m.position.x, mz=m.position.z, my=m.position.y;
-    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+    if(feetY < (my+halfH) && headY > (my-halfH)){
       if(tx>mx-halfW-r && tx<mx+halfW+r && pz>mz-halfD-r && pz<mz+halfD+r){
         tx = (tx>mx) ? (mx+halfW+r) : (mx-halfW-r);
         blockedX=true;
@@ -159,16 +175,14 @@ function moveAndCollide(dt){
     }
   }
   if(blockedX) P.vel.x=0;
-
   // ---- Z 轴 ----
   let tz=nz, blockedZ=false;
   for(const m of colliders){
-    if(!m.geometry) continue;
-    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    const bb=m.geometry.boundingBox; if(!bb) continue;
+    if(!canBlock(m)) continue;
+    const bb=m.geometry.boundingBox;
     const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
     const mx=m.position.x, mz=m.position.z, my=m.position.y;
-    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+    if(feetY < (my+halfH) && headY > (my-halfH)){
       if(tx>mx-halfW-r && tx<mx+halfW+r && tz>mz-halfD-r && tz<mz+halfD+r){
         tz = (tz>mz) ? (mz+halfD+r) : (mz-halfD-r);
         blockedZ=true;
@@ -176,10 +190,7 @@ function moveAndCollide(dt){
     }
   }
   if(blockedZ) P.vel.z=0;
-
-  /* 兜底：万一出生点正好在某个碰撞盒内部（tx/tz 被来回夹住），
-     检测到这个情况就把玩家沿最近的可站立方向轻推出去，避免彻底卡死。 */
+  /* 兜底：数值异常时保持原位，绝不让 NaN 传染给下一帧 */
   if(!isFinite(tx)||!isFinite(tz)){ tx=P.pos.x; tz=P.pos.z; }
-
   P.pos.x=tx; P.pos.z=tz; P.pos.y=ny;
 }

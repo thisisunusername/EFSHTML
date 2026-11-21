@@ -1193,7 +1193,12 @@ function equipTagOf(id){
    内部用 queueMicrotask 合并同帧多次调用，所以随便打点都不会重复写盘。 */
 function saveTick(){ try{ if(typeof autoSaveTouch==='function') autoSaveTouch(); }catch(e){} }
 function buyItem(id){
-  const it=SHOP_ITEMS[id]; if(!it) saveTick(); return;
+  /* 【注意括号】这里曾经被写成 `if(!it) saveTick(); return;` ——
+     return 脱离了 if 的作用域，变成「函数无条件立即返回」，
+     结果就是商店里点任何商品都毫无反应，而且不报错。
+     补上大括号，把 return 真正关回 if 里。 */
+  const it=SHOP_ITEMS[id];
+  if(!it){ saveTick(); return; }
   if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); saveTick(); return; }
 
   const cat=it.cat;

@@ -99,6 +99,8 @@ function bindUI(){
     const startJoy=(t)=>{
       r0=joyBase.getBoundingClientRect();
       jx=t.clientX; jy=t.clientY;
+      /* 记录原始触点，供 updP 里的双保险读取（不依赖 pointerId 配对） */
+      window.__joyTouch={ active:true, sx:t.clientX, sy:t.clientY, cx:t.clientX, cy:t.clientY };
       // 摇杆跟着手指出现在按下处
       joyBase.style.left=(t.clientX-r0.width/2)+'px';
       joyBase.style.top=(t.clientY-r0.height/2)+'px';
@@ -110,6 +112,7 @@ function bindUI(){
     };
 
     const moveJoy=(t)=>{
+      if(window.__joyTouch){ window.__joyTouch.cx=t.clientX; window.__joyTouch.cy=t.clientY; }
       let dx=t.clientX-jx, dy=t.clientY-jy;
       const max=48, d=Math.hypot(dx,dy);
       if(d>max){ dx*=max/d; dy*=max/d; }
@@ -119,6 +122,7 @@ function bindUI(){
 
     const endJoy=()=>{
       jId=null; P.joyX=0; P.joyY=0;
+      if(window.__joyTouch) window.__joyTouch.active=false;
       joyStick.style.transform='translate(-50%,-50%)';
       joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
     };
@@ -148,6 +152,24 @@ function bindUI(){
     // 兜底：所有指针抬起都清理
     addEventListener('pointerup',e=>{ if(e.pointerId===jId) endJoy(); });
     addEventListener('pointercancel',e=>{ if(e.pointerId===jId) endJoy(); });
+
+    /* 【最终兜底】touch 事件监听。
+       如果设备上 pointer 事件被别的层抢走或 pointerId 对不上，
+       这里直接用 touch 事件驱动移动——两套事件里哪套能用就走哪套。 */
+    joyZone.addEventListener('touchstart',e=>{
+      if(jId!==null) return;
+      const t=e.changedTouches[0]; if(!t) return;
+      startJoy({clientX:t.clientX, clientY:t.clientY, pointerId:t.identifier});
+      e.preventDefault();
+    }, {passive:false});
+    joyZone.addEventListener('touchmove',e=>{
+      const t=e.changedTouches[0]; if(!t) return;
+      moveJoy({clientX:t.clientX, clientY:t.clientY});
+      e.preventDefault();
+    }, {passive:false});
+    const tEnd=e=>{ endJoy(); };
+    joyZone.addEventListener('touchend',tEnd,{passive:true});
+    joyZone.addEventListener('touchcancel',tEnd,{passive:true});
   }
 
   // 移动端操作按钮
@@ -159,6 +181,22 @@ function bindUI(){
     sprintBtn.addEventListener('touchend',()=>{ P.sprinting=false; });
   }
   const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
+  // 开镜：按住生效，松开还原（同时兼容 pointer 与 touch）
+  const aimBtn=$('btnAim');
+  if(aimBtn){
+    const aimOn=e=>{ P.aiming=true; aimBtn.classList.add('active'); if(e&&e.preventDefault) e.preventDefault(); };
+    const aimOff=e=>{ P.aiming=false; aimBtn.classList.remove('active'); };
+    aimBtn.addEventListener('touchstart',aimOn,{passive:false});
+    aimBtn.addEventListener('touchend',aimOff,{passive:true});
+    aimBtn.addEventListener('touchcancel',aimOff,{passive:true});
+    aimBtn.addEventListener('pointerdown',aimOn);
+    aimBtn.addEventListener('pointerup',aimOff);
+    aimBtn.addEventListener('pointercancel',aimOff);
+    aimBtn.addEventListener('pointerleave',aimOff);
+  }
+  // 键盘右键也可开镜（桌面端）
+  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ P.aiming=true; if(aimBtn) aimBtn.classList.add('active'); } });
+  addEventListener('mouseup',e=>{ if(e.button===2){ P.aiming=false; if(aimBtn) aimBtn.classList.remove('active'); } });
 
   // 触屏视角拖拽（屏幕右半区，整屏监听，不依赖按钮）
   const viewLayer=$('viewLayer');

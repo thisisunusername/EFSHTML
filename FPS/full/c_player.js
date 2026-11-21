@@ -10,6 +10,8 @@ const P={
   onGround:true,
   shooting:false, reload:false, reloadT:0,
   shootCd:0, sprinting:false, joyX:0, joyY:0, alive:true,
+  aiming:false,    /* 开镜状态（按住开镜键） */
+  aimT:0,          /* 开镜过渡插值 0~1，用于平滑 FOV */
   keys:{},
 };
 const LOCK_TURN=false; // 手机端陀螺仪可后续接入
@@ -51,6 +53,31 @@ function updP(dt){
   // 虚拟摇杆输入（移动端，挂在 P 上避免跨模块变量问题）
   if(P.joyX||P.joyY){
     mx=P.joyX; mz=P.joyY;
+  }
+  /* 【双保险】直接读取 joyZone 上正在生效的触点。
+     某些 Android WebView 里 pointermove 的 pointerId 与 pointerdown 不一致，
+     导致 P.joyX 永远是 0、怎么拖都不动。这里绕过 pointerId 匹配，
+     直接问浏览器「左半屏现在有几个手指按着、在哪」，
+     只要发现按下点与当前点的位移，就照样驱动移动，不依赖事件配对。 */
+  if(!mx && !mz && window.__joyTouch && window.__joyTouch.active){
+    const t=window.__joyTouch;
+    let dx=t.cx-t.sx, dy=t.cy-t.sy;
+    const max=48, d=Math.hypot(dx,dy);
+    if(d>6){
+      if(d>max){ dx*=max/d; dy*=max/d; }
+      mx=dx/max; mz=dy/max;
+      P.joyX=mx; P.joyY=mz;
+    }
+  }
+
+  /* 开镜：按住开镜键时 FOV 收紧，松开还原。
+     aimT 是平滑插值，避免瞬间跳变导致眩晕。 */
+  const aimTarget = P.aiming && P.onGround ? 1 : 0;
+  P.aimT += (aimTarget - P.aimT) * Math.min(1, dt*12);
+  if(camera){
+    const baseFov = P.sprinting ? 78 : 75;
+    camera.fov = baseFov - 28*P.aimT;   // 75 -> 47
+    camera.updateProjectionMatrix();
   }
 
   // 相对 yaw 的方向

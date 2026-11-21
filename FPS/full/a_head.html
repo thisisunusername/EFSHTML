@@ -12,7 +12,9 @@
   /* HUD */
   #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
   /* 视角触摸层：覆盖全屏，位于摇杆/按钮之下 */
-  #viewLayer{ position:fixed; inset:0; z-index:5; touch-action:none; background:transparent; }
+  #viewLayer{ position:fixed; right:0; top:0; bottom:0; width:50%; z-index:25; touch-action:none; background:transparent; }
+  /* 右半屏负责转视角；左半屏只归摇杆。两者不重叠，
+     否则摇杆铺满左半屏会把视角拖拽抢走（反之亦然）。 */
   /* 游戏内常驻操作提示（手机端小字条） */
   #htip{ position:absolute; left:50%; transform:translateX(-50%); bottom:58px; max-width:94vw; padding:5px 10px; border-radius:8px; background:rgba(10,14,22,.72); border:1px solid rgba(124,92,255,.35); color:#c8d0e0; font-size:10.5px; line-height:1.5; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   #htip.hide{ opacity:0; }
@@ -42,14 +44,20 @@
   #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; }
-  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
+  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
-  #btnFire{ right:30px; bottom:28px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
-  #btnJump{ right:130px; bottom:28px; }
-  #btnReload{ right:130px; bottom:116px; }
-  #btnInteract{ right:30px; bottom:130px; border-color:var(--accent2); }
-  #btnSprint{ right:130px; bottom:204px; }
+  /* 按钮图标（SVG，currentColor 跟随主题） */
+  .actbtn .ico{ width:30px; height:30px; fill:currentColor; stroke:none; pointer-events:none; }
+  #btnFire .ico{ width:38px; height:38px; }
+  #btnJump .ico{ width:30px; height:30px; }
+  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
+  #btnFire{ right:26px; bottom:26px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+  #btnAim{ right:118px; bottom:96px; width:62px; height:62px; border-color:#7c5cff; }
+  #btnJump{ right:126px; bottom:22px; }
+  #btnReload{ right:30px; bottom:126px; }
+  #btnInteract{ right:204px; bottom:34px; width:58px; height:58px; }
+  #btnSprint{ right:196px; bottom:110px; width:58px; height:58px; }
 
   /* 菜单 */
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -106,11 +114,24 @@
 <div id="viewLayer"></div>
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
 <div id="actZone">
-  <div class="actbtn" id="btnFire">开火</div>
-  <div class="actbtn" id="btnJump">跳</div>
-  <div class="actbtn" id="btnReload">换弹</div>
-  <div class="actbtn" id="btnInteract">拾取</div>
-  <div class="actbtn" id="btnSprint">奔跑</div>
+  <div class="actbtn" id="btnFire" title="开火">
+    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2c-.7 0-1.3.4-1.6 1L9 6H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1l1.4 8.3c.1.9.8 1.5 1.7 1.5h5.8c.9 0 1.6-.6 1.7-1.5L18 10h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-4l-1.4-3c-.3-.6-.9-1-1.6-1z"/></svg>
+  </div>
+  <div class="actbtn" id="btnAim" title="开镜">
+    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="1.7"/></svg>
+  </div>
+  <div class="actbtn" id="btnJump" title="跳跃">
+    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="4" r="2.2"/><path d="M12 7.2v5.6M12 12.8l-3 4.2M12 12.8l3 4.2M12 8.8l-4 2.4M12 8.8l4 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+  </div>
+  <div class="actbtn" id="btnReload" title="换弹">
+    <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="7.6" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="12.2" y="8.5" width="3.3" height="7.5" rx="1"/><path d="M17.5 12a5.5 5.5 0 0 0-9.4-3.9M6.5 12a5.5 5.5 0 0 0 9.4 3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8.1 5.9l-.2 2.6 2.5-.7M15.9 18.1l.2-2.6-2.5.7" fill="currentColor"/></svg>
+  </div>
+  <div class="actbtn" id="btnInteract" title="拾取">
+    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2.5 3 6.5v6c0 4.4 3.6 7.6 9 9 5.4-1.4 9-4.6 9-9v-6l-9-4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v5M9.5 10.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+  </div>
+  <div class="actbtn" id="btnSprint" title="奔跑">
+    <svg viewBox="0 0 24 24" class="ico"><circle cx="14" cy="4" r="2.2"/><path d="M6 21l3.2-5.2 2.6-2.2-1.3-4.6-2.8 1.6L6 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.5 9l3.6-2 2.4 2.6 2.5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.6 15l-1.4 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </div>
 </div>
 
 <div id="loaderr"></div>

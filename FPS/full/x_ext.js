@@ -67,7 +67,18 @@ function findNearDoor(){
 /* 每帧调用：更新高亮提示 + 门板开关动画 */
 function updDoors(dt){
   const nd=findNearDoor();
-  if(nd!==nearDoor){
+  const nc=findNearContainer();
+  /* 【容器提示优先】站在箱子边上时提示「搜索」，
+     而不是把「开门」写在上面让玩家以为只能开门。 */
+  if(nc && nd){
+    const el=$('doorHint');
+    if(el){
+      el.style.display='block';
+      if(el.dataset.t!=='搜'){ el.dataset.t='搜';
+        el.innerHTML='<b>E</b> 搜索 '+CONTAINER_NAME[nc.type].replace(/^\S+\s/,''); }
+    }
+  }
+  else if(nd!==nearDoor){
     if(nearDoor) nearDoor.panel.material.emissive && nearDoor.panel.material.emissive.setHex(0x000000);
     nearDoor=nd;
     const el=$('doorHint');
@@ -313,9 +324,185 @@ const NPC_POINTS=[
    门优先，其次才是拾取等其它交互。 */
 function interact(){
   if(!P.alive) return;
+  /* 【容器优先】搜打撤的核心动作是「搜」。站在箱子边上按 E，
+     当然是想开箱子，而不是想开旁边那扇门。 */
+  const c=findNearContainer();
+  if(c){ openContainer(c); return true; }
   const d=findNearDoor();
   if(d){ toggleDoor(d); return true; }
   return false;
+}
+/* ==================== 局内容器 / 搜索 ====================
+   设计要点：
+   1. 容器是「稀疏资源」—— 不能三步一个，否则失去探索感。
+      所以只在校舍、操场看台、体育馆等关键点位撒 11 个。
+   2. 三种容器有不同产出战利品表：
+        box 纸箱   杂货：绷带、止痛药、手枪弹、开锁器
+        locker 铁柜 军械：头盔、护甲、配件、步枪弹
+        med 医疗柜  医疗：医疗包、急救包、绷带
+   3. 【关键】搜到的东西自动打「搜来的」标记（P.looted），
+      撤离后卖出价格比原价高 —— 这是搜打撤的主要赚钱手段，
+      否则玩家只能靠买低卖高，那就不叫搜打撤了。 */
+
+/* 容器点位：坐标全部落在建筑外的空地或门口，
+   避免生成在墙里导致玩家摸不到（此前 loot 就踩过这个坑）。 */
+const CONTAINER_SPOTS=[
+  {x:-8,  z:-4,  type:'box'},     // 主楼门前
+  {x:8,   z:-4,  type:'locker'},  // 主楼门前东侧
+  {x:-20, z:22,  type:'box'},     // 西楼侧空地
+  {x:20,  z:22,  type:'med'},     // 东楼侧空地
+  {x:0,   z:42,  type:'box'},     // 操场看台前
+  /* 【坐标体检修正】原来 (-26,-6) 和 (26,-6) 正好压在东西教学楼
+     外墙皮上（西楼 x:-42..-26，东楼 x:26..42），容器一半嵌进墙里。
+     往外挪 4 米到楼外空地，且避开篮球场。 */
+  {x:-46, z:-6,  type:'locker'},  // 西教学楼外（楼外空地）
+  {x:46,  z:-6,  type:'med'},     // 东教学楼外（楼外空地）
+  {x:52,  z:20,  type:'locker'},  // 体育馆内
+  {x:-34, z:30,  type:'med'},     // 西北角
+  {x:34,  z:36,  type:'box'},     // 东南角
+  /* 原来 (-6,-30) 在主教学楼体内部（z:-30..-14），完全看不见。
+     现在放到校门内侧偏西，避开正中主干道和石碑（石碑在 -9,-40）。 */
+  {x:-20, z:-40, type:'box'},     // 校门内侧偏西
+];
+const containers=[];        // {x,z,type,mesh,opened,items:{id:cnt},used}
+/* 战利品表：[物品id, 权重, 最小数量, 最大数量] */
+const LOOT_TABLES={
+  box:[
+    ['bandage',30,1,3], ['painkill',18,1,2], ['ammo_pistol',24,1,2],
+    ['med',14,1,2], ['lockpick',8,1,1], ['grenade',5,1,1],
+    ['smoke',4,1,1], ['ammo_shot',10,1,1],
+  ],
+  locker:[
+    ['ammo_rifle',26,1,2], ['helm_light',12,1,1], ['vest_light',10,1,1],
+    ['mod_reddot',8,1,1], ['mod_grip_vert',9,1,1], ['mod_comp',7,1,1],
+    ['mod_mag_ext',6,1,1], ['ammo_sniper',8,1,1], ['vest_med',4,1,1],
+    ['mod_holo',4,1,1], ['helm_med',3,1,1],
+  ],
+  med:[
+    ['med',30,1,2], ['bandage',28,2,4], ['painkill',18,1,2],
+    ['med_kit',16,1,1], ['grenade',4,1,1],
+  ],
+};
+const CONTAINER_NAME={ box:'📦 纸箱', locker:'🗄️ 铁柜', med:'🧰 医疗柜' };
+const CONTAINER_COLOR={ box:0x8a6a3f, locker:0x5a6470, med:0xd8d2c4 };
+
+/* 按权重从战利品表抽 n 件（允许重复，同类合并数量） */
+function rollLoot(table, n){
+  const out={};
+  const total=table.reduce((s,e)=>s+e[1],0);
+  for(let i=0;i<n;i++){
+    let r=Math.random()*total, pick=null;
+    for(const e of table){ r-=e[1]; if(r<=0){ pick=e; break; } }
+    if(!pick) pick=table[table.length-1];
+    const id=pick[0];
+    const c=pick[2]+Math.floor(Math.random()*(pick[3]-pick[2]+1));
+    out[id]=(out[id]||0)+c;
+  }
+  return out;
+}
+/* 建容器模型：一个矮方块 + 顶盖，不同颜色区分种类。
+   容器要有碰撞，否则玩家会直接穿过它。 */
+function spawnContainer(spot){
+  const c=CONTAINER_COLOR[spot.type]||0x777777;
+  const h = spot.type==='locker' ? 1.5 : 0.85;
+  const w = spot.type==='locker' ? 0.9 : 1.1;
+  const body=box(w, h, w*0.8, c, spot.x, h/2, spot.z);
+  body.castShadow=true; body.receiveShadow=true;
+  const lid=box(w*1.06, 0.1, w*0.86, c, spot.x, h+0.05, spot.z, true);
+  lid.castShadow=true;
+  const o={ x:spot.x, z:spot.z, type:spot.type, mesh:body, lid,
+            opened:false, items:rollLoot(LOOT_TABLES[spot.type]||LOOT_TABLES.box, 2+((Math.random()*3)|0)) };
+  containers.push(o);
+  return o;
+}
+function buildContainers(){
+  for(const m of containers){ try{ scene.remove(m.mesh); scene.remove(m.lid); }catch(e){} }
+  containers.length=0;
+  CONTAINER_SPOTS.forEach(spawnContainer);
+}
+/* 找离玩家最近、且在可交互距离内的容器 */
+function findNearContainer(){
+  let best=null, bd=2.2;
+  for(const c of containers){
+    if(c.opened && !Object.keys(c.items).length) continue;
+    const d=Math.hypot(P.pos.x-c.x, P.pos.z-c.z);
+    if(d<bd){ bd=d; best=c; }
+  }
+  return best;
+}
+/* ---- 搜索面板 ---- */
+let cacheContainer=null;   // 当前打开的容器
+function openContainer(c){
+  cacheContainer=c;
+  const el=$('lootBox'); if(!el) return;
+  const ti=$('lbTitle'); if(ti) ti.textContent=CONTAINER_NAME[c.type]||'📦 容器';
+  paintContainer();
+  el.style.display='';
+  sfxUI();
+}
+function closeContainer(){
+  const el=$('lootBox'); if(el) el.style.display='none';
+  cacheContainer=null;
+}
+function paintContainer(){
+  const g=$('lbGrid'); if(!g) return;
+  const c=cacheContainer;
+  if(!c){ g.innerHTML=''; return; }
+  let h='';
+  const ids=Object.keys(c.items).filter(id=>c.items[id]>0 && SHOP_ITEMS[id]);
+  if(!ids.length){
+    h='<div class="lbEmpty">空的 · 已经搜干净了</div>';
+  } else {
+    for(const id of ids){
+      const it=SHOP_ITEMS[id];
+      /* 稀有物品（价格 ≥1000 或配件）高亮，让玩家一眼看到好东西 */
+      const rare=(it.price>=1000 || it.cat==='mod')?' rare':'';
+      h+='<div class="lbi'+rare+'" data-loot="'+id+'" title="'+it.name+'">'
+        +it.icon+'<b>'+c.items[id]+'</b></div>';
+    }
+  }
+  g.innerHTML=h;
+  g.querySelectorAll('[data-loot]').forEach(node=>{
+    node.onclick=()=>{ takeLoot(node.dataset.loot); };
+  });
+  const tip=$('lbTip');
+  if(tip) tip.textContent='点物品拿取 · 背包 '+pouchUsed()+'/'+P.bagCap;
+}
+/* 从容器拿一件物品进背包。
+   优先塞背包；背包满了如果胸挂能收就进胸挂（医疗/弹药正好是胸挂能收的），
+   这样玩家不会因为背包装满了就白跑一趟。 */
+function takeLoot(id){
+  const c=cacheContainer; if(!c) return;
+  if(!(c.items[id]>0)) return;
+  const it=SHOP_ITEMS[id]; if(!it) return;
+  let src=null;
+  if(bagAdd(id,1)) src='bag';
+  else if(typeof chestAccept==='function' && chestAccept(id) && chestFree()>0){
+    if(!P.chestPouch[id]) P.chestPouch[id]=0;
+    P.chestPouch[id]++; src='chest';
+  }
+  if(!src){ sfxDeny(); toast('背包和胸挂都满了'); return; }
+  c.items[id]--;
+  if(c.items[id]<=0) delete c.items[id];
+  /* 【来源标记】搜来的东西记一笔，撤离后卖价更高。 */
+  if(!P.looted[id]) P.looted[id]=0;
+  P.looted[id]++;
+  sfxPickup();
+  paintContainer(); refreshHUD();
+  if(!Object.keys(c.items).length){
+    c.opened=true;
+    if(c.lid){ c.lid.rotation.x=-0.5; c.lid.position.y+=0.1; }
+    toast('已搜空 '+CONTAINER_NAME[c.type]);
+    setTimeout(closeContainer,350);
+  }
+}
+/* 绑定关闭按钮（只绑一次） */
+function bindContainerUI(){
+  const cl=$('lbClose');
+  if(cl && !cl.__bound){ cl.__bound=true; cl.onclick=()=>{ closeContainer(); sfxUI(); }; }
+  const el=$('lootBox');
+  if(el && !el.__bound){ el.__bound=true;
+    el.addEventListener('touchstart', e=>e.stopPropagation(), {passive:true}); }
 }
 
 /* 屏幕提示条点击也能开门（手机上没有键盘） */

@@ -86,49 +86,62 @@
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  /* ===== 右侧按键布局（按用户示意图） =====
-                                 瞄准
-        摇杆              跳跃    开火
-                         趴下     换弹
+  /* ===== 右侧按键布局 =====
+     【错位的原因】原来是每个按钮各自写 right/bottom 计算位置，
+     而 #actZone 只有 50% 宽。三列（开火列/跳跃列/检视列）在窄屏上
+     累计宽度会超过 actZone 的 50%，于是最左边的检视键被压出容器，
+     表现为「跳跃键跑到奇怪的地方 / 键与键叠在一起」。
+     只要屏幕比例一变（横屏/竖屏/不同机型）就会错。
 
-      换成两列三行的紧凑方阵：
-        右列（贴屏幕右边缘）：开火（大）/ 换弹
-        左列：跳跃（上）/ 趴下（下）
-        瞄准单独浮在两列左上方
-
-      以前是散落的 5 个按钮各自 right/bottom 定位，
-      互相之间没有对齐关系，窄屏时会叠在一起。 */
+     现在改成真正的网格：actZone 内部用 CSS Grid 摆一个 3 列 × 4 行的
+     固定坐标方阵，每个按钮指定 grid-area，不再算 right/bottom 像素。
+     容器变窄时网格整体等比缩放（用 --u 单位），键与键的相对位置恒定。 */
   #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%;
             display:none; pointer-events:none; z-index:35; }
-
-  /* 所有按钮统一基准尺寸，靠 CSS 变量缩放 */
-  #actZone{ --bs:56px; --gap:8px; --big:84px; }
-
-  #btnFire{ right:16px; bottom:16px;
-            width:var(--big); height:var(--big);
-            border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
-  #btnFire .ico{ width:36px; height:36px; }
-
-  #btnReload{ right:16px; bottom:calc(16px + var(--big) + var(--gap));
-              width:var(--bs); height:var(--bs); }
-  #btnReload .ico{ width:26px; height:26px; }
-
-  #btnJump{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--bs) + var(--gap));
-            width:var(--bs); height:var(--bs); }
-  #btnJump .ico{ width:26px; height:26px; }
-
-  #btnProne{ right:calc(16px + var(--big) + var(--gap)); bottom:16px;
-             width:var(--bs); height:var(--bs); }
-  #btnProne .ico{ width:26px; height:26px; }
-
-  /* 瞄准：浮在跳跃/趴下这列的正上方，明确远离开火 */
-  #btnAim{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--big) + var(--gap)*2);
-           width:64px; height:64px; border-color:#7c5cff; }
+  /* 按钮网格容器：固定在右下角，3 列 × 3 行 */
+  #actGrid{
+    position:absolute; right:14px; bottom:14px;
+    display:grid;
+    grid-template-columns: repeat(3, var(--u));
+    grid-template-rows: repeat(3, var(--u));
+    gap: 8px;
+    pointer-events:none;
+    /* --u = 单个格子的边长，随屏幕短边自适应，保证不同机型比例一致 */
+    --u: 58px;
+  }
+  @media (max-height:420px){ #actGrid{ --u:52px; } }
+  @media (max-height:360px){ #actGrid{ --u:46px; } }
+  /* 网格里的按钮统一按格子摆，用 grid-area 定位，不再用 right/bottom */
+  #actGrid .actbtn{
+    position:static; right:auto; bottom:auto;
+    width:var(--u); height:var(--u);
+    margin:0; justify-self:center; align-self:center;
+    pointer-events:auto;
+  }
+  /* 布局（3 列 × 3 行）：
+        [    ] [瞄准] [    ]
+        [检视] [跳跃] [换弹]
+        [    ] [趴下] [开火]
+     开火最大、贴右下角，其余按功能分组，位置固定不随屏幕变。 */
+  #btnAim{    grid-column:2; grid-row:1; width:calc(var(--u)*1.05); height:calc(var(--u)*1.05); border-color:#7c5cff; }
+  #btnInspect{grid-column:1; grid-row:2; }
+  #btnJump{   grid-column:2; grid-row:2; }
+  #btnReload{ grid-column:3; grid-row:2; }
+  #btnProne{  grid-column:2; grid-row:3; }
+  #btnFire{   grid-column:3; grid-row:3;
+              width:calc(var(--u)*1.42); height:calc(var(--u)*1.42);
+              border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
   #btnAim .ico{ width:28px; height:28px; }
-  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
-  /* 检视按钮：放在开镜左边一格，不抢开火键的位置 */
-  #btnInspect{ right:calc(16px + (var(--big) + var(--gap))*2); bottom:16px; }
+  /* 交互（E）和奔跑（Shift）也放进网格，否则它们会被自动填充到空格子里，
+     导致上面的固定布局被打乱。交互放左上空格，奔跑放左下空格。 */
+  #btnInteract{grid-column:1; grid-row:1; }
+  #btnSprint{  grid-column:1; grid-row:3; }
   #btnInspect .ico{ width:24px; height:24px; }
+  #btnJump .ico{ width:26px; height:26px; }
+  #btnReload .ico{ width:26px; height:26px; }
+  #btnProne .ico{ width:26px; height:26px; }
+  #btnFire .ico{ width:36px; height:36px; }
+  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
 
   /* ==== GM 隐藏面板（主菜单连点 D 15 次）====
      浮在屏幕上层，可拖动、可收起。z-index 比遮罩(9999)略低但比
@@ -171,18 +184,15 @@
   #gmCash small{ font-size:10px; color:#8d97a8; font-weight:600;
     letter-spacing:.08em; display:block; margin-bottom:2px; }
 
-  /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
-  #btnInteract{ right:50%; transform:translateX(50%);
-                bottom:calc(16px + var(--big) + var(--gap));
-                width:58px; height:58px; }
+  /* 交互（开门/拾取）和奔跑的位置已经统一交给上面的 #actGrid 网格，
+     这里不再用 right/bottom 单独定位 ——
+     旧的那套 calc 定位正是「按键错位」的来源之一，
+     两套规则同时存在时，后写的会盖掉先写的，结果随屏幕比例漂移。 */
   #btnInteract .ico{ width:26px; height:26px; }
-
-  /* 奔跑：紧贴开火上方的斜角位，避免压住换弹 */
-  #btnSprint{ right:calc(16px + var(--big) + var(--gap));
-              bottom:calc(16px + var(--big) + var(--gap));
-              width:52px; height:52px; }
   #btnSprint .ico{ width:22px; height:22px; }
-  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
+  /* 基础外观：尺寸/位置由 #actGrid .actbtn 统一规定，
+     这里只管圆形、配色、图标居中这些「长相」。 */
+  .actbtn{ width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
   /* 按钮图标（SVG，currentColor 跟随主题）
      【统一图标体系】全部改用 Lucide 官方图标（ISC 许可）的描边风格：
@@ -485,6 +495,86 @@ html[data-lang="en"] #bagBtn span{
   .stkg.dim{ opacity:.42; }
   .stkg.dim:hover{ background:rgba(255,255,255,.06); }
 
+  /* 治疗按钮上的数量角标 + 无药时变暗 */
+  .medn{ margin-left:4px; font-size:11px; font-weight:800; color:#7dffb0;
+         background:rgba(125,255,176,.15); padding:1px 5px; border-radius:6px; }
+  #medBtn.none{ opacity:.45; }
+  #medBtn.none .medn{ color:#889; background:rgba(255,255,255,.07); }
+  #medBtn:active{ background:rgba(125,255,176,.28); }
+
+  /* ===== 胸挂快速取用区 =====
+     和背包格子刻意做出视觉区分：青色边框 + 一条分隔线，
+     让玩家一眼看出「上面这排是急用的，下面是背包」。
+     胸挂格子不参与 .stkgrid 的滚动区，始终钉在顶部可见。 */
+  .chestrow{ flex:0 0 auto; margin-bottom:8px; padding-bottom:8px;
+             border-bottom:1px dashed rgba(90,220,255,.28); }
+  .chesthd{ font-size:11.5px; font-weight:700; color:#7fd8f5;
+            letter-spacing:.03em; margin-bottom:5px; }
+  .chesthd.dim{ color:#79828f; font-weight:600; }
+  .chestgrid{ display:grid; grid-template-columns:repeat(8,1fr); gap:4px; }
+  .stkg.chest{ border-color:rgba(90,220,255,.45);
+               background:rgba(90,220,255,.10); }
+  .stkg.chest:hover{ background:rgba(90,220,255,.24); }
+  .stkg.chest:active{ background:rgba(90,220,255,.42); }
+  .stkg.chest.empty{ border-style:dashed; border-color:rgba(90,220,255,.18);
+background:rgba(90,220,255,.03); cursor:default; }
+  /* ===== 仓库拖拽配件 =====
+     手机上没有「右键菜单」，配件装到武器上最直观的方式就是拖。
+     .dragghost 是跟随手指的浮动图标，pointer-events:none 保证它
+     不会挡住下面的落点元素（否则 elementFromPoint 永远拿到 ghost 自己）。
+     .stkslot.hot 表示「这一格能接这个配件」，给玩家明确的可行落点提示。 */
+  .dragghost{ position:fixed; z-index:99999; width:44px; height:44px;
+              display:flex; align-items:center; justify-content:center;
+              font-size:24px; border-radius:10px; pointer-events:none;
+              background:rgba(124,92,255,.85); box-shadow:0 6px 18px rgba(0,0,0,.6);
+              transform:translate(-50%,-50%); }
+  .stkslot.hot{ border-color:#7dffb0 !important;
+                background:rgba(125,255,176,.18) !important;
+                box-shadow:0 0 0 2px rgba(125,255,176,.35) inset; }
+  .stkg.armed{ border-color:#ffd54a; background:rgba(255,213,74,.16); }
+  /* ===== 卖出系统 =====
+     .stkgp 是卖出模式下格子右上角的估价，.selsell 是已勾选的黄框。
+     两者都用绝对定位/强描边，保证在密集的仓库格子里一眼能分辨。 */
+  .stkbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .stksell{ cursor:pointer; font-size:12px; font-weight:800; padding:5px 13px;
+            border-radius:9px; border:1px solid rgba(255,213,74,.55);
+            background:rgba(255,213,74,.14); color:#ffd54a; font-family:inherit; }
+  .stksell:active{ background:rgba(255,213,74,.34); }
+  .stksell.on{ border-color:#7dffb0; background:rgba(125,255,176,.2); color:#7dffb0; }
+  .stksell.cancel{ border-color:rgba(255,255,255,.22);
+                   background:rgba(255,255,255,.06); color:#9aa4b2; }
+  .stksellhint{ font-size:10.5px; color:#ffd54a; opacity:.85; margin:4px 0 2px; }
+  .stkg.selsell{ border-color:#ffd54a; background:rgba(255,213,74,.26);
+                 box-shadow:0 0 0 2px rgba(255,213,74,.5) inset; }
+  .stkgp{ position:absolute; left:1px; top:0; font-size:8.5px; font-weight:800;
+          color:#7dffb0; text-shadow:0 1px 2px #000; pointer-events:none;
+          letter-spacing:-.02em; }
+  /* ===== 局内容器搜索面板 =====
+     位置刻意放在屏幕中下方而不是正中：手在操作右下按钮，
+     面板压在中间会被手掌挡住。宽度给足以便一行放 5 格。 */
+  #lootBox{ position:fixed; left:50%; bottom:18%; transform:translateX(-50%);
+            width:min(86vw,420px); z-index:9000;
+            background:rgba(14,18,26,.96); border:1px solid rgba(90,220,255,.35);
+            border-radius:14px; padding:10px 12px 8px;
+            box-shadow:0 10px 34px rgba(0,0,0,.65); }
+  .lbHead{ display:flex; align-items:center; justify-content:space-between;
+           font-size:13px; font-weight:800; color:#bff0ff; margin-bottom:8px; }
+  .lbClose{ cursor:pointer; color:#8a94a3; font-size:15px; padding:0 4px; }
+  .lbGrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .lbi{ position:relative; aspect-ratio:1; border-radius:9px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; font-size:20px;
+        background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); }
+  .lbi:active{ background:rgba(125,255,176,.3); border-color:#7dffb0; }
+  .lbi b{ position:absolute; right:2px; bottom:0; font-size:9px; color:#ffd54a;
+          font-weight:800; text-shadow:0 1px 2px #000; }
+  .lbi.rare{ border-color:#ffd54a; background:rgba(255,213,74,.14); }
+  .lbTip{ font-size:10.5px; color:#79828f; margin-top:7px; text-align:center; }
+  .lbEmpty{ grid-column:1 / -1; text-align:center; color:#79828f; font-size:12px;
+            padding:14px 0; }
+  @media (max-width:520px){
+    .chestgrid{ grid-template-columns:repeat(6,1fr); }
+  }
+
   /* 手机竖屏：右栏格子缩小成 6 列 */
   @media (max-width:520px){
     .stkgrid{ grid-template-columns:repeat(6,1fr); }
@@ -550,6 +640,10 @@ html[data-lang="en"] #bagBtn span{
     <div class="pill">⏱ <span id="timer">00:00</span></div>
     <div class="pill" id="sndBtn" style="cursor:pointer">🔊 <span id="sndTxt">开</span></div>
     <div class="pill" id="bagBtn" style="cursor:pointer">🎒 <span>背包</span></div>
+    <!-- 医药快速使用：不用打开背包，点一下立刻吃最合适的药。
+         优先用胸挂里的（胸挂就是快速取用区），胸挂没有再翻背包。
+         按钮上会显示当前可用药品的数量，没有药时自动变暗。 -->
+    <div class="pill" id="medBtn" style="cursor:pointer">🩹 <span>治疗</span><b id="medBtnN" class="medn">0</b></div>
   </div>
   <div id="crosshair"></div>
   <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>
@@ -566,6 +660,7 @@ html[data-lang="en"] #bagBtn span{
 <div id="viewLayer"></div>
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
 <div id="actZone">
+ <div id="actGrid">
   <div class="actbtn" id="btnFire" title="开火">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide crosshair：外圈 + 四向刻度线 -->
@@ -634,6 +729,7 @@ html[data-lang="en"] #bagBtn span{
       <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/>
     </svg>
   </div>
+ </div><!-- /#actGrid -->
 </div>
 
 <!-- 底部中间：武器切换条（主武器 / 手枪 / 副武器）
@@ -691,6 +787,13 @@ html[data-lang="en"] #bagBtn span{
 <div id="gunsmith" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
+     里面是一堆可点的物品格，点一个拿一个，拿完自动关。 -->
+<div id="lootBox" style="display:none">
+  <div class="lbHead"><span id="lbTitle">📦 容器</span><b class="lbClose" id="lbClose">✕</b></div>
+  <div class="lbGrid" id="lbGrid"></div>
+  <div class="lbTip" id="lbTip">点物品拿取 · 背包满了就拿不了</div>
+</div>
 <!-- GM 隐藏面板：主菜单连续点 D 15 次显示 -->
 <div id="gmPanel">
   <div id="gmHead">
@@ -2215,22 +2318,62 @@ function init(){
   ready=true;
 }
 
+/* 窗户（玻璃 + 窗框）。
+     【原来错在哪】直接把玻璃当成 `box(2.6,2.6,.3, 0x88ccee, x, y, -14.15, true)`：
+     主楼墙体中心 z=-22、厚 16，墙面在 z=-14。玻璃中心放 -14.15、厚 0.3，
+     于是它向外凸 0.15、向内凹 0.15 —— 一半埋在墙里，和墙面完全共面，
+     从外面看就是一片闪烁的色块（z-fighting），既没有窗框也没有凹进去的窗洞感。
+     东西楼（墙面 x=±26）和行政楼（墙面 z=18.5，原代码放 18.6，连凸都没凸出来，
+     整块玻璃埋在墙里看不见）都是同类错误。
+
+     现在统一用这个函数：玻璃贴在墙面外侧 0.06 米（留极小的间隙避免共面），
+     四周加一圈窗框（比玻璃略突出），并在玻璃上开十字窗棂。
+     face 用 'S'(朝 -z) / 'N'(朝 +z) / 'W'(朝 -x) / 'E'(朝 +x) 指定朝向。 */
+function windowPane(w,h, x,y,z, face, noCol){
+  const T=0.08;                    // 玻璃厚度
+  const F=0.16;                    // 窗框厚度（比玻璃厚，才有立体感）
+  const off=0.02;                  // 贴墙间隙，防止与墙面共面闪烁
+  const glassC=0x9fd4e8;           // 玻璃：淡青蓝，比原来的 0x88ccee 更像玻璃
+  const frameC=0xcfc8ba;           // 窗框：浅米灰（塑钢/铝合金的颜色）
+  const dir=(face==='S')?-1:(face==='N'?1:(face==='W'?-1:1));
+  const along=(face==='S'||face==='N');   // 沿 x 铺开 还是 沿 z 铺开
+  /* 玻璃：只显示不碰撞（原来的 noCol 语义保留） */
+  const gz = (face==='S'||face==='N') ? z+dir*(off+T/2) : x+dir*(off+T/2);
+  if(along) box(w,h,T,glassC, x,y,gz, true);
+  else      box(T,h,w,glassC, gz,y,z, true);
+  /* 窗框：上下左右四条，围出一个略大于玻璃的矩形 */
+  const fz=(face==='S'||face==='N') ? z+dir*(off+F/2) : x+dir*(off+F/2);
+  const frame=(w2,h2,dx,dy)=>{
+    if(along) box(w2,h2,F,frameC, x+dx,y+dy,fz, true);
+    else      box(F,h2,w2,frameC, fz,y+dy,z+dx, true);
+  };
+  frame(w+F*2, F, 0,  h/2+F*0.4);          // 上
+  frame(w+F*2, F, 0, -h/2-F*0.4);          // 下
+  frame(F, h,     -w/2-F*0.4, 0);          // 左
+  frame(F, h,      w/2+F*0.4, 0);          // 右
+  /* 竖向窗棂：把玻璃分成三格，比一整块玻璃有辨识度 */
+  const barT=0.05;
+  if(along) box(barT,h,T*0.6,frameC, x,y,gz, true);
+  else      box(T*0.6,h,barT,frameC, gz,y,z, true);
+  return null;
+}
+
 /* ============ 学校建筑（还原现实校园） ============ */
 function buildSchool(){
   /* ---- 主教学楼（南侧，z=-22）60m 宽 × 4 层 ---- */
   box(60,14,16,0xd9c6a3,0,7,-22);                 // 主楼体
   /* 主楼屋顶做成「两边收窄」的样子：
-     主楼本体 60 米宽（x 从 -30 到 30），而东西楼内边缘在 x=±26，
+    主楼本体 60 米宽（x 从 -30 到 30），而东西楼内边缘在 x=±26，
      如果屋顶也做满 60 米，它会在 y=14.35 的高度悬在东西楼上方
      —— 两个屋顶互相插在一起，从远处看就是「楼顶打架」。
      这里收窄到 50 米（x 从 -25 到 25），刚好落在东西楼之间。 */
   box(50,.7,16,0x6b5a45,0,14.35,-22);            // 平屋顶
-  // 正面门窗（朝南 z=-14）
+  // 正面门窗（朝南 z=-14）—— 墙面 z=-14，玻璃朝外贴在南面
   for(let i=0;i<13;i++){
     const x=-27+i*4.5;
-    box(2.6,2.6,.3,0x88ccee,x,5,-14.15,true);    // 窗（一层，高一点）
-    box(2.6,2.6,.3,0x88ccee,x,9.5,-14.15,true);  // 窗（二层）
-    box(2.6,2.6,.3,0x88ccee,x,12.5,-14.15,true); // 窗（三层）
+    windowPane(2.6,2.6, x,5,   -14, 'S');        // 窗（一层，高一点）
+    windowPane(2.6,2.6, x,9.5, -14, 'S');        // 窗（二层）
+    windowPane(2.6,2.6, x,12.5,-14, 'S');        // 窗（三层）
   }
   /* 正门已交给 carveMainDoor() 建造真实可开的门，
      这里不能再放一块 6x3.6 的装饰门板 —— 它正好把门洞堵死，
@@ -2254,17 +2397,30 @@ function buildSchool(){
      既不碰主楼也不碰行政楼。 */
   box(16,14,32,0xd9c6a3,-34,7,2);
   box(16,.7,32,0x6b5a45,-34,14.35,2);
-  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,-26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,-26.15,10,z,true); }
+  /* 东楼墙面在 x=-26（本体 -34、宽 16），窗户朝东（+x 方向，即 'E'） */
+  for(let i=0;i<6;i++){ const z=-10+i*4.5;
+    windowPane(2.6,2.4, -26,5, z, 'E');
+    windowPane(2.6,2.4, -26,10,z, 'E');
+  }
 
   /* ---- 西教学楼（x=34） ---- */
   box(16,14,32,0xd9c6a3,34,7,2);
   box(16,.7,32,0x6b5a45,34,14.35,2);
-  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,26.15,10,z,true); }
+  for(let i=0;i<6;i++){ const z=-10+i*4.5;
+    windowPane(2.6,2.4, 26,5, z, 'W');
+    windowPane(2.6,2.4, 26,10,z, 'W');
+  }
 
   /* ---- 后侧行政楼（z=26） ---- */
   box(34,11,15,0xcfbc9a,0,5.5,26);
   box(34,.7,15,0x6b5a45,0,11.35,26);
-  for(let i=0;i<7;i++){ const x=-13+i*4.3; box(2.4,2.4,.3,0x88ccee,x,4.5,18.6,true); box(2.4,2.4,.3,0x88ccee,x,8,18.6,true); }
+  /* 行政楼本体 z=26、深 15，南墙面在 z=18.5（26-7.5）。
+     原来窗户放 z=18.6 —— 在墙面内侧 0.1 米，整块埋在墙里，从外面根本看不见。
+     现在朝南贴在墙面外侧。 */
+  for(let i=0;i<7;i++){ const x=-13+i*4.3;
+    windowPane(2.4,2.4, x,4.5, 18.5, 'S');
+    windowPane(2.4,2.4, x,8,   18.5, 'S');
+  }
   /* 行政楼门同理，交给 carveAdminDoor()，
      这里不再放 5x3.2 的装饰门板堵住门洞。 */
 
@@ -2371,6 +2527,9 @@ function setupWorld(){
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
+  /* 【局内容器】每次开局重新生成一遍，战利品随机 */
+  if(typeof buildContainers==='function') buildContainers();
+  if(typeof bindContainerUI==='function') bindContainerUI();
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）
   initWeapon();       // 第一人称武器模型
   // 操作提示 8 秒后淡出
@@ -2409,6 +2568,16 @@ const P={
      完全不像搜打撤。现在彻底拆开。 */
   stash:{ med:2, ammo_pistol:2, bandage:3, melee_knife:1, pis_default:1 },  // 局外仓库（新手初始物资）
   pouch:{},                // 局内背包 { itemId: 数量 }
+  chestPouch:{},           // 胸挂格子 { itemId: 数量 }（独立容量，只收小件）
+  /* 【物品来源追踪】卖出系统要区分「搜来的」和「自己买的」：
+     搜来的可以卖高于原价（黑市价），自己买的按原价 6 折回收。
+     这里只记「搜来的数量」，仓库里总数减掉它就是自己买的。
+     结构：{ itemId: 搜来的数量 } */
+  looted:{},
+  /* 【局内来源记录】本次出击从仓库带走的物品里，有多少件是搜来的。
+     撤离成功时按这个数把它们「还原成搜来的」（否则带进带出几次就
+     莫名从 1.35 倍跌成 0.6 倍）；阵亡时直接清空（东西都没了）。 */
+  pouchLoot:{},
   bagCap:24,               // 局内背包容量（由背包装备决定）
   /* 出击装备：六个槽位，对应仓库左侧的竖排装备栏
        primary   主武器（步枪/冲锋枪/狙击）
@@ -3090,20 +3259,39 @@ function respawnEnemy(e){
 }
 
 /* ---- 物资拾取 ---- */
+/* 【改了行为】以前踩到地上物资就直接改 P.ammo / P.inv —— 等于凭空变出子弹，
+   和「搜打撤」里「东西必须是背包里实实在在的一件」完全不符。
+   现在统一塞进背包（并打上「搜来的」标记），撤离后才能作为战利品卖钱。
+   背包装不下就提示，不白拿。 */
+const LOOT_PICK={
+  ammo:['ammo_rifle',1],
+  med: ['med',1],
+  gun: ['ammo_rifle',2],   // 地上的"枪"改为给一把枪的弹药补给，避免凭空多出枪
+};
 function updLoot(dt){
   for(const l of loots){
     if(l.taken) continue;
     const d=Math.hypot(P.pos.x-l.x,P.pos.z-l.z);
     if(d<1.5){
-      l.taken=true; l.mesh.visible=false;
-      switch(l.type){
-        case 'ammo': P.ammo.ammo+=30; break;
-        case 'med':  P.inv.med++; break;
-        case 'cash': P.ammo.cash+=200; break;
-        case 'gun':  P.inv.gun=true; P.ammo.gun=120; break;
+      if(l.type==='cash'){
+        l.taken=true; l.mesh.visible=false;
+        P.ammo.cash=(P.ammo.cash|0)+200;
+        sfxPickup(); toast('💵 +¥200'); refreshHUD();
+        continue;
       }
-      sfxPickup();
-      refreshHUD();
+      const pair=LOOT_PICK[l.type];
+      if(!pair){ l.taken=true; l.mesh.visible=false; continue; }
+      const id=pair[0], cnt=pair[1];
+      if(typeof bagAdd==='function' && bagAdd(id,cnt)){
+        l.taken=true; l.mesh.visible=false;
+        if(!P.looted[id]) P.looted[id]=0;
+        P.looted[id]+=cnt;
+        const it=SHOP_ITEMS[id];
+        sfxPickup(); toast('拾取 '+(it?it.name:id)+' ×'+cnt);
+        refreshHUD();
+      } else {
+        toast('背包满了 · 先清点东西');
+      }
     }
   }
 }
@@ -3241,6 +3429,13 @@ function autoSaveSnapshot(){
     ammo: { rifle:P.ammo.rifle|0, pistol:P.ammo.pistol|0,
             sniper:P.ammo.sniper|0, shot:P.ammo.shot|0 },
     stash: P.stash || {},
+    /* 胸挂格子也要存：它装的是医疗/弹药，局内撤离线时是真实收益。
+       不存的话退到主菜单再进，胸挂里塞的急救包会凭空消失。 */
+    chestPouch: P.chestPouch || {},
+    /* 【搜来的物品数量】卖出系统靠它判断「这件是搜的还是买的」。
+       不存的话，退出重进之后搜来的东西会被当成自购品只能按 6 折卖，
+       玩家辛苦搜一身装备反而亏钱。 */
+    looted: P.looted || {},
     equip: P.equip || {},
     skins: P.skins || {},
     bagCap: P.bagCap|0,
@@ -3352,6 +3547,37 @@ function autoSaveApply(o){
       P.skins = clean;
     }
     if(typeof o.bagCap==='number' && o.bagCap>0) P.bagCap = o.bagCap|0;
+    /* 【胸挂格子】按当前胸挂容量做截断：
+       如果存档里塞了 8 格、但玩家现在只戴 3 格胸挂（比如换了装备），
+       多出来的部分不能凭空保留，否则容量限制形同虚设。
+       多出的物品不销毁，挪回仓库 —— 玩家不会因为换胸挂而丢东西。 */
+    if(o.chestPouch && typeof o.chestPouch==='object'){
+      const clean={};
+      for(const id in o.chestPouch){
+        if(!Object.prototype.hasOwnProperty.call(o.chestPouch, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const n=Number(o.chestPouch[id]);
+        if(!isFinite(n) || n<=0) continue;
+        clean[id]=n|0;
+      }
+      P.chestPouch=clean;
+    }else{
+      P.chestPouch=P.chestPouch||{};
+    }
+    /* 【搜来的物品数量】读档校验：只保留合法物品 id 的正整数。 */
+    if(o.looted && typeof o.looted==='object'){
+      const cl={};
+      for(const id in o.looted){
+        if(!Object.prototype.hasOwnProperty.call(o.looted, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const n=Number(o.looted[id]);
+        if(!isFinite(n) || n<=0) continue;
+        cl[id]=n|0;
+      }
+      P.looted=cl;
+    }else{
+      P.looted=P.looted||{};
+    }
     if(typeof o.helmetDur==='number') P.helmetDur = Math.max(0, o.helmetDur|0);
     if(typeof o.vestDur==='number')   P.vestDur   = Math.max(0, o.vestDur|0);
     /* 【武器耐久】按武器 id 逐个校验并夹到 [0, 上限]。
@@ -3490,8 +3716,62 @@ function refreshHUD(){
       av.innerHTML='🛡️ <b>'+Math.max(0,Math.round(d))+'</b>';
     } else { av.style.display='none'; }
   }
+  /* 【治疗按钮】同步数量与可用状态。
+     数量 = 胸挂 + 背包里的所有治疗品总数，这样玩家一眼知道自己还剩几口药。
+     没药或者满血时按钮变暗（.none），点它也不会有反馈骗人。 */
+  const mb=$('medBtn');
+  if(mb){
+    const n=medTotalCount();
+    const nb=$('medBtnN'); if(nb) nb.textContent=n;
+    mb.classList.toggle('none', n<=0 || P.hp>=100);
+  }
 }
-
+/* 统计身上（胸挂 + 背包）所有治疗品的总数 */
+function medTotalCount(){
+  let n=0;
+  const add=(box)=>{
+    for(const id in box){
+      const it=SHOP_ITEMS[id];
+      if(it && it.heal && box[id]>0) n+=box[id];
+    }
+  };
+  add(P.chestPouch); add(P.pouch);
+  return n;
+}
+/* 【一键治疗】不打开背包也能立刻吃药。
+   挑药策略按优先级：
+     1. 先胸挂后背包 —— 胸挂本来就是「急用格」，掏出来最快；
+     2. 同级里优先选「刚好能补满」的最小药，避免满血差 5 点却吃掉一个
+        900 块的急救包；
+     3. 找不到刚好够的，就选当前能用的、heal 最大的那个（救命优先）。
+   这样玩家连点治疗时，不会因为一个绷带把急救包浪费掉。 */
+function medQuickUse(){
+  if(P.hp>=100){ sfxDeny(); toast('生命已满'); return false; }
+  const need=100-P.hp;
+  const cands=[];
+  const scan=(box,src)=>{
+    for(const id in box){
+      const it=SHOP_ITEMS[id];
+      if(!it || !it.heal || !(box[id]>0)) continue;
+      cands.push({id, src, heal:it.heal, price:it.price||0, name:it.name});
+    }
+  };
+  scan(P.chestPouch,'chest');   // 胸挂先入列
+  scan(P.pouch,'bag');
+  if(!cands.length){ sfxDeny(); toast('没有可用的药'); return false; }
+  // 刚好够补满的里挑最便宜的；否则挑 heal 最大的
+  const enough=cands.filter(c=>c.heal>=need);
+  let pick;
+  if(enough.length){
+    enough.sort((a,b)=> (a.heal-b.heal) || (a.price-b.price));
+    pick=enough[0];
+  } else {
+    cands.sort((a,b)=> b.heal-a.heal);
+    pick=cands[0];
+  }
+  useItem(pick.id, pick.src);
+  return true;
+}
 function toast(t){
   const el=$('toast'); if(!el) return;
   el.textContent=t; el.style.opacity='1';
@@ -3619,6 +3899,10 @@ if(window.__uiBound) return; window.__uiBound=true;
   /* 【局内背包入口】HUD 右上角的「🎒 背包」可直接点开 */
   const bagBtn=$('bagBtn');
   if(bagBtn) bagBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); toggleBag(); };
+  /* 【HUD 治疗按钮】一键吃药，不用开背包。
+     连点不会出错：medQuickUse 内部会重新判满血/无药。 */
+  const medBtn=$('medBtn');
+  if(medBtn) medBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); medQuickUse(); };
   // 音效开关
   const sndBtn=$('sndBtn');
   if(sndBtn) sndBtn.onclick=(ev)=>{
@@ -4135,9 +4419,13 @@ const SHOP_ITEMS={
   skin_void:{cat:'skin', get name(){ return T('虚空紫'); },     icon:'🟪', price:5000, get desc(){ return T('暗紫辐射 · 最强发光'); }, skin:'skin_void'},
   skin_gold:{cat:'skin', get name(){ return T('黄金'); },       icon:'🟨', price:9000, get desc(){ return T('土豪金 · 无光但最闪'); }, skin:'skin_gold'},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
-  chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('额外 2 个弹匣位'); }, mags:2},
-  chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('额外 4 个弹匣位'); }, mags:4},
-  chest_large:{cat:'chest',  get name(){ return T('重型胸挂'); }, icon:'🦺', price:4500, get desc(){ return T('额外 6 个弹匣位'); }, mags:6},
+  /* ---- 胸挂（提供独立的快速取用格子，不占背包容量）----
+     slot = 胸挂能装几格小件。
+     原来是 mags:2/4/6（只能说明「额外弹匣位」，界面上看不见也用不上），
+     现在换成真实的格子数，并且只收医疗/弹药/手雷/配件这类小件。 */
+  chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('3 格快速取用（医疗/弹药/手雷）'); }, slot:3},
+  chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('5 格快速取用（医疗/弹药/手雷）'); }, slot:5},
+  chest_large:{cat:'chest',  get name(){ return T('重型胸挂'); }, icon:'🦺', price:4500, get desc(){ return T('8 格快速取用（医疗/弹药/手雷）'); }, slot:8},
 };
 
 /* 分类标签（顺序即显示顺序） */
@@ -4303,16 +4591,49 @@ let shopTab='gun';   // 当前商店标签页（默认停在主武器，对应�
 let bagTab='all';    // 当前背包筛选
 
 /* 背包占用格数：数量 1 个占 1 格，子弹按堆叠算 1 格 */
-/* 局内背包占用格数（只有 pouch 算容量，stash 无限） */
+/* ---- 局内背包占用格数（只有 pouch 算容量，stash 无限） ---- */
 function pouchUsed(){
   let n=0;
   for(const k in P.pouch){ if(P.pouch[k]>0) n++; }
   return n;
 }
 function pouchFree(){ return P.bagCap - pouchUsed(); }
-/* 兼容旧名字 */
 function bagUsed(){ return pouchUsed(); }
 function bagFree(){ return pouchFree(); }
+
+/* ============ 胸挂格子 ============
+   以前胸挂只有一个 `mags:4` 的数字，代表「额外 4 个弹匣位」，
+   但玩家在界面上完全看不到这 4 个位置，也不知道里面装了什么 ——
+   等于买了个数字。
+   现在胸挂是真正的独立格子区（P.chestPouch），和背包分开：
+     · 容量由胸挂的 slot 字段决定（简易 3 格 / 战术 5 格 / 重型 8 格）
+     · 只允许放「小件」：医疗、弹药、手雷、配件
+       —— 大件（枪、背包、护甲）塞不进胸挂，这符合现实
+     · 局内胸挂格子在背包界面单独一排显示，点一下立即使用
+     · 【不占背包容量】玩家不用为了带个急救包而牺牲一格背包
+   胸挂脱下时，里面的东西自动倒回背包（背包满了就掉在地上，见 chestUnequip） */
+function chestCapOf(){
+  const id=P.equip && P.equip.chest;
+  const it=id && SHOP_ITEMS[id];
+  return (it && it.slot) ? (it.slot|0) : 0;
+}
+function chestUsed(){
+  let n=0;
+  for(const k in P.chestPouch){ if(P.chestPouch[k]>0) n++; }
+  return n;
+}
+function chestFree(){ return chestCapOf() - chestUsed(); }
+/* 这个物品能不能放进胸挂：只收小件 */
+function chestAccept(id){
+  const it=SHOP_ITEMS[id]; if(!it) return false;
+  if(it.cat==='med') return true;                  // 医疗
+  if(it.cat==='ammo') return true;                 // 弹药
+  if(id==='grenade'||id==='flashbang'||id==='smoke') return true;
+  if(it.cat==='mod') return true;                  // 配件（小件）
+  return false;                                    // 枪/背包/胸挂/护甲 都不收
+}
+/* 兼容旧名字 */
+function bagUsed(){ return pouchUsed(); }
 
 /* 往局内背包塞东西（局内拾取用），容量不足返回 false */
 function bagAdd(id, cnt){
@@ -4336,6 +4657,29 @@ function bagTake(id, cnt){
 function stashAdd(id, cnt){
   if(!cnt) cnt=1;
   P.stash[id]=(P.stash[id]||0)+cnt;
+  return true;
+}
+/* 【从仓库扣一件，并同步「搜来的」账本】
+   凡是要从仓库拿走物品的地方都该走这个函数，而不是直接 P.stash[id]--。
+   直接扣会让 P.looted 留下幽灵额度 —— 搜来的东西早就用掉了，
+   但账本还以为仓库里这件是搜来的，于是自购品被按 1.35 倍卖出去，
+   等于凭空印钱。这属于「藏得很深、玩很久才会被发现」的漏洞。 */
+function stashConsume(id, n){
+  const cnt = n||1;
+  if(!(P.stash[id]>0)) return false;
+  const move = Math.min(cnt, P.stash[id]);
+  P.stash[id]-=move;
+  if(P.stash[id]<=0) delete P.stash[id];
+  if(P.looted && P.looted[id]>0){
+    const took=Math.min(move, P.looted[id]|0);
+    P.looted[id]=(P.looted[id]|0)-move;
+    if(P.looted[id]<=0) delete P.looted[id];
+    /* 记下「有多少件搜来物被带出仓库」，撤离成功时按这个数还回去 */
+    if(took>0){
+      if(!P.pouchLoot || typeof P.pouchLoot!=='object') P.pouchLoot={};
+      P.pouchLoot[id]=(P.pouchLoot[id]|0)+took;
+    }
+  }
   return true;
 }
 
@@ -4398,8 +4742,8 @@ function gunMount(gunId, slot, modId){
   if(md.slot!==slot) return;
   const cur=gunModId(gunId, slot);
   if(cur===modId){ toast(T('已经装着了')); return; }
-  /* 配件要有货：仓库里有才装得上（mod_iron 是原厂自带，免费）。
-     装新配件时把旧的退回仓库，不吞玩家东西。 */
+    /* 配件要有货：仓库里有才装得上（mod_iron 是原厂自带，免费）。
+       装新配件时把旧的退回仓库，不吞玩家东西。 */
   if(modId!=='mod_iron' && !(P.stash[modId]>0)){
     if((P.ammo.cash|0) >= (md.price||0)){
       P.ammo.cash-=md.price;
@@ -4408,8 +4752,7 @@ function gunMount(gunId, slot, modId){
       sfxDeny(); toast(T('货币不足')); return;
     }
   }else if(modId!=='mod_iron'){
-    P.stash[modId]--;
-    if(P.stash[modId]<=0) delete P.stash[modId];
+    stashConsume(modId);   // 走统一扣减，顺带清掉搜来账本
   }
   if(cur && cur!=='mod_iron') stashAdd(cur,1);
   const m=gunModsOf(gunId);
@@ -4737,7 +5080,14 @@ function buyItem(id){
 function toggleStash(){
   const el=$('stash'); if(!el) return;
   const opening = el.style.display!=='flex';
-  if(opening){ buildStashNew(); el.style.display='flex'; }
+  if(opening){
+    /* 每次打开仓库顺手修一次 looted 账本（见 clampLooted 注释），
+       并重置卖出模式 —— 否则上次点开卖出没确认就退出，
+       下次进来还是选择模式，点格子不装备，玩家会以为仓库坏了。 */
+    if(typeof clampLooted==='function') clampLooted();
+    sellMode=false; sellSel={};
+    buildStashNew(); el.style.display='flex';
+  }
   else el.style.display='none';
 }
 function closeStash(){ const el=$('stash'); if(el) el.style.display='none'; }
@@ -4749,8 +5099,9 @@ function stashTake(id, n){
   const move = Math.min(cnt, P.stash[id]);
   /* 出击包按格算：新物品要占一格 */
   if(!(P.pouch[id]>0) && pouchUsed()>=P.bagCap){ toast('出击背包已满（'+P.bagCap+' 格）'); sfxDeny(); return false; }
-  P.stash[id]-=move;
-  if(P.stash[id]<=0) delete P.stash[id];
+  /* 统一走 stashConsume：它会把「搜来的」账本一起扣掉，
+     避免背包里的搜来物撤离回来后被当成自购品。 */
+  if(!stashConsume(id, move)) return false;
   P.pouch[id]=(P.pouch[id]||0)+move;
   sfxPickup(); return true;
 }
@@ -4778,6 +5129,80 @@ function stashPut(id, n){
 
 /* 当前选中的物品（点一下格子选中，再点装备槽放入） */
 let selStash=null;
+/* 【卖出模式】点「卖出」进入选择模式：此时点仓库格子是「勾选/取消」，
+   不再是「装备/放背包」。选完点「确认卖出」一次结算。
+   为什么不直接点一下就卖：仓库里点错一格就把几千块的枪卖了，
+   玩家会当场原地爆炸。所以必须两步确认。 */
+let sellMode=false;
+let sellSel={};      // { itemId: 选中数量（按此 id 全部卖） }
+/* 单个物品的卖出单价：
+     · 搜来的（P.looted 里还有额度）→ 原价 × 1.35（黑市溢价）
+     · 自己买的 → 原价 × 0.6（六折回收，即原价 -40%）
+   混着有时按「先卖搜来的」顺序算，这样对玩家最有利。 */
+const SELL_LOOT_MUL=1.35;
+const SELL_BOUGHT_MUL=0.6;
+/* 【防止刷钱】looted 只是「这个东西里有几件是搜来的」的账本。
+   它有两个必须守住的不变量：
+     ① looted[id] ≤ stash[id]        —— 搜来 3 件但仓库只剩 1 件，账本最多算 1
+     ② 任何让物品离开仓库的动作都要同步扣账本
+        （stashTake / 装备 / 卖出 / 用掉）
+   只做 ① 是不够的。反例：
+     搜到 5 个医疗包(looted=5) → 全用掉 → 仓库空(looted 被夹成 0，OK)
+     但如果是：搜到 1 个(looted=1) → 拿去装备/放背包 → 仓库 0、
+     looted 被夹成 0 —— 这时是安全的。
+     真正的坑在于「夹」这个动作本身是无损的：
+     仓库里只剩 1 件自购品，而 looted 还记着 5，
+     夹成 1 之后那 1 件自购品就被永久当成搜来的，按 1.35 倍卖 —— 白赚 35%。
+   所以这里改成：一旦发现 looted > stash，说明搜来的那些已经不在仓库里了，
+   直接清零，而不是夹到 stash 的数。宁可少给玩家一点溢价，
+   也不能留下一个「玩两百小时后被发现」的经济漏洞。 */
+function clampLooted(){
+  if(typeof P.looted!=='object' || !P.looted) P.looted={};
+  for(const id in P.looted){
+    const have=P.stash[id]|0;
+    const n=P.looted[id]|0;
+    if(have<=0 || n<=0){ delete P.looted[id]; continue; }
+    if(n>have) delete P.looted[id];
+  }
+}
+function sellPriceOf(id){
+  const it=SHOP_ITEMS[id];
+  if(!it) return 0;
+  const base=Math.max(1, it.price|0);
+  /* 按「这一格整批卖」算平均价：先抵扣搜来的数量，剩下的算自购 */
+  const have=P.stash[id]|0;
+  const loot=Math.min(have, (P.looted[id]|0));
+  const bought=Math.max(0, have-loot);
+  if(have<=0) return 0;
+  return Math.floor((loot*base*SELL_LOOT_MUL + bought*base*SELL_BOUGHT_MUL)/have);
+}
+/* 一次性结算：把 sellSel 里选中的物品全部卖掉 */
+function doSellSelected(){
+  clampLooted();   // 卖之前夹一次账本，防止用掉的搜来物品被重复溢价
+  let total=0, cnt=0;
+  for(const id in sellSel){
+    const n=Math.min(sellSel[id]|0, P.stash[id]|0);
+    if(n<=0) continue;
+    const it=SHOP_ITEMS[id]; if(!it) continue;
+    const base=Math.max(1, it.price|0);
+    /* 先消耗「搜来的」额度再消耗自购额度 */
+    let loot=Math.min(n, P.looted[id]|0);
+    let bought=n-loot;
+    total += Math.floor(loot*base*SELL_LOOT_MUL + bought*base*SELL_BOUGHT_MUL);
+    /* 扣减来源计数 */
+    if(loot>0){ P.looted[id]=(P.looted[id]|0)-loot; if(P.looted[id]<=0) delete P.looted[id]; }
+    P.stash[id]=(P.stash[id]|0)-n;
+    if(P.stash[id]<=0) delete P.stash[id];
+    cnt+=n;
+  }
+  if(!cnt){ toast('没有选中物品'); sfxDeny(); return; }
+  P.ammo.cash=(P.ammo.cash|0)+total;
+  sellSel={}; sellMode=false;
+  sfxBuy();
+  toast('卖出 '+cnt+' 件 · +¥'+total);
+  saveTick();
+  buildStashNew(); refreshHUD();
+}
 
 function stashSlotOf(id){
   const it=SHOP_ITEMS[id]; if(!it) return null;
@@ -4833,7 +5258,18 @@ function buildStashNew(){
 
   /* ---------- 右侧：现金 + 仓库格子 ---------- */
   h+='<div class="stkright">';
-  h+='<div class="stkcash">💵 <b>'+P.ammo.cash+'</b> 元</div>';
+  h+='<div class="stkbar">'
+    +'<div class="stkcash">💵 <b>'+P.ammo.cash+'</b> 元</div>'
+    +(sellMode
+      ? '<button class="stksell on" id="stkSellBtn">确认卖出'+(Object.keys(sellSel).length?' ('+Object.keys(sellSel).length+')':'')+'</button>'
+        +'<button class="stksell cancel" id="stkSellCancel">取消</button>'
+      : '<button class="stksell" id="stkSellBtn">卖出</button>')
+    +'</div>';
+  if(sellMode){
+    h+='<div class="stksellhint">'
+      +'点物品选中 · 黄色边框是搜来的（¥溢价）· 点击确认卖出'
+      +'</div>';
+  }
 
   /* 仓库格子：把数量展开成一格一格的小方块。
      塔科夫那种 2×3 大物品我们先不做（手机屏幕太小），
@@ -4854,10 +5290,16 @@ function buildStashNew(){
   /* 渲染有物品的格子 */
   for(const id of owned){
     const it=SHOP_ITEMS[id];
-    const sel=(selStash===id)?' sel':'';
+    const sel=(sellMode && sellSel[id])?' selsell'
+             :(!sellMode && selStash===id)?' sel':'';
+    /* 卖出模式下每格右上角标出「能卖多少钱」，玩家不用猜 */
+    const priceTag = sellMode
+      ? '<span class="stkgp">¥'+sellPriceOf(id)+'</span>'
+      : '';
     h+='<div class="stkg'+sel+'" data-item="'+id+'">'
       +'<span class="stkgi">'+it.icon+'</span>'
       +'<b class="stkgq">'+P.stash[id]+'</b>'
+      +priceTag
       +'</div>';
   }
   /* 补空格子，凑成整齐的一片 */
@@ -4873,7 +5315,30 @@ function buildStashNew(){
 
   /* ---- 绑定事件 ---- */
   const bk=$('stkBack');
-  if(bk) bk.onclick=()=>{ selStash=null; toggleStash(); };
+  if(bk) bk.onclick=()=>{ selStash=null; sellMode=false; sellSel={}; toggleStash(); };
+
+  /* 【卖出按钮】点一下进入/退出选择模式 */
+  const sb=$('stkSellBtn');
+  if(sb) sb.onclick=()=>{
+    if(!sellMode){
+      sellMode=true; sellSel={}; sfxUI();
+      buildStashNew();
+    } else {
+      /* 已经在选择模式：这个按钮此时变成「确认卖出」 */
+      const n=Object.keys(sellSel).length;
+      if(!n){ toast('先点物品选中'); sfxDeny(); return; }
+      let total=0;
+      for(const id in sellSel){
+        const c=sellSel[id]|0;
+        const base=Math.max(1, SHOP_ITEMS[id].price|0);
+        const loot=Math.min(c, P.looted[id]|0), bought=c-loot;
+        total+=Math.floor(loot*base*SELL_LOOT_MUL + bought*base*SELL_BOUGHT_MUL);
+      }
+      if(confirm('确认卖出 '+n+' 种物品？共可得 ¥'+total)) doSellSelected();
+    }
+  };
+  const sc=$('stkSellCancel');
+  if(sc) sc.onclick=()=>{ sellMode=false; sellSel={}; sfxUI(); buildStashNew(); };
 
   /* 点装备槽：如果是背包就展开出击背包，否则卸下 */
   el.querySelectorAll('[data-slot]').forEach(node=>{
@@ -4905,6 +5370,14 @@ function buildStashNew(){
     node.onclick=()=>{
       const id=node.dataset.item;
       const it=SHOP_ITEMS[id]; if(!it) return;
+      /* 【卖出模式】此时点格子只是勾选，不做装备/放包 */
+      if(sellMode){
+        if(sellSel[id]) delete sellSel[id];
+        else sellSel[id]=P.stash[id]|0;
+        sfxUI();
+        buildStashNew();
+        return;
+      }
 
       /* 装备类直接穿上（替换下来的回仓库） */
       const slot=stashSlotOf(id);
@@ -4912,8 +5385,7 @@ function buildStashNew(){
         const old=P.equip[slot];
         if(old && old!==id) stashAdd(old,1);
         P.equip[slot]=id;
-        P.stash[id]--;
-        if(P.stash[id]<=0) delete P.stash[id];
+        stashConsume(id);   // 同步搜来账本（见 stashConsume 注释）
         /* 背包要重算容量 */
         if(slot==='backpack'){ P.bagCap=it.cap||24; }
         toast('已装备 '+(it.name||''));
@@ -4940,6 +5412,117 @@ function buildStashNew(){
       if(bagTake(id,1)) stashAdd(id,1);
       buildStashNew(); refreshHUD();
     };
+  });
+  /* 【拖拽配件到武器】在仓库里把配件格子拖到「主武器/手枪」槽上即安装。
+     为什么要拖而不是点：点格子已经有含义（装备 / 放背包），
+     加二级菜单在手机上很难用，所以走直觉的「拖上去」。
+     实现用 pointer 事件 + 8px 阈值区分「点击」和「拖动」，
+     否则手指稍微抖一下就会既装备又拖拽，两次操作打架。 */
+  bindStashDrag(el);
+}
+/* 找到当前能接收某配件的武器槽（返回槽 key，如 'primary'） */
+function modTargetSlot(modId){
+  const md=GUN_MODS[modId];
+  if(!md) return null;
+  for(const s of ['primary','secondary']){
+    const gid=P.equip[s];
+    if(!gid) continue;
+    const list=GUN_SLOTS[gid];
+    if(list && list.indexOf(md.slot)>=0) return s;
+  }
+  return null;
+}
+/* 把配件拖到武器上 = 安装到那把枪的对应槽位 */
+function dragModOnto(modId, slotKey){
+  const gid=P.equip[slotKey];
+  if(!gid){ sfxDeny(); toast('这个槽没装枪'); return false; }
+  const md=GUN_MODS[modId];
+  if(!md){ return false; }
+  const list=GUN_SLOTS[gid]||[];
+  if(list.indexOf(md.slot)<0){
+    sfxDeny(); toast(SHOP_ITEMS[gid]?SHOP_ITEMS[gid].name:gid+' 没有 '+md.slot+' 位置');
+    return false;
+  }
+  gunMount(gid, md.slot, modId);
+  buildStashNew();
+  return true;
+}
+function bindStashDrag(root){
+  const ghostPool={g:null};
+  const cells=root.querySelectorAll('[data-item]');
+  cells.forEach(cell=>{
+    const id=cell.dataset.item;
+    const it=SHOP_ITEMS[id];
+    if(!it || it.cat!=='mod') return;      // 只有配件可拖
+    cell.classList.add('armed');           // 视觉提示：这个能拖
+    let sx=0, sy=0, dragging=false, moved=false, ghost=null;
+    let hotSlot=null;
+    const clearHot=()=>{
+      if(hotSlot) hotSlot.classList.remove('hot');
+      hotSlot=null;
+    };
+    const dropTargetAt=(x,y)=>{
+      const e=document.elementFromPoint(x,y);
+      if(!e) return null;
+      const n=e.closest ? e.closest('[data-slot]') : null;
+      if(!n) return null;
+      const k=n.dataset.slot;
+      if(k!=='primary' && k!=='secondary') return null;
+      const gid=P.equip[k];
+      if(!gid) return null;
+      const list=GUN_SLOTS[gid]||[];
+      if(list.indexOf(GUN_MODS[id]?GUN_MODS[id].slot:'')<0) return null;
+      return n;
+    };
+    const onDown=(ev)=>{
+      if(ev.button!==undefined && ev.button!==0 && ev.pointerType==='mouse') return;
+      sx=ev.clientX; sy=ev.clientY; moved=false; dragging=true;
+    };
+    const onMove=(ev)=>{
+      if(!dragging) return;
+      const dx=ev.clientX-sx, dy=ev.clientY-sy;
+      if(!moved && Math.abs(dx)+Math.abs(dy) < 8) return;   // 阈值内当点击
+      moved=true;
+      if(!ghost){
+        ghost=document.createElement('div');
+        ghost.className='dragghost';
+        ghost.textContent=it.icon||'🔧';
+        document.body.appendChild(ghost);
+        ghostPool.g=ghost;
+      }
+      ghost.style.left=ev.clientX+'px';
+      ghost.style.top=ev.clientY+'px';
+      const t=dropTargetAt(ev.clientX, ev.clientY);
+      if(t!==hotSlot){ clearHot(); if(t){ t.classList.add('hot'); hotSlot=t; } }
+      if(ev.cancelable) ev.preventDefault();
+    };
+    const onUp=(ev)=>{
+      if(!dragging) return;
+      const wasMoved=moved;
+      dragging=false; moved=false;
+      if(ghost){ ghost.remove(); ghost=null; ghostPool.g=null; }
+      const t=hotSlot; clearHot();
+      if(!wasMoved) return;                 // 没拖动 → 交给 click 处理
+      if(t){
+        dragModOnto(id, t.dataset.slot);
+      } else {
+        const tk=modTargetSlot(id);
+        if(tk){ dragModOnto(id, tk); }
+        else { sfxDeny(); toast('拖到主武器或手枪上才能装'); }
+      }
+    };
+    cell.addEventListener('pointerdown', onDown);
+    cell.addEventListener('pointermove', onMove);
+    cell.addEventListener('pointerup', onUp);
+    cell.addEventListener('pointercancel', onUp);
+    /* 拖动结束后浏览器仍会补发一次 click —— 用捕获阶段拦掉，
+       否则会「装上配件」又立刻「把配件塞进背包」，玩家会一脸懵。 */
+    cell.addEventListener('click', (ev)=>{
+      if(cell.dataset.justDragged==='1'){ ev.stopPropagation(); ev.preventDefault();
+        cell.dataset.justDragged=''; }
+    }, true);
+    const mark=(ev)=>{ if(moved) cell.dataset.justDragged='1'; };
+    cell.addEventListener('pointerup', mark);
   });
 }
 
@@ -5030,7 +5613,31 @@ function buildBagNew(){
   /* 局内没有钱的概念（现金是撤离后结算的），这里显示剩余空间 */
   const free=Math.max(0, P.bagCap-pouchUsed());
   h+='<div class="stkcash">'+free+' 格空位</div>';
-
+  /* ---------- 胸挂格子（独立一排，点一下立即使用） ----------
+     放在背包格子【上面】且视觉上分开，强调「快速取用」：
+     打仗时急的是掏急救包，不是翻背包。 */
+  const ccap=chestCapOf();
+  if(ccap>0){
+    const cfill=Math.min(ccap, chestUsed());
+    h+='<div class="chestrow"><div class="chesthd">🦺 胸挂快速取用 '+cfill+'/'+ccap+'</div><div class="chestgrid">';
+    const owned2=[];
+    for(const id in P.chestPouch){
+      if(!(P.chestPouch[id]>0)) continue;
+      if(!SHOP_ITEMS[id]) continue;
+      owned2.push(id);
+    }
+    for(const id of owned2){
+      const it=SHOP_ITEMS[id];
+      h+='<div class="stkg chest" data-use="'+id+'" data-src="chest">'
+        +'<span class="stkgi">'+it.icon+'</span>'
+        +'<b class="stkgq">'+P.chestPouch[id]+'</b>'
+        +'</div>';
+    }
+    for(let i=owned2.length;i<ccap;i++) h+='<div class="stkg chest empty"></div>';
+    h+='</div></div>';
+  }else{
+    h+='<div class="chestrow"><div class="chesthd dim">🦺 没有佩戴胸挂（不能快速取用医疗/弹药）</div></div>';
+  }
   h+='<div class="stkgrid" id="bagGrid">';
   const owned=[];
   for(const id in P.pouch){
@@ -5081,7 +5688,8 @@ function buildBagNew(){
       const id=g.dataset.use;
       if(!id) return;
       ev.stopPropagation();
-      useItem(id);
+      /* data-src='chest' 表示这一格在胸挂区，从胸挂扣数量 */
+      useItem(id, g.dataset.src);
     });
   }
 }
@@ -5097,19 +5705,27 @@ function cellOf(id, label, fb){
   return '<div class="cell eq"><div class="ci">'+(it?it.icon:fb)+'</div><div class="cn">'+(it?it.name:label)+extra+'</div><div class="cq">'+label+'</div></div>';
 }
 
-/* 使用背包（pouch）里的物品 */
-function useItem(id){
+/* 使用背包（pouch）或胸挂（chestPouch）里的物品。
+   src 省略时按「胸挂优先」查找 —— 胸挂就是用来快速取用的。 */
+function useItem(id, src){
   const it=SHOP_ITEMS[id]; if(!it) return;
-  if(!(P.pouch[id]>0)){ sfxDeny(); return; }
+  /* 决定从哪个容器扣：显式指定 > 胸挂里有就胸挂 > 背包 */
+  let from=null;
+  if(src==='chest' && P.chestPouch[id]>0) from='chest';
+  else if(src==='bag' && P.pouch[id]>0) from='bag';
+  else if(P.chestPouch[id]>0) from='chest';
+  else if(P.pouch[id]>0) from='bag';
+  if(!from){ sfxDeny(); return; }
+  const box = (from==='chest') ? P.chestPouch : P.pouch;
   if(it.heal){
     if(P.hp>=100){ sfxDeny(); toast('生命已满'); return; }
-    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    box[id]--; if(box[id]<=0) delete box[id];
     P.hp=Math.min(100,P.hp+it.heal);
     sfxPickup(); toast(it.name+' +'+it.heal+' HP');
     refreshHUD(); buildBagNew(); return;
   }
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
-    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    box[id]--; if(box[id]<=0) delete box[id];
     sfxPickup(); toast('已投掷 '+it.name); buildBagNew(); return;
   }
   /* 【弹药物品】点一下就把备弹补到对应枪里。
@@ -5119,7 +5735,7 @@ function useItem(id){
     const key={rifle:'rifle',pistol:'pistol',sniper:'sniper',shot:'shot'}[it.ammo]||it.ammo;
     const add=it.count||30;
     P.ammo[key]=(P.ammo[key]|0)+add;
-    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    box[id]--; if(box[id]<=0) delete box[id];
     sfxPickup(); toast('装填 '+it.name+' +'+add);
     refreshHUD(); buildBagNew(); return;
   }
@@ -5133,21 +5749,64 @@ function useItem(id){
 }
 
 /* ---- 撤离 / 阵亡 结算 ---- */
-/* 撤离成功：局内背包 + 身上装备全部并回仓库 */
+/* 撤离成功：局内背包 + 胸挂 + 身上装备全部并回仓库 */
 function settleExfil(){
   let gained=0;
+  /* 【带回物品的来源标记】物品带上局的时候 stashConsume 把它的
+     「搜来的」额度扣掉了。撤离成功后它回到仓库，如果这里不补回去，
+     玩家每次带出去又带回来，搜来的东西就会慢慢「变成」自购品，
+     最后只能按 6 折卖 —— 明明什么都没做，价格自己掉了，很反直觉。
+     所以：带回多少件，就把多少件的搜来额度还回去（以物品当初的来源为准）。 */
+  const backLoot={};
+  for(const id in P.pouch){
+    if(P.pouch[id]>0) backLoot[id]=(backLoot[id]||0)+P.pouch[id];
+  }
+  for(const id in P.chestPouch){
+    if(P.chestPouch[id]>0) backLoot[id]=(backLoot[id]||0)+P.chestPouch[id];
+  }
   for(const id in P.pouch){
     if(P.pouch[id]>0){ P.stash[id]=(P.stash[id]||0)+P.pouch[id]; gained+=P.pouch[id]; }
   }
+  /* 胸挂里的东西也带回来 —— 它是你自己带进去的，撤离成功自然该保住。
+     如果只结算 pouch 而不结算 chestPouch，玩家会发现
+     「放进胸挂的急救包撤离后不见了」，这显然不合逻辑。 */
+  for(const id in P.chestPouch){
+    if(P.chestPouch[id]>0){ P.stash[id]=(P.stash[id]||0)+P.chestPouch[id]; gained+=P.chestPouch[id]; }
+  }
   P.pouch={};
+  P.chestPouch={};
+  /* 把「带出去又带回来」的物品的搜来额度还回去。
+     注意只还「原来就是搜来的」那些：P.pouchLoot 在 stashTake 时记录了
+     这次带进局的物品里有多少是搜来的，没有该记录就什么都不还，
+     保证不会把自购品误标成搜来的。 */
+  if(P.pouchLoot && typeof P.pouchLoot==='object'){
+    for(const id in P.pouchLoot){
+      const n=P.pouchLoot[id]|0;
+      if(n<=0) continue;
+      const have=P.stash[id]|0;
+      const add=Math.min(n, have);
+      if(add>0){
+        P.looted[id]=(P.looted[id]|0)+add;
+        if(P.looted[id]>have) P.looted[id]=have;
+      }
+    }
+  }
+  P.pouchLoot={};
   /* 装备也一起"带回"，保留在 equip 里继续用 */
   saveTick();   // 撤离是钱/仓库大变动，必须立刻落盘
+  /* 撤离时如果搜索面板还开着，要关掉 —— 否则下一局开局就顶着
+     上一局的箱子面板，看着像 bug。 */
+  try{ if(typeof closeContainer==='function') closeContainer(); }catch(e){}
   toast('撤离成功！带回 '+gained+' 件物品');
 }
 /* 阵亡：局内背包和装备全部丢失（搜打撤的风险） */
 function settleDeath(){
-  const lost=Object.keys(P.pouch).length;
+  /* 胸挂里的也算「带进局的物资」，阵亡一样丢。 */
+  const lost=Object.keys(P.pouch).length + Object.keys(P.chestPouch).length;
   P.pouch={};
+  P.chestPouch={};
+  /* 阵亡：带出去的搜来记录也一并作废（东西已经丢了，不能再还额度）。 */
+  P.pouchLoot={};
   /* 【阵亡清空全部九个槽位】
      原来只写了 helmet/armorVest/backpack 三个，
      后来加了 primary/secondary/melee/chest 四个武器槽却忘了同步，
@@ -5157,6 +5816,7 @@ function settleDeath(){
   P.equip={ helmet:null, armorVest:null, backpack:null,
             primary:null, secondary:null, melee:null, chest:null };
   P.helmetDur=0; P.vestDur=0; P.bagCap=0;
+  try{ if(typeof closeContainer==='function') closeContainer(); }catch(e){}
   saveTick();   // 阵亡清空装备，同样要落盘（否则刷新后装备回来了，风险机制失效）
   return lost;
 }
@@ -5341,7 +6001,18 @@ function findNearDoor(){
 /* 每帧调用：更新高亮提示 + 门板开关动画 */
 function updDoors(dt){
   const nd=findNearDoor();
-  if(nd!==nearDoor){
+  const nc=findNearContainer();
+  /* 【容器提示优先】站在箱子边上时提示「搜索」，
+     而不是把「开门」写在上面让玩家以为只能开门。 */
+  if(nc && nd){
+    const el=$('doorHint');
+    if(el){
+      el.style.display='block';
+      if(el.dataset.t!=='搜'){ el.dataset.t='搜';
+        el.innerHTML='<b>E</b> 搜索 '+CONTAINER_NAME[nc.type].replace(/^\S+\s/,''); }
+    }
+  }
+  else if(nd!==nearDoor){
     if(nearDoor) nearDoor.panel.material.emissive && nearDoor.panel.material.emissive.setHex(0x000000);
     nearDoor=nd;
     const el=$('doorHint');
@@ -5587,9 +6258,185 @@ const NPC_POINTS=[
    门优先，其次才是拾取等其它交互。 */
 function interact(){
   if(!P.alive) return;
+  /* 【容器优先】搜打撤的核心动作是「搜」。站在箱子边上按 E，
+     当然是想开箱子，而不是想开旁边那扇门。 */
+  const c=findNearContainer();
+  if(c){ openContainer(c); return true; }
   const d=findNearDoor();
   if(d){ toggleDoor(d); return true; }
   return false;
+}
+/* ==================== 局内容器 / 搜索 ====================
+   设计要点：
+   1. 容器是「稀疏资源」—— 不能三步一个，否则失去探索感。
+      所以只在校舍、操场看台、体育馆等关键点位撒 11 个。
+   2. 三种容器有不同产出战利品表：
+        box 纸箱   杂货：绷带、止痛药、手枪弹、开锁器
+        locker 铁柜 军械：头盔、护甲、配件、步枪弹
+        med 医疗柜  医疗：医疗包、急救包、绷带
+   3. 【关键】搜到的东西自动打「搜来的」标记（P.looted），
+      撤离后卖出价格比原价高 —— 这是搜打撤的主要赚钱手段，
+      否则玩家只能靠买低卖高，那就不叫搜打撤了。 */
+
+/* 容器点位：坐标全部落在建筑外的空地或门口，
+   避免生成在墙里导致玩家摸不到（此前 loot 就踩过这个坑）。 */
+const CONTAINER_SPOTS=[
+  {x:-8,  z:-4,  type:'box'},     // 主楼门前
+  {x:8,   z:-4,  type:'locker'},  // 主楼门前东侧
+  {x:-20, z:22,  type:'box'},     // 西楼侧空地
+  {x:20,  z:22,  type:'med'},     // 东楼侧空地
+  {x:0,   z:42,  type:'box'},     // 操场看台前
+  /* 【坐标体检修正】原来 (-26,-6) 和 (26,-6) 正好压在东西教学楼
+     外墙皮上（西楼 x:-42..-26，东楼 x:26..42），容器一半嵌进墙里。
+     往外挪 4 米到楼外空地，且避开篮球场。 */
+  {x:-46, z:-6,  type:'locker'},  // 西教学楼外（楼外空地）
+  {x:46,  z:-6,  type:'med'},     // 东教学楼外（楼外空地）
+  {x:52,  z:20,  type:'locker'},  // 体育馆内
+  {x:-34, z:30,  type:'med'},     // 西北角
+  {x:34,  z:36,  type:'box'},     // 东南角
+  /* 原来 (-6,-30) 在主教学楼体内部（z:-30..-14），完全看不见。
+     现在放到校门内侧偏西，避开正中主干道和石碑（石碑在 -9,-40）。 */
+  {x:-20, z:-40, type:'box'},     // 校门内侧偏西
+];
+const containers=[];        // {x,z,type,mesh,opened,items:{id:cnt},used}
+/* 战利品表：[物品id, 权重, 最小数量, 最大数量] */
+const LOOT_TABLES={
+  box:[
+    ['bandage',30,1,3], ['painkill',18,1,2], ['ammo_pistol',24,1,2],
+    ['med',14,1,2], ['lockpick',8,1,1], ['grenade',5,1,1],
+    ['smoke',4,1,1], ['ammo_shot',10,1,1],
+  ],
+  locker:[
+    ['ammo_rifle',26,1,2], ['helm_light',12,1,1], ['vest_light',10,1,1],
+    ['mod_reddot',8,1,1], ['mod_grip_vert',9,1,1], ['mod_comp',7,1,1],
+    ['mod_mag_ext',6,1,1], ['ammo_sniper',8,1,1], ['vest_med',4,1,1],
+    ['mod_holo',4,1,1], ['helm_med',3,1,1],
+  ],
+  med:[
+    ['med',30,1,2], ['bandage',28,2,4], ['painkill',18,1,2],
+    ['med_kit',16,1,1], ['grenade',4,1,1],
+  ],
+};
+const CONTAINER_NAME={ box:'📦 纸箱', locker:'🗄️ 铁柜', med:'🧰 医疗柜' };
+const CONTAINER_COLOR={ box:0x8a6a3f, locker:0x5a6470, med:0xd8d2c4 };
+
+/* 按权重从战利品表抽 n 件（允许重复，同类合并数量） */
+function rollLoot(table, n){
+  const out={};
+  const total=table.reduce((s,e)=>s+e[1],0);
+  for(let i=0;i<n;i++){
+    let r=Math.random()*total, pick=null;
+    for(const e of table){ r-=e[1]; if(r<=0){ pick=e; break; } }
+    if(!pick) pick=table[table.length-1];
+    const id=pick[0];
+    const c=pick[2]+Math.floor(Math.random()*(pick[3]-pick[2]+1));
+    out[id]=(out[id]||0)+c;
+  }
+  return out;
+}
+/* 建容器模型：一个矮方块 + 顶盖，不同颜色区分种类。
+   容器要有碰撞，否则玩家会直接穿过它。 */
+function spawnContainer(spot){
+  const c=CONTAINER_COLOR[spot.type]||0x777777;
+  const h = spot.type==='locker' ? 1.5 : 0.85;
+  const w = spot.type==='locker' ? 0.9 : 1.1;
+  const body=box(w, h, w*0.8, c, spot.x, h/2, spot.z);
+  body.castShadow=true; body.receiveShadow=true;
+  const lid=box(w*1.06, 0.1, w*0.86, c, spot.x, h+0.05, spot.z, true);
+  lid.castShadow=true;
+  const o={ x:spot.x, z:spot.z, type:spot.type, mesh:body, lid,
+            opened:false, items:rollLoot(LOOT_TABLES[spot.type]||LOOT_TABLES.box, 2+((Math.random()*3)|0)) };
+  containers.push(o);
+  return o;
+}
+function buildContainers(){
+  for(const m of containers){ try{ scene.remove(m.mesh); scene.remove(m.lid); }catch(e){} }
+  containers.length=0;
+  CONTAINER_SPOTS.forEach(spawnContainer);
+}
+/* 找离玩家最近、且在可交互距离内的容器 */
+function findNearContainer(){
+  let best=null, bd=2.2;
+  for(const c of containers){
+    if(c.opened && !Object.keys(c.items).length) continue;
+    const d=Math.hypot(P.pos.x-c.x, P.pos.z-c.z);
+    if(d<bd){ bd=d; best=c; }
+  }
+  return best;
+}
+/* ---- 搜索面板 ---- */
+let cacheContainer=null;   // 当前打开的容器
+function openContainer(c){
+  cacheContainer=c;
+  const el=$('lootBox'); if(!el) return;
+  const ti=$('lbTitle'); if(ti) ti.textContent=CONTAINER_NAME[c.type]||'📦 容器';
+  paintContainer();
+  el.style.display='';
+  sfxUI();
+}
+function closeContainer(){
+  const el=$('lootBox'); if(el) el.style.display='none';
+  cacheContainer=null;
+}
+function paintContainer(){
+  const g=$('lbGrid'); if(!g) return;
+  const c=cacheContainer;
+  if(!c){ g.innerHTML=''; return; }
+  let h='';
+  const ids=Object.keys(c.items).filter(id=>c.items[id]>0 && SHOP_ITEMS[id]);
+  if(!ids.length){
+    h='<div class="lbEmpty">空的 · 已经搜干净了</div>';
+  } else {
+    for(const id of ids){
+      const it=SHOP_ITEMS[id];
+      /* 稀有物品（价格 ≥1000 或配件）高亮，让玩家一眼看到好东西 */
+      const rare=(it.price>=1000 || it.cat==='mod')?' rare':'';
+      h+='<div class="lbi'+rare+'" data-loot="'+id+'" title="'+it.name+'">'
+        +it.icon+'<b>'+c.items[id]+'</b></div>';
+    }
+  }
+  g.innerHTML=h;
+  g.querySelectorAll('[data-loot]').forEach(node=>{
+    node.onclick=()=>{ takeLoot(node.dataset.loot); };
+  });
+  const tip=$('lbTip');
+  if(tip) tip.textContent='点物品拿取 · 背包 '+pouchUsed()+'/'+P.bagCap;
+}
+/* 从容器拿一件物品进背包。
+   优先塞背包；背包满了如果胸挂能收就进胸挂（医疗/弹药正好是胸挂能收的），
+   这样玩家不会因为背包装满了就白跑一趟。 */
+function takeLoot(id){
+  const c=cacheContainer; if(!c) return;
+  if(!(c.items[id]>0)) return;
+  const it=SHOP_ITEMS[id]; if(!it) return;
+  let src=null;
+  if(bagAdd(id,1)) src='bag';
+  else if(typeof chestAccept==='function' && chestAccept(id) && chestFree()>0){
+    if(!P.chestPouch[id]) P.chestPouch[id]=0;
+    P.chestPouch[id]++; src='chest';
+  }
+  if(!src){ sfxDeny(); toast('背包和胸挂都满了'); return; }
+  c.items[id]--;
+  if(c.items[id]<=0) delete c.items[id];
+  /* 【来源标记】搜来的东西记一笔，撤离后卖价更高。 */
+  if(!P.looted[id]) P.looted[id]=0;
+  P.looted[id]++;
+  sfxPickup();
+  paintContainer(); refreshHUD();
+  if(!Object.keys(c.items).length){
+    c.opened=true;
+    if(c.lid){ c.lid.rotation.x=-0.5; c.lid.position.y+=0.1; }
+    toast('已搜空 '+CONTAINER_NAME[c.type]);
+    setTimeout(closeContainer,350);
+  }
+}
+/* 绑定关闭按钮（只绑一次） */
+function bindContainerUI(){
+  const cl=$('lbClose');
+  if(cl && !cl.__bound){ cl.__bound=true; cl.onclick=()=>{ closeContainer(); sfxUI(); }; }
+  const el=$('lootBox');
+  if(el && !el.__bound){ el.__bound=true;
+    el.addEventListener('touchstart', e=>e.stopPropagation(), {passive:true}); }
 }
 
 /* 屏幕提示条点击也能开门（手机上没有键盘） */

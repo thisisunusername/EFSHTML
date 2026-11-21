@@ -86,49 +86,62 @@
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  /* ===== 右侧按键布局（按用户示意图） =====
-                                 瞄准
-        摇杆              跳跃    开火
-                         趴下     换弹
+  /* ===== 右侧按键布局 =====
+     【错位的原因】原来是每个按钮各自写 right/bottom 计算位置，
+     而 #actZone 只有 50% 宽。三列（开火列/跳跃列/检视列）在窄屏上
+     累计宽度会超过 actZone 的 50%，于是最左边的检视键被压出容器，
+     表现为「跳跃键跑到奇怪的地方 / 键与键叠在一起」。
+     只要屏幕比例一变（横屏/竖屏/不同机型）就会错。
 
-      换成两列三行的紧凑方阵：
-        右列（贴屏幕右边缘）：开火（大）/ 换弹
-        左列：跳跃（上）/ 趴下（下）
-        瞄准单独浮在两列左上方
-
-      以前是散落的 5 个按钮各自 right/bottom 定位，
-      互相之间没有对齐关系，窄屏时会叠在一起。 */
+     现在改成真正的网格：actZone 内部用 CSS Grid 摆一个 3 列 × 4 行的
+     固定坐标方阵，每个按钮指定 grid-area，不再算 right/bottom 像素。
+     容器变窄时网格整体等比缩放（用 --u 单位），键与键的相对位置恒定。 */
   #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%;
             display:none; pointer-events:none; z-index:35; }
-
-  /* 所有按钮统一基准尺寸，靠 CSS 变量缩放 */
-  #actZone{ --bs:56px; --gap:8px; --big:84px; }
-
-  #btnFire{ right:16px; bottom:16px;
-            width:var(--big); height:var(--big);
-            border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
-  #btnFire .ico{ width:36px; height:36px; }
-
-  #btnReload{ right:16px; bottom:calc(16px + var(--big) + var(--gap));
-              width:var(--bs); height:var(--bs); }
-  #btnReload .ico{ width:26px; height:26px; }
-
-  #btnJump{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--bs) + var(--gap));
-            width:var(--bs); height:var(--bs); }
-  #btnJump .ico{ width:26px; height:26px; }
-
-  #btnProne{ right:calc(16px + var(--big) + var(--gap)); bottom:16px;
-             width:var(--bs); height:var(--bs); }
-  #btnProne .ico{ width:26px; height:26px; }
-
-  /* 瞄准：浮在跳跃/趴下这列的正上方，明确远离开火 */
-  #btnAim{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--big) + var(--gap)*2);
-           width:64px; height:64px; border-color:#7c5cff; }
+  /* 按钮网格容器：固定在右下角，3 列 × 3 行 */
+  #actGrid{
+    position:absolute; right:14px; bottom:14px;
+    display:grid;
+    grid-template-columns: repeat(3, var(--u));
+    grid-template-rows: repeat(3, var(--u));
+    gap: 8px;
+    pointer-events:none;
+    /* --u = 单个格子的边长，随屏幕短边自适应，保证不同机型比例一致 */
+    --u: 58px;
+  }
+  @media (max-height:420px){ #actGrid{ --u:52px; } }
+  @media (max-height:360px){ #actGrid{ --u:46px; } }
+  /* 网格里的按钮统一按格子摆，用 grid-area 定位，不再用 right/bottom */
+  #actGrid .actbtn{
+    position:static; right:auto; bottom:auto;
+    width:var(--u); height:var(--u);
+    margin:0; justify-self:center; align-self:center;
+    pointer-events:auto;
+  }
+  /* 布局（3 列 × 3 行）：
+        [    ] [瞄准] [    ]
+        [检视] [跳跃] [换弹]
+        [    ] [趴下] [开火]
+     开火最大、贴右下角，其余按功能分组，位置固定不随屏幕变。 */
+  #btnAim{    grid-column:2; grid-row:1; width:calc(var(--u)*1.05); height:calc(var(--u)*1.05); border-color:#7c5cff; }
+  #btnInspect{grid-column:1; grid-row:2; }
+  #btnJump{   grid-column:2; grid-row:2; }
+  #btnReload{ grid-column:3; grid-row:2; }
+  #btnProne{  grid-column:2; grid-row:3; }
+  #btnFire{   grid-column:3; grid-row:3;
+              width:calc(var(--u)*1.42); height:calc(var(--u)*1.42);
+              border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
   #btnAim .ico{ width:28px; height:28px; }
-  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
-  /* 检视按钮：放在开镜左边一格，不抢开火键的位置 */
-  #btnInspect{ right:calc(16px + (var(--big) + var(--gap))*2); bottom:16px; }
+  /* 交互（E）和奔跑（Shift）也放进网格，否则它们会被自动填充到空格子里，
+     导致上面的固定布局被打乱。交互放左上空格，奔跑放左下空格。 */
+  #btnInteract{grid-column:1; grid-row:1; }
+  #btnSprint{  grid-column:1; grid-row:3; }
   #btnInspect .ico{ width:24px; height:24px; }
+  #btnJump .ico{ width:26px; height:26px; }
+  #btnReload .ico{ width:26px; height:26px; }
+  #btnProne .ico{ width:26px; height:26px; }
+  #btnFire .ico{ width:36px; height:36px; }
+  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
 
   /* ==== GM 隐藏面板（主菜单连点 D 15 次）====
      浮在屏幕上层，可拖动、可收起。z-index 比遮罩(9999)略低但比
@@ -171,18 +184,15 @@
   #gmCash small{ font-size:10px; color:#8d97a8; font-weight:600;
     letter-spacing:.08em; display:block; margin-bottom:2px; }
 
-  /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
-  #btnInteract{ right:50%; transform:translateX(50%);
-                bottom:calc(16px + var(--big) + var(--gap));
-                width:58px; height:58px; }
+  /* 交互（开门/拾取）和奔跑的位置已经统一交给上面的 #actGrid 网格，
+     这里不再用 right/bottom 单独定位 ——
+     旧的那套 calc 定位正是「按键错位」的来源之一，
+     两套规则同时存在时，后写的会盖掉先写的，结果随屏幕比例漂移。 */
   #btnInteract .ico{ width:26px; height:26px; }
-
-  /* 奔跑：紧贴开火上方的斜角位，避免压住换弹 */
-  #btnSprint{ right:calc(16px + var(--big) + var(--gap));
-              bottom:calc(16px + var(--big) + var(--gap));
-              width:52px; height:52px; }
   #btnSprint .ico{ width:22px; height:22px; }
-  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
+  /* 基础外观：尺寸/位置由 #actGrid .actbtn 统一规定，
+     这里只管圆形、配色、图标居中这些「长相」。 */
+  .actbtn{ width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
   /* 按钮图标（SVG，currentColor 跟随主题）
      【统一图标体系】全部改用 Lucide 官方图标（ISC 许可）的描边风格：
@@ -485,6 +495,86 @@ html[data-lang="en"] #bagBtn span{
   .stkg.dim{ opacity:.42; }
   .stkg.dim:hover{ background:rgba(255,255,255,.06); }
 
+  /* 治疗按钮上的数量角标 + 无药时变暗 */
+  .medn{ margin-left:4px; font-size:11px; font-weight:800; color:#7dffb0;
+         background:rgba(125,255,176,.15); padding:1px 5px; border-radius:6px; }
+  #medBtn.none{ opacity:.45; }
+  #medBtn.none .medn{ color:#889; background:rgba(255,255,255,.07); }
+  #medBtn:active{ background:rgba(125,255,176,.28); }
+
+  /* ===== 胸挂快速取用区 =====
+     和背包格子刻意做出视觉区分：青色边框 + 一条分隔线，
+     让玩家一眼看出「上面这排是急用的，下面是背包」。
+     胸挂格子不参与 .stkgrid 的滚动区，始终钉在顶部可见。 */
+  .chestrow{ flex:0 0 auto; margin-bottom:8px; padding-bottom:8px;
+             border-bottom:1px dashed rgba(90,220,255,.28); }
+  .chesthd{ font-size:11.5px; font-weight:700; color:#7fd8f5;
+            letter-spacing:.03em; margin-bottom:5px; }
+  .chesthd.dim{ color:#79828f; font-weight:600; }
+  .chestgrid{ display:grid; grid-template-columns:repeat(8,1fr); gap:4px; }
+  .stkg.chest{ border-color:rgba(90,220,255,.45);
+               background:rgba(90,220,255,.10); }
+  .stkg.chest:hover{ background:rgba(90,220,255,.24); }
+  .stkg.chest:active{ background:rgba(90,220,255,.42); }
+  .stkg.chest.empty{ border-style:dashed; border-color:rgba(90,220,255,.18);
+background:rgba(90,220,255,.03); cursor:default; }
+  /* ===== 仓库拖拽配件 =====
+     手机上没有「右键菜单」，配件装到武器上最直观的方式就是拖。
+     .dragghost 是跟随手指的浮动图标，pointer-events:none 保证它
+     不会挡住下面的落点元素（否则 elementFromPoint 永远拿到 ghost 自己）。
+     .stkslot.hot 表示「这一格能接这个配件」，给玩家明确的可行落点提示。 */
+  .dragghost{ position:fixed; z-index:99999; width:44px; height:44px;
+              display:flex; align-items:center; justify-content:center;
+              font-size:24px; border-radius:10px; pointer-events:none;
+              background:rgba(124,92,255,.85); box-shadow:0 6px 18px rgba(0,0,0,.6);
+              transform:translate(-50%,-50%); }
+  .stkslot.hot{ border-color:#7dffb0 !important;
+                background:rgba(125,255,176,.18) !important;
+                box-shadow:0 0 0 2px rgba(125,255,176,.35) inset; }
+  .stkg.armed{ border-color:#ffd54a; background:rgba(255,213,74,.16); }
+  /* ===== 卖出系统 =====
+     .stkgp 是卖出模式下格子右上角的估价，.selsell 是已勾选的黄框。
+     两者都用绝对定位/强描边，保证在密集的仓库格子里一眼能分辨。 */
+  .stkbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .stksell{ cursor:pointer; font-size:12px; font-weight:800; padding:5px 13px;
+            border-radius:9px; border:1px solid rgba(255,213,74,.55);
+            background:rgba(255,213,74,.14); color:#ffd54a; font-family:inherit; }
+  .stksell:active{ background:rgba(255,213,74,.34); }
+  .stksell.on{ border-color:#7dffb0; background:rgba(125,255,176,.2); color:#7dffb0; }
+  .stksell.cancel{ border-color:rgba(255,255,255,.22);
+                   background:rgba(255,255,255,.06); color:#9aa4b2; }
+  .stksellhint{ font-size:10.5px; color:#ffd54a; opacity:.85; margin:4px 0 2px; }
+  .stkg.selsell{ border-color:#ffd54a; background:rgba(255,213,74,.26);
+                 box-shadow:0 0 0 2px rgba(255,213,74,.5) inset; }
+  .stkgp{ position:absolute; left:1px; top:0; font-size:8.5px; font-weight:800;
+          color:#7dffb0; text-shadow:0 1px 2px #000; pointer-events:none;
+          letter-spacing:-.02em; }
+  /* ===== 局内容器搜索面板 =====
+     位置刻意放在屏幕中下方而不是正中：手在操作右下按钮，
+     面板压在中间会被手掌挡住。宽度给足以便一行放 5 格。 */
+  #lootBox{ position:fixed; left:50%; bottom:18%; transform:translateX(-50%);
+            width:min(86vw,420px); z-index:9000;
+            background:rgba(14,18,26,.96); border:1px solid rgba(90,220,255,.35);
+            border-radius:14px; padding:10px 12px 8px;
+            box-shadow:0 10px 34px rgba(0,0,0,.65); }
+  .lbHead{ display:flex; align-items:center; justify-content:space-between;
+           font-size:13px; font-weight:800; color:#bff0ff; margin-bottom:8px; }
+  .lbClose{ cursor:pointer; color:#8a94a3; font-size:15px; padding:0 4px; }
+  .lbGrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .lbi{ position:relative; aspect-ratio:1; border-radius:9px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; font-size:20px;
+        background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); }
+  .lbi:active{ background:rgba(125,255,176,.3); border-color:#7dffb0; }
+  .lbi b{ position:absolute; right:2px; bottom:0; font-size:9px; color:#ffd54a;
+          font-weight:800; text-shadow:0 1px 2px #000; }
+  .lbi.rare{ border-color:#ffd54a; background:rgba(255,213,74,.14); }
+  .lbTip{ font-size:10.5px; color:#79828f; margin-top:7px; text-align:center; }
+  .lbEmpty{ grid-column:1 / -1; text-align:center; color:#79828f; font-size:12px;
+            padding:14px 0; }
+  @media (max-width:520px){
+    .chestgrid{ grid-template-columns:repeat(6,1fr); }
+  }
+
   /* 手机竖屏：右栏格子缩小成 6 列 */
   @media (max-width:520px){
     .stkgrid{ grid-template-columns:repeat(6,1fr); }
@@ -550,6 +640,10 @@ html[data-lang="en"] #bagBtn span{
     <div class="pill">⏱ <span id="timer">00:00</span></div>
     <div class="pill" id="sndBtn" style="cursor:pointer">🔊 <span id="sndTxt">开</span></div>
     <div class="pill" id="bagBtn" style="cursor:pointer">🎒 <span>背包</span></div>
+    <!-- 医药快速使用：不用打开背包，点一下立刻吃最合适的药。
+         优先用胸挂里的（胸挂就是快速取用区），胸挂没有再翻背包。
+         按钮上会显示当前可用药品的数量，没有药时自动变暗。 -->
+    <div class="pill" id="medBtn" style="cursor:pointer">🩹 <span>治疗</span><b id="medBtnN" class="medn">0</b></div>
   </div>
   <div id="crosshair"></div>
   <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>
@@ -566,6 +660,7 @@ html[data-lang="en"] #bagBtn span{
 <div id="viewLayer"></div>
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
 <div id="actZone">
+ <div id="actGrid">
   <div class="actbtn" id="btnFire" title="开火">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide crosshair：外圈 + 四向刻度线 -->
@@ -634,6 +729,7 @@ html[data-lang="en"] #bagBtn span{
       <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/>
     </svg>
   </div>
+ </div><!-- /#actGrid -->
 </div>
 
 <!-- 底部中间：武器切换条（主武器 / 手枪 / 副武器）
@@ -691,6 +787,13 @@ html[data-lang="en"] #bagBtn span{
 <div id="gunsmith" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
+     里面是一堆可点的物品格，点一个拿一个，拿完自动关。 -->
+<div id="lootBox" style="display:none">
+  <div class="lbHead"><span id="lbTitle">📦 容器</span><b class="lbClose" id="lbClose">✕</b></div>
+  <div class="lbGrid" id="lbGrid"></div>
+  <div class="lbTip" id="lbTip">点物品拿取 · 背包满了就拿不了</div>
+</div>
 <!-- GM 隐藏面板：主菜单连续点 D 15 次显示 -->
 <div id="gmPanel">
   <div id="gmHead">

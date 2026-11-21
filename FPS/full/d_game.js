@@ -357,20 +357,39 @@ function respawnEnemy(e){
 }
 
 /* ---- 物资拾取 ---- */
+/* 【改了行为】以前踩到地上物资就直接改 P.ammo / P.inv —— 等于凭空变出子弹，
+   和「搜打撤」里「东西必须是背包里实实在在的一件」完全不符。
+   现在统一塞进背包（并打上「搜来的」标记），撤离后才能作为战利品卖钱。
+   背包装不下就提示，不白拿。 */
+const LOOT_PICK={
+  ammo:['ammo_rifle',1],
+  med: ['med',1],
+  gun: ['ammo_rifle',2],   // 地上的"枪"改为给一把枪的弹药补给，避免凭空多出枪
+};
 function updLoot(dt){
   for(const l of loots){
     if(l.taken) continue;
     const d=Math.hypot(P.pos.x-l.x,P.pos.z-l.z);
     if(d<1.5){
-      l.taken=true; l.mesh.visible=false;
-      switch(l.type){
-        case 'ammo': P.ammo.ammo+=30; break;
-        case 'med':  P.inv.med++; break;
-        case 'cash': P.ammo.cash+=200; break;
-        case 'gun':  P.inv.gun=true; P.ammo.gun=120; break;
+      if(l.type==='cash'){
+        l.taken=true; l.mesh.visible=false;
+        P.ammo.cash=(P.ammo.cash|0)+200;
+        sfxPickup(); toast('💵 +¥200'); refreshHUD();
+        continue;
       }
-      sfxPickup();
-      refreshHUD();
+      const pair=LOOT_PICK[l.type];
+      if(!pair){ l.taken=true; l.mesh.visible=false; continue; }
+      const id=pair[0], cnt=pair[1];
+      if(typeof bagAdd==='function' && bagAdd(id,cnt)){
+        l.taken=true; l.mesh.visible=false;
+        if(!P.looted[id]) P.looted[id]=0;
+        P.looted[id]+=cnt;
+        const it=SHOP_ITEMS[id];
+        sfxPickup(); toast('拾取 '+(it?it.name:id)+' ×'+cnt);
+        refreshHUD();
+      } else {
+        toast('背包满了 · 先清点东西');
+      }
     }
   }
 }

@@ -140,22 +140,62 @@ function init(){
   ready=true;
 }
 
+/* 窗户（玻璃 + 窗框）。
+     【原来错在哪】直接把玻璃当成 `box(2.6,2.6,.3, 0x88ccee, x, y, -14.15, true)`：
+     主楼墙体中心 z=-22、厚 16，墙面在 z=-14。玻璃中心放 -14.15、厚 0.3，
+     于是它向外凸 0.15、向内凹 0.15 —— 一半埋在墙里，和墙面完全共面，
+     从外面看就是一片闪烁的色块（z-fighting），既没有窗框也没有凹进去的窗洞感。
+     东西楼（墙面 x=±26）和行政楼（墙面 z=18.5，原代码放 18.6，连凸都没凸出来，
+     整块玻璃埋在墙里看不见）都是同类错误。
+
+     现在统一用这个函数：玻璃贴在墙面外侧 0.06 米（留极小的间隙避免共面），
+     四周加一圈窗框（比玻璃略突出），并在玻璃上开十字窗棂。
+     face 用 'S'(朝 -z) / 'N'(朝 +z) / 'W'(朝 -x) / 'E'(朝 +x) 指定朝向。 */
+function windowPane(w,h, x,y,z, face, noCol){
+  const T=0.08;                    // 玻璃厚度
+  const F=0.16;                    // 窗框厚度（比玻璃厚，才有立体感）
+  const off=0.02;                  // 贴墙间隙，防止与墙面共面闪烁
+  const glassC=0x9fd4e8;           // 玻璃：淡青蓝，比原来的 0x88ccee 更像玻璃
+  const frameC=0xcfc8ba;           // 窗框：浅米灰（塑钢/铝合金的颜色）
+  const dir=(face==='S')?-1:(face==='N'?1:(face==='W'?-1:1));
+  const along=(face==='S'||face==='N');   // 沿 x 铺开 还是 沿 z 铺开
+  /* 玻璃：只显示不碰撞（原来的 noCol 语义保留） */
+  const gz = (face==='S'||face==='N') ? z+dir*(off+T/2) : x+dir*(off+T/2);
+  if(along) box(w,h,T,glassC, x,y,gz, true);
+  else      box(T,h,w,glassC, gz,y,z, true);
+  /* 窗框：上下左右四条，围出一个略大于玻璃的矩形 */
+  const fz=(face==='S'||face==='N') ? z+dir*(off+F/2) : x+dir*(off+F/2);
+  const frame=(w2,h2,dx,dy)=>{
+    if(along) box(w2,h2,F,frameC, x+dx,y+dy,fz, true);
+    else      box(F,h2,w2,frameC, fz,y+dy,z+dx, true);
+  };
+  frame(w+F*2, F, 0,  h/2+F*0.4);          // 上
+  frame(w+F*2, F, 0, -h/2-F*0.4);          // 下
+  frame(F, h,     -w/2-F*0.4, 0);          // 左
+  frame(F, h,      w/2+F*0.4, 0);          // 右
+  /* 竖向窗棂：把玻璃分成三格，比一整块玻璃有辨识度 */
+  const barT=0.05;
+  if(along) box(barT,h,T*0.6,frameC, x,y,gz, true);
+  else      box(T*0.6,h,barT,frameC, gz,y,z, true);
+  return null;
+}
+
 /* ============ 学校建筑（还原现实校园） ============ */
 function buildSchool(){
   /* ---- 主教学楼（南侧，z=-22）60m 宽 × 4 层 ---- */
   box(60,14,16,0xd9c6a3,0,7,-22);                 // 主楼体
   /* 主楼屋顶做成「两边收窄」的样子：
-     主楼本体 60 米宽（x 从 -30 到 30），而东西楼内边缘在 x=±26，
+    主楼本体 60 米宽（x 从 -30 到 30），而东西楼内边缘在 x=±26，
      如果屋顶也做满 60 米，它会在 y=14.35 的高度悬在东西楼上方
      —— 两个屋顶互相插在一起，从远处看就是「楼顶打架」。
      这里收窄到 50 米（x 从 -25 到 25），刚好落在东西楼之间。 */
   box(50,.7,16,0x6b5a45,0,14.35,-22);            // 平屋顶
-  // 正面门窗（朝南 z=-14）
+  // 正面门窗（朝南 z=-14）—— 墙面 z=-14，玻璃朝外贴在南面
   for(let i=0;i<13;i++){
     const x=-27+i*4.5;
-    box(2.6,2.6,.3,0x88ccee,x,5,-14.15,true);    // 窗（一层，高一点）
-    box(2.6,2.6,.3,0x88ccee,x,9.5,-14.15,true);  // 窗（二层）
-    box(2.6,2.6,.3,0x88ccee,x,12.5,-14.15,true); // 窗（三层）
+    windowPane(2.6,2.6, x,5,   -14, 'S');        // 窗（一层，高一点）
+    windowPane(2.6,2.6, x,9.5, -14, 'S');        // 窗（二层）
+    windowPane(2.6,2.6, x,12.5,-14, 'S');        // 窗（三层）
   }
   /* 正门已交给 carveMainDoor() 建造真实可开的门，
      这里不能再放一块 6x3.6 的装饰门板 —— 它正好把门洞堵死，
@@ -179,17 +219,30 @@ function buildSchool(){
      既不碰主楼也不碰行政楼。 */
   box(16,14,32,0xd9c6a3,-34,7,2);
   box(16,.7,32,0x6b5a45,-34,14.35,2);
-  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,-26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,-26.15,10,z,true); }
+  /* 东楼墙面在 x=-26（本体 -34、宽 16），窗户朝东（+x 方向，即 'E'） */
+  for(let i=0;i<6;i++){ const z=-10+i*4.5;
+    windowPane(2.6,2.4, -26,5, z, 'E');
+    windowPane(2.6,2.4, -26,10,z, 'E');
+  }
 
   /* ---- 西教学楼（x=34） ---- */
   box(16,14,32,0xd9c6a3,34,7,2);
   box(16,.7,32,0x6b5a45,34,14.35,2);
-  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,26.15,10,z,true); }
+  for(let i=0;i<6;i++){ const z=-10+i*4.5;
+    windowPane(2.6,2.4, 26,5, z, 'W');
+    windowPane(2.6,2.4, 26,10,z, 'W');
+  }
 
   /* ---- 后侧行政楼（z=26） ---- */
   box(34,11,15,0xcfbc9a,0,5.5,26);
   box(34,.7,15,0x6b5a45,0,11.35,26);
-  for(let i=0;i<7;i++){ const x=-13+i*4.3; box(2.4,2.4,.3,0x88ccee,x,4.5,18.6,true); box(2.4,2.4,.3,0x88ccee,x,8,18.6,true); }
+  /* 行政楼本体 z=26、深 15，南墙面在 z=18.5（26-7.5）。
+     原来窗户放 z=18.6 —— 在墙面内侧 0.1 米，整块埋在墙里，从外面根本看不见。
+     现在朝南贴在墙面外侧。 */
+  for(let i=0;i<7;i++){ const x=-13+i*4.3;
+    windowPane(2.4,2.4, x,4.5, 18.5, 'S');
+    windowPane(2.4,2.4, x,8,   18.5, 'S');
+  }
   /* 行政楼门同理，交给 carveAdminDoor()，
      这里不再放 5x3.2 的装饰门板堵住门洞。 */
 
@@ -296,6 +349,9 @@ function setupWorld(){
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
+  /* 【局内容器】每次开局重新生成一遍，战利品随机 */
+  if(typeof buildContainers==='function') buildContainers();
+  if(typeof bindContainerUI==='function') bindContainerUI();
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）
   initWeapon();       // 第一人称武器模型
   // 操作提示 8 秒后淡出

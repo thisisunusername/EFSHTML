@@ -103,6 +103,13 @@ function autoSaveSnapshot(){
     ammo: { rifle:P.ammo.rifle|0, pistol:P.ammo.pistol|0,
             sniper:P.ammo.sniper|0, shot:P.ammo.shot|0 },
     stash: P.stash || {},
+    /* 胸挂格子也要存：它装的是医疗/弹药，局内撤离线时是真实收益。
+       不存的话退到主菜单再进，胸挂里塞的急救包会凭空消失。 */
+    chestPouch: P.chestPouch || {},
+    /* 【搜来的物品数量】卖出系统靠它判断「这件是搜的还是买的」。
+       不存的话，退出重进之后搜来的东西会被当成自购品只能按 6 折卖，
+       玩家辛苦搜一身装备反而亏钱。 */
+    looted: P.looted || {},
     equip: P.equip || {},
     skins: P.skins || {},
     bagCap: P.bagCap|0,
@@ -214,6 +221,37 @@ function autoSaveApply(o){
       P.skins = clean;
     }
     if(typeof o.bagCap==='number' && o.bagCap>0) P.bagCap = o.bagCap|0;
+    /* 【胸挂格子】按当前胸挂容量做截断：
+       如果存档里塞了 8 格、但玩家现在只戴 3 格胸挂（比如换了装备），
+       多出来的部分不能凭空保留，否则容量限制形同虚设。
+       多出的物品不销毁，挪回仓库 —— 玩家不会因为换胸挂而丢东西。 */
+    if(o.chestPouch && typeof o.chestPouch==='object'){
+      const clean={};
+      for(const id in o.chestPouch){
+        if(!Object.prototype.hasOwnProperty.call(o.chestPouch, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const n=Number(o.chestPouch[id]);
+        if(!isFinite(n) || n<=0) continue;
+        clean[id]=n|0;
+      }
+      P.chestPouch=clean;
+    }else{
+      P.chestPouch=P.chestPouch||{};
+    }
+    /* 【搜来的物品数量】读档校验：只保留合法物品 id 的正整数。 */
+    if(o.looted && typeof o.looted==='object'){
+      const cl={};
+      for(const id in o.looted){
+        if(!Object.prototype.hasOwnProperty.call(o.looted, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const n=Number(o.looted[id]);
+        if(!isFinite(n) || n<=0) continue;
+        cl[id]=n|0;
+      }
+      P.looted=cl;
+    }else{
+      P.looted=P.looted||{};
+    }
     if(typeof o.helmetDur==='number') P.helmetDur = Math.max(0, o.helmetDur|0);
     if(typeof o.vestDur==='number')   P.vestDur   = Math.max(0, o.vestDur|0);
     /* 【武器耐久】按武器 id 逐个校验并夹到 [0, 上限]。

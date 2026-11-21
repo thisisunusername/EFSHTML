@@ -3,8 +3,12 @@ const P={
   pos:new THREE.Vector3(0,1.6,5),
   vel:new THREE.Vector3(),
   yaw:0, pitch:0,
+  firing:false,            // 扳机是否按住（全自动连发靠它）
   hp:100, armor:0,
-  ammo:{ammo:90,med:0,cash:0,gun:120},
+  /* ammo=手枪弹匣 / gun=长枪弹匣 / rifle|pistol|sniper|shot=各类后备弹。
+     sniper 和 shot 以前没初始化，撒弹枪和狙击买了弹也只能靠
+     「完全没弹时白给满匣」的兜底苟着，换弹时后备一直是 undefined。 */
+  ammo:{ammo:90,med:0,cash:0,gun:120,rifle:0,pistol:0,sniper:0,shot:0},
   inv:{gun:true,med:0},
   /* 【搜打撤基础装备】撤离类游戏的核心是「带什么进去、能带回什么」。
      bag 是按 id 聚合的物品表：{ itemId: 数量 }。
@@ -158,7 +162,15 @@ function updP(dt){
   P.aimT += (aimTarget - P.aimT) * Math.min(1, dt*12);
   if(camera){
     const baseFov = P.sprinting ? 78 : 75;
-    camera.fov = baseFov - 28*P.aimT;   // 75 -> 47
+    /* 各枪开镜倍率不同：狙击压到 0.55 倍视场（约 2.4 倍镜），
+       DMR 0.72、步枪 1.0、手枪 1.0。
+       以前所有枪都固定缩 28 度，狙击开镜完全不像狙击。 */
+    let adsK=1;
+    try{
+      const it=(typeof curItem==='function')?curItem():null;
+      if(it && it.adsFov) adsK=it.adsFov;
+    }catch(e){ adsK=1; }
+    camera.fov = baseFov - 28*P.aimT*adsK;
     camera.updateProjectionMatrix();
   }
 

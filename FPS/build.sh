@@ -187,3 +187,15 @@ if command -v node >/dev/null 2>&1 && [ -f i18n_test.js ]; then
     exit 1
   fi
 fi
+
+# 射击模式（全自动/半自动/栓动/泵动）+ M870 霰弹 + 机瞄位姿
+if command -v node >/dev/null 2>&1 && [ -f firemode_test.js ]; then
+  FM=$(node firemode_test.js 2>&1)
+  if echo "$FM" | grep -q 'FIREMODE_OK'; then
+    echo "FIREMODE_OK: 四种射击模式手感分离，M870 9 弹丸近距高伤，全部枪械有机瞄位姿"
+  else
+    echo "$FM" | tail -24
+    echo "射击模式测试失败"
+    exit 1
+  fi
+fi

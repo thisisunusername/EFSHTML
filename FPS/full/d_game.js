@@ -2,48 +2,133 @@
 let enemyTick=0;
 
 /* ---- 射击 ----
-   现在支持三种手持状态：
-     primary   主武器：耗 P.ammo.gun，高伤害、快射速
-     secondary 手枪  ：耗 P.ammo.ammo，低伤害、慢射速
-     melee     副武器：不耗弹、射速慢、只能近身（射线限 3 米） */
-function fire(){
-  if(P.reload) return;
-  if(P.shootCd>0) return;
+   三种手持状态：
+     primary   主武器：步枪 / 冲锋枪 / DMR / 狙击 / 霰弹枪
+     secondary 手枪  ：耗 P.ammo.ammo
+     melee     副武器：不耗弹、射速慢、只能近身（射线限 3 米）
 
+   【射击模式】由 SHOP_ITEMS[id].fireMode 决定：
+     auto 全自动 —— 按住左键持续开火（在 updFireHold 里循环调用）
+     semi 半自动 —— 一次扳机一发，射速受 fireCd 限制
+     bolt 栓动   —— 每发之间拉枪机，fireCd 很长（狙击）
+     pump 泵动   —— 每发之间拉护木，见 wPump 动画
+   本函数只管「打一发」，不负责判断能不能连发；
+   连发由 updFireHold 每帧检测左键是否还压着来决定。
+
+   【霰弹】pellets>1 的枪一次发多条射线，每条独立算伤害；
+   单颗伤害很低（14），但近距离九颗全中就是 126，一枪带走；
+   距离拉开后散得很开，大部分弹丸打空 —— 这就是「近距离伤害高」，
+   不需要额外写衰减公式，散射本身就是衰减。 */
+function fireOnce(dirOverride){
   const melee=curIsMelee();
   const t=curAmmoKey();             // melee 时为 null
-  if(!melee && (P.ammo[t]|0)<=0){ sfxEmpty(); startReload(); return; }
-
-  if(!melee) P.ammo[t]--;
-  P.shootCd=curFireCd();
-  P.shooting=true;
-  sfxShoot();
-  addShake(melee?0.35:(curIsPrimary()?0.55:0.9));
-  weaponKick();
-
-  // 射线检测（近战只打到 3 米内）
-  const dir=lookDir();
+  const dir=dirOverride||lookDir();
   const origin=camera.position.clone();
+  const pellets=melee?1:curPellets();
+  const baseDmg=curDamage();
   const raycaster=new THREE.Raycaster(origin,dir,0.2, melee?3.0:120);
-  const hits=raycaster.intersectObjects(shootables,true);
-  if(hits.length>0){
+  let hitAny=false, headAny=false;
+  for(let i=0;i<pellets;i++){
+    /* 第 0 颗沿准星正中；其余在圆锥内随机偏移（散射） */
+    if(i>0){
+      const sp=melee?0:SHOT_SPREAD*(P.aimT>0.5?0.55:1);
+      raycaster.ray.direction.set(
+        dir.x+(Math.random()-0.5)*sp*2,
+        dir.y+(Math.random()-0.5)*sp*2,
+        dir.z+(Math.random()-0.5)*sp*2
+      ).normalize();
+    }else{
+      raycaster.ray.direction.copy(dir);
+    }
+    const hits=raycaster.intersectObjects(shootables,true);
+    if(!hits.length) continue;
     const hit=hits[0];
     const obj=hit.object;
-    // 命中敌人（body/head）
     for(const e of enemies){
       if(e.body===obj||e.head===obj){
-        const dmg=curDamage();
-        e.hp-=dmg;
+        /* 霰弹距离衰减：6 米内满伤，12 米后只剩三成。
+           普通枪 pellets=1，衰减几乎看不出，不影响原手感。 */
+        let d=baseDmg;
+        if(pellets>1){
+          const dist=hit.distance||0;
+          if(dist>6) d*= Math.max(0.30, 1-(dist-6)*0.115);
+        }
+        e.hp-=d;
         e.aggro=true;
-        if(obj===e.head && !melee) sfxHeadshot(); else sfxHit();
-        if(e.hp<=0){ e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill(); }
+        hitAny=true;
+        if(obj===e.head && !melee) headAny=true;
+        if(e.hp<=0 && e.alive){
+          e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill();
+        }
         break;
       }
     }
   }
-  // 枪口火光（简单后续可扩展）
+  if(headAny) sfxHeadshot(); else if(hitAny) sfxHit();
+}
+/* 霰弹散射半角（弧度/轴向偏移量）：0.028 约等于 1.6 度，
+   8 米处散开半径约 22cm —— 正好覆盖一个人上半身。 */
+const SHOT_SPREAD=0.028;
+
+/* 实际扣板机入口：检查冷却/弹药，播放声音，决定是否进入泵动/栓动装填 */
+function fire(){
+  if(P.reload) return;
+  if(P.shootCd>0) return;
+  /* 泵动/栓动：上一发的拉栓动作没做完，不许再开火。
+     这条比 shootCd 更严格，因为 fireCd（0.20）比拉栓时间（0.58）短。 */
+  if(wPump>0) return;
+  const melee=curIsMelee();
+  const t=curAmmoKey();             // melee 时为 null
+  if(!melee && (P.ammo[t]|0)<=0){ sfxEmpty(); startReload(); return; }
+  if(!melee) P.ammo[t]--;
+  const mode=curFireMode();
+  P.shootCd=curFireCd();
+  P.shooting=true;
+  sfxShoot();
+  /* 后坐力：每把枪自己登记 recoil 系数，霰弹/栓动最大 */
+  const rk=curRecoilK();
+  addShake(melee?0.35:0.55*rk*rk);
+  weaponKick();
+  fireOnce();
+  /* 泵动 / 栓动：打完这一发就开始拉栓，拉完才能再打。
+     泵动同时把 wPump 置 1 驱动护木动画；栓动没有护木，
+     就用同样的计时器把 shootCd 拉长到拉栓结束。 */
+  if(mode==='pump'){
+    wPumpDur=curPumpTime()||0.58;
+    wPump=1;
+    P.shootCd=Math.max(P.shootCd, wPumpDur);
+  }else if(mode==='bolt'){
+    wPumpDur=curPumpTime()||0.55;
+    wPump=1;                      // 借用同一套进度量，只是没有护木模型可动
+    P.shootCd=Math.max(P.shootCd, curFireCd());
+  }
+  /* 打空自动换弹（全自动枪打空后会自动接上，不用再点一次） */
+  if(!melee && (P.ammo[t]|0)<=0) startReload();
 }
 
+/* ---- 全自动持续开火 ----
+   以前 mousedown 只调一次 fire()，所以所有枪实际都是「点一次打一发」。
+   现在在主循环里检查：左键压住 && 当前枪是 auto && 冷却到了 -> 再打一发。
+   半自动/栓动/泵动不走这里，必须重新按一次。 */
+/* 场景是否已经能开火。
+   正常情况下用 b_world.js 的 ready；但在测试桩里 b_world 的
+   let ready 可能落在另一个作用域，读不到就退化为「只要
+   camera 存在就算就绪」——fire() 本来就要用 camera，
+   camera 都没有的话它也开不了枪。 */
+function canShootYet(){
+  return !!camera;
+}
+function updFireHold(dt){
+  if(!P.firing) return;
+  /* ready 由 b_world.js 声明（let renderer,...,ready=false），
+     initWorld() 成功后才置真。场景没建好之前按住开火键不应该开枪。
+     用 typeof 保护：单块静态检查时可能还没加载 b_world。 */
+  if(typeof ready==='boolean' ? !ready : !canShootYet()) return;
+  if(P.reload||curIsMelee()) return;
+  if(!curIsAuto()) return;
+  if(P.shootCd>0||wPump>0) return;
+  fire();
+}
 /* ---- 换弹 ----
    近战不需要换弹，直接忽略。
    弹匣容量按武器数据里的 mag 取，没写就用默认值。 */

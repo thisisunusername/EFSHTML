@@ -50,6 +50,14 @@
   #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px; }
   .pill{ background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; backdrop-filter:blur(6px); }
   .pill b{ color:var(--accent2); }
+  /* 射击模式徽标：全自动/半自动/栓动/泵动。
+     auto 用青色高亮，跳单发的模式用橙色，一眼能看出手感差别。 */
+  #fireModeTag{ margin-left:7px; font-size:10.5px; font-weight:700; letter-spacing:.04em;
+    padding:1.5px 6px; border-radius:6px; background:rgba(255,255,255,.10);
+    color:#9fb0c8; vertical-align:1px; }
+  #fireModeTag.auto{ color:#0b1a14; background:#48d99a; }
+  #fireModeTag.pump,#fireModeTag.bolt{ color:#2a1a05; background:#f0a35a; }
+  #fireModeTag.semi{ color:#1a1226; background:#a78bfa; }
   #hpwrap{ flex:1; min-width:80px; }
   #hpbar{ height:8px; background:rgba(255,255,255,.12); border-radius:6px; overflow:hidden; margin-top:5px; }
   #hpfill{ height:100%; width:100%; background:linear-gradient(90deg,#48c774,#8ce6a0); border-radius:6px; transition:width .2s; }
@@ -486,7 +494,7 @@ html[data-lang="en"] #bagBtn span{
 <div id="hud">
   <div id="topbar">
     <div class="pill">🪙 <b id="money">0</b></div>
-    <div class="pill" id="weaponPill">🔫 <span id="wpnName">手枪</span></div>
+    <div class="pill" id="weaponPill">🔫 <span id="wpnName">手枪</span><span id="fireModeTag"></span></div>
     <div class="pill" id="ammoPill"><span id="ammo">12</span> / <span id="ammoReserve">36</span></div>
     <div class="pill" id="hpwrap">❤️ <span id="hpNum">100</span><div id="hpbar"><div id="hpfill"></div></div></div>
     <div class="pill" id="armorPill" style="display:none">🛡️ <b>0</b></div>

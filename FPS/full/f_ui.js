@@ -28,6 +28,16 @@ function refreshHUD(){
     const it=id&&SHOP_ITEMS[id];
     wpn.textContent = it ? it.name : slotName(P.slot);
   }
+  /* 射击模式徽标：全自动/半自动/栓动/泵动/近战。
+     玩家换了枪如果不显示模式，根本不知道这把是点射还是连发。 */
+  const fmt=$('fireModeTag');
+  if(fmt){
+    const mode=curFireMode();
+    const melee=(mode==='melee');
+    fmt.textContent = melee ? T('近战') : fireModeLabel();
+    fmt.className = melee ? '' : mode;
+    fmt.style.display='';
+  }
   /* 【护甲 HUD】穿戴头盔/护甲后在地血条旁显示剩余耐久 */
   const av=$('armorPill');
   if(av){
@@ -218,10 +228,24 @@ if(window.__uiBound) return; window.__uiBound=true;
   addEventListener('blur',()=>{
     P.keys={};
     P.sprinting=false;
+    P.firing=false;      // 切出去必须松开扳机，否则回来就是满屏弹壳
     if(typeof endJoy==='function'){ try{ endJoy(); }catch(err){} }
   });
+  /* 左键：按住不放记为 P.firing，松开才算停。
+     全自动枪的连发不在这个事件里循环，而是由 updFireHold
+     在主循环里每帧检查 —— 事件只负责「扳机是否被按住」。
+     半自动/栓动/泵动虽然也会把 P.firing 置真，
+     但 updFireHold 会直接 return（curIsAuto() 为假），
+     所以它们仍然只能靠重新点击开火。 */
   addEventListener('mousedown',e=>{
-    if(e.button===0 && ready) fire();
+    if(e.button!==0) return;
+    if(!ready) return;
+    P.firing=true;
+    fire();                          // 按下立刻先打一发，不能等下一帧
+  });
+  addEventListener('mouseup',e=>{
+    if(e.button!==0) return;
+    P.firing=false;
   });
 
   // 指针锁定视角
@@ -418,7 +442,23 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   }
 
   // 移动端操作按钮
-  const fireBtn=$('btnFire'); if(fireBtn){ fireBtn.addEventListener('touchstart',e=>{ if(ready) fire(); e.preventDefault(); }); }
+  /* 移动端开火键：同样用「按住」语义。
+     以前只监听 touchstart，所以移动端也打不出连发。
+     touchend / touchcancel 都必须清掉，否则手指抬起后
+     全自动枪会一直响到弹匣打空。 */
+  const fireBtn=$('btnFire');
+  if(fireBtn){
+    fireBtn.addEventListener('touchstart',e=>{
+      if(ready){ P.firing=true; fire(); }
+      e.preventDefault();
+    },{passive:false});
+    const stopFire=()=>{ P.firing=false; };
+    fireBtn.addEventListener('touchend',stopFire);
+    fireBtn.addEventListener('touchcancel',stopFire);
+    /* 桌面调试：鼠标压住按钮也走同一套 */
+    fireBtn.addEventListener('mousedown',e=>{ if(ready){ P.firing=true; fire(); } e.preventDefault(); });
+    fireBtn.addEventListener('mouseup',()=>{ P.firing=false; });
+  }
   const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ if(ready) doJump(); e.preventDefault(); }); }
   const reloadBtn=$('btnReload'); if(reloadBtn){ reloadBtn.addEventListener('touchstart',e=>{ startReload(); e.preventDefault(); }); }
   const sprintBtn=$('btnSprint'); if(sprintBtn){
@@ -581,11 +621,13 @@ const SHOP_ITEMS={
      主武器决定你拿的是步枪还是冲锋枪；手枪是副武器，主武器没子弹时切换用；
      小刀是最后的近战手段，不耗子弹。
      这三个 cat 分别对应 SLOTS 里的 primary / secondary / melee。 */
-  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26},
-  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18},
-  gun_sniper: {cat:'gun',    get name(){ return T('狙击步枪'); }, icon:'🎯', price:8000, get desc(){ return T('单发 · 极高伤害'); }, ammoType:'sniper', dmg:60},
-  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('应急副武器'); }, ammoType:'pistol', dmg:14},
-  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('高伤副武器'); }, ammoType:'pistol', dmg:24},
+  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26, fireMode:'auto', fireCd:0.086, mag:30, recoil:1.0, adsZ:0.62, adsY:0.013, sightY:0.092},
+  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18, fireMode:'auto', fireCd:0.070, mag:30, recoil:0.70, adsZ:0.50, adsY:0.012, sightY:0.095},
+  gun_sniper: {cat:'gun',    get name(){ return T('狙击步枪'); }, icon:'🎯', price:8000, get desc(){ return T('栓动 · 极高伤害 · 开镜倍率高'); }, ammoType:'sniper', dmg:60, fireMode:'bolt', fireCd:1.30, mag:5, recoil:1.0, adsZ:0.46, adsY:0.020, sightY:0.125, adsFov:0.55},
+  gun_dmr:    {cat:'gun',    get name(){ return T('精确射手步枪'); }, icon:'🎯', price:6200, get desc(){ return T('半自动 · 高精度 · 中远距'); }, ammoType:'rifle', dmg:44, fireMode:'semi', fireCd:0.30, mag:20, recoil:1.0, adsZ:0.55, adsY:0.018, sightY:0.108, adsFov:0.72},
+  gun_m870:   {cat:'gun',    get name(){ return T('雷明顿 M870'); }, icon:'🔫', price:5200, get desc(){ return T('泵动 · 9 颗弹丸 · 近距一枪致命'); }, ammoType:'shot', dmg:14, fireMode:'pump', fireCd:0.20, mag:7, pumpTime:0.58, pellets:9, recoil:1.0, adsZ:0.60, adsY:0.014, sightY:0.090},
+  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('半自动 · 应急副武器'); }, ammoType:'pistol', dmg:14, fireMode:'semi', fireCd:0.17, mag:12, recoil:0.90, adsZ:0.40, adsY:0.012, sightY:0.093},
+  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('半自动 · 高伤副武器'); }, ammoType:'pistol', dmg:24, fireMode:'semi', fireCd:0.24, mag:8, recoil:0.75, adsZ:0.42, adsY:0.013, sightY:0.093},
   melee_knife:{cat:'melee',  get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹'); }, dmg:35},
   melee_baton:{cat:'melee',  get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */

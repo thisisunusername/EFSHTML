@@ -1318,8 +1318,6 @@ var S = {
   eyeX:0, eyeY:0,  /* 眼睛偏移的平滑插值，避免朝向切换时抖动 */
   bobCur:0,        /* 走路上下浮动的平滑插值 */
   seeT:0,          /* 当前被某个敌人盯住的累计秒数（用于 HUD 警戒条） */
-  camT:0,          /* 被监控报警盯住的累计秒数（独立于 seeT，不当场抓人） */
-  camAlarm:null,   /* 监控报警点 {x,y,t,floor}，用于把附近老师吸引过来 */
   seenBy:'',       /* 正在盯着玩家的敌人名字 */
   safeT:0,         /* 被抓送回后的短暂无敌保护（秒） */
   camsOff:false,   /* 保安室的监控总闸是否已关 */
@@ -1768,7 +1766,7 @@ function startGame(diff){
   if(typeof updateCheatTag==='function') updateCheatTag();
   S.camsOff=false; S.carBroken=false; S.elecOpen=false; S.wallBroken=false;
   S.moving=false; S.bobCur=0; S.eyeX=0; S.eyeY=0;
-  S.seeT=0; S.seenBy=''; S.camT=0; S.camAlarm=null; S.safeT=0;
+  S.seeT=0; S.seenBy=''; S.safeT=0;
   S.npcs=spawnNpcs(S.diff);
   S._noCam=true;
   for(var k in input) input[k]=false;
@@ -2167,12 +2165,6 @@ function updateNpcs(dt){
           setPath(n, f, S.px, S.py);
           if(!n.path || !n.path.length) n.state='patrol';
         }
-      } else if(S.camAlarm && n.kind==='teacher' && S.camAlarm.floor===S.floor){
-        /* 监控报警：老师朝报警点赶过去查看（不会瞬间锁死玩家位置）。
-           只在当前层巡逻状态下触发，赶到后自动回巡逻。 */
-        n.state='chase';
-        setPath(n, f, S.camAlarm.x, S.camAlarm.y);
-        if(!n.path || n.path.length<2){ n.state='patrol'; n.path=null; }
       } else n.state='patrol';
     } else {
       n.state='patrol';        /* 后台层只巡逻，不追 */
@@ -2282,28 +2274,11 @@ function checkCatch(dt){
     if(m.kind==='guard' && inClass) continue;   /* 保安看不进教室 */
     if(npcSees(m)){ watchers++; if(!watcher) watcher=m; }
   }
-  /* 2b) 监控只负责「报警」，不当场抓人。
-     改造前的写法是把监控当成第二种 watcher 直接累加 S.seeT，
-     结果站在监控下面跟被老师盯住完全等价：满 SEE_LIMIT 秒必被抓。
-     摇杆版地图小、5 个监控又都卡在关键路口，等于寸步难行。
-     现在监控改为独立计时 camT：它只延长暴露时间（速度为玩家的 0.35 倍），
-     并把附近老师吸引过来，真正的处决权仍然只在老师手里。 */
+  /* 2b) 监控也算「被看见」：站在有监控的路上，同样会累计 */
   if(watchers===0){
     var cam=camerasWatcher();
-    if(cam){
-      S.camT=(S.camT||0)+dt;
-      S.camAlarm={x:cam.x, y:cam.y, t:0.9, floor:S.floor};   /* 报警点，供老师赶过来 */
-      S.camLabel = cam.label||'监控';
-      /* 监控不能直接抓人，只在极度接近时轻微推高 seeT，给玩家逃离缓冲 */
-      if(S.camT>1.6) S.seeT = Math.min(S.seeT+dt*0.35, 2.2);
-    } else {
-      S.camT = Math.max(0, (S.camT||0) - dt*1.5);
-    }
-  } else {
-    S.camT = Math.max(0, (S.camT||0) - dt*1.5);
+    if(cam){ watchers=1; watcher={name:cam.label||'监控'}; }
   }
-  /* 报警点随时间衰减，避免老师被永久锁在一个坐标上 */
-  if(S.camAlarm){ S.camAlarm.t-=dt; if(S.camAlarm.t<=0) S.camAlarm=null; }
   if(watchers>0){
     S.seenBy = watcher ? watcher.name : '';
     S.everSpotted = true;

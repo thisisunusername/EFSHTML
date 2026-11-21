@@ -370,9 +370,50 @@ function fontApply(){
   }catch(e){}
   return fontSel;
 }
+/* 【字体是否真的加载成功】@font-face 只是「声明」，
+   浏览器要等实际用到才会去下载/解析那个 ttf。
+   如果文件路径不对（file:// 下最容易被拦），
+   document.fonts.check() 会返回 false，界面静默回退到系统字体 ——
+   玩家看到的就是「换了字体没反应」。
+   这里给出探测函数，设置面板调用它来决定要不要提示。 */
+function fontFaceLoaded(family){
+  try{
+    const f = FONT_FAMILY[family];
+    if(!f) return null;
+    /* 只关心那四个 @font-face 自带字体；系统/等宽/衬线/圆体/手写
+       都依赖设备本地字体，无需检测（本来就不该有加载问题）。 */
+    const m = f.css.match(/^"([A-Za-z]+)"/);
+    if(!m) return null;
+    const name = m[1];
+    if(typeof document==='undefined' || !document.fonts || !document.fonts.check) return null;
+    return document.fonts.check('16px "'+name+'"');
+  }catch(e){ return null; }
+}
+/* 主动触发加载：把四个字体都拉一遍，这样切过去立刻就是正确字形，
+   不会先闪一下系统字体。走 load() 是异步的，失败了也不会影响界面。 */
+function fontWarmup(){
+  try{
+    if(typeof document==='undefined' || !document.fonts) return;
+    const names=['ZCOOLXiaoWei','MaShanZheng','ZCOOLKuaiLe','LongCang'];
+    for(const n of names){
+      try{
+        const p=document.fonts.load('16px "'+n+'"');
+        if(p && p.catch) p.catch(()=>{});
+      }catch(e){}
+    }
+  }catch(e){}
+}
 function fontSetFamily(v){
   fontSel.family = fontNormFamily(v);
   fontSave(); fontApply();
+  /* 切到自带字体时顺手确认一下有没有加载成功，失败就明确提示，
+     而不是让玩家盯着屏幕猜。 */
+  try{
+    const ok = fontFaceLoaded(fontSel.family);
+    if(ok === false && typeof toast==='function'){
+      toast('字体文件没能加载（fonts/ 要和 index.html 放在一起）');
+    }
+  }catch(e){}
   return fontSel.family;
 }
 function fontSetSize(k, v){

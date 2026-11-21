@@ -22,19 +22,19 @@
      否则本地那条会 404、只能走网络那条（离线就还是没有效果）。
      这一点我在部署步骤里一并复制过去。 */
   @font-face{ font-family:'ZCOOLXiaoWei';
-    src:url('../fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
+    src:url('fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/zcoolxiaowei/v15/i7dMIFFrTRywPpUVX9_RJyM1YFI.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'MaShanZheng';
-    src:url('../fonts/MaShanZheng.ttf') format('truetype'),
+    src:url('fonts/MaShanZheng.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'ZCOOLKuaiLe';
-    src:url('../fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
+    src:url('fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'LongCang';
-    src:url('../fonts/LongCang.ttf') format('truetype'),
+    src:url('fonts/LongCang.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2');
     font-display:swap; }
   :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
@@ -755,7 +755,14 @@ html[data-lang="en"] #bagBtn span{
   /* ---- 主菜单：M3 深色表面 + 大圆角 + 状态层 ---- */
   html[data-theme="material"] body{
     background:var(--m3-surface); color:var(--m3-on-surface);
-    font-family:"Roboto","Noto Sans SC",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+    /* 【字体必须跟随设置】这里原来写死了一串字面量
+       （Roboto / Noto Sans SC / PingFang SC …），
+       而选择器 html[data-theme="material"] body 的优先级
+       高于 html,body —— 于是只要主题选 Material，
+       设置里再怎么换字体都会被这一行盖掉，
+       表现就是「字体切换没有用」。
+       改成跟随 --font-ui 变量即可。 */
+    font-family:var(--font-ui);
   }
   html[data-theme="material"] #menu{
     background:var(--m3-surface); background-image:none;

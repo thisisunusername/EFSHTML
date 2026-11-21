@@ -22,19 +22,19 @@
      否则本地那条会 404、只能走网络那条（离线就还是没有效果）。
      这一点我在部署步骤里一并复制过去。 */
   @font-face{ font-family:'ZCOOLXiaoWei';
-    src:url('../fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
+    src:url('fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/zcoolxiaowei/v15/i7dMIFFrTRywPpUVX9_RJyM1YFI.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'MaShanZheng';
-    src:url('../fonts/MaShanZheng.ttf') format('truetype'),
+    src:url('fonts/MaShanZheng.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'ZCOOLKuaiLe';
-    src:url('../fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
+    src:url('fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2');
     font-display:swap; }
   @font-face{ font-family:'LongCang';
-    src:url('../fonts/LongCang.ttf') format('truetype'),
+    src:url('fonts/LongCang.ttf') format('truetype'),
         url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2');
     font-display:swap; }
   :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
@@ -755,7 +755,14 @@ html[data-lang="en"] #bagBtn span{
   /* ---- 主菜单：M3 深色表面 + 大圆角 + 状态层 ---- */
   html[data-theme="material"] body{
     background:var(--m3-surface); color:var(--m3-on-surface);
-    font-family:"Roboto","Noto Sans SC",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+    /* 【字体必须跟随设置】这里原来写死了一串字面量
+       （Roboto / Noto Sans SC / PingFang SC …），
+       而选择器 html[data-theme="material"] body 的优先级
+       高于 html,body —— 于是只要主题选 Material，
+       设置里再怎么换字体都会被这一行盖掉，
+       表现就是「字体切换没有用」。
+       改成跟随 --font-ui 变量即可。 */
+    font-family:var(--font-ui);
   }
   html[data-theme="material"] #menu{
     background:var(--m3-surface); background-image:none;
@@ -12298,9 +12305,50 @@ function fontApply(){
   }catch(e){}
   return fontSel;
 }
+/* 【字体是否真的加载成功】@font-face 只是「声明」，
+   浏览器要等实际用到才会去下载/解析那个 ttf。
+   如果文件路径不对（file:// 下最容易被拦），
+   document.fonts.check() 会返回 false，界面静默回退到系统字体 ——
+   玩家看到的就是「换了字体没反应」。
+   这里给出探测函数，设置面板调用它来决定要不要提示。 */
+function fontFaceLoaded(family){
+  try{
+    const f = FONT_FAMILY[family];
+    if(!f) return null;
+    /* 只关心那四个 @font-face 自带字体；系统/等宽/衬线/圆体/手写
+       都依赖设备本地字体，无需检测（本来就不该有加载问题）。 */
+    const m = f.css.match(/^"([A-Za-z]+)"/);
+    if(!m) return null;
+    const name = m[1];
+    if(typeof document==='undefined' || !document.fonts || !document.fonts.check) return null;
+    return document.fonts.check('16px "'+name+'"');
+  }catch(e){ return null; }
+}
+/* 主动触发加载：把四个字体都拉一遍，这样切过去立刻就是正确字形，
+   不会先闪一下系统字体。走 load() 是异步的，失败了也不会影响界面。 */
+function fontWarmup(){
+  try{
+    if(typeof document==='undefined' || !document.fonts) return;
+    const names=['ZCOOLXiaoWei','MaShanZheng','ZCOOLKuaiLe','LongCang'];
+    for(const n of names){
+      try{
+        const p=document.fonts.load('16px "'+n+'"');
+        if(p && p.catch) p.catch(()=>{});
+      }catch(e){}
+    }
+  }catch(e){}
+}
 function fontSetFamily(v){
   fontSel.family = fontNormFamily(v);
   fontSave(); fontApply();
+  /* 切到自带字体时顺手确认一下有没有加载成功，失败就明确提示，
+     而不是让玩家盯着屏幕猜。 */
+  try{
+    const ok = fontFaceLoaded(fontSel.family);
+    if(ok === false && typeof toast==='function'){
+      toast('字体文件没能加载（fonts/ 要和 index.html 放在一起）');
+    }
+  }catch(e){}
   return fontSel.family;
 }
 function fontSetSize(k, v){
@@ -12967,6 +13015,7 @@ try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff
 /* 【主菜单生涯统计首次填充】打开页面就要显示真实的击杀数/撤离次数，
    不能等打完一局才出现。P.stats 会被存档读回，所以这里直接渲染即可。 */
 try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
+try{ if(typeof fontWarmup==='function') fontWarmup(); }catch(e){}
 /* ============ 屏幕诊断条（长按顶栏 2 秒触发）============
    手机上看不到控制台，遇到「按钮点不动/人物悬空」这类问题时
    只能靠猜。这里做一个最小诊断：按住顶栏 2 秒，弹出一个小面板，

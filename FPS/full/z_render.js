@@ -179,6 +179,7 @@ try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff
 /* 【主菜单生涯统计首次填充】打开页面就要显示真实的击杀数/撤离次数，
    不能等打完一局才出现。P.stats 会被存档读回，所以这里直接渲染即可。 */
 try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
+try{ if(typeof fontWarmup==='function') fontWarmup(); }catch(e){}
 /* ============ 屏幕诊断条（长按顶栏 2 秒触发）============
    手机上看不到控制台，遇到「按钮点不动/人物悬空」这类问题时
    只能靠猜。这里做一个最小诊断：按住顶栏 2 秒，弹出一个小面板，

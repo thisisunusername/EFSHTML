@@ -468,6 +468,38 @@ function initGM(){
     minBtn.textContent=el.classList.contains('min')?'+':'−';
     gmClampPos(el);
   });
+  /* 【手机上的解锁入口】操作说明里那个「D」按键图标可以点。
+     手机压根没有键盘，光绑 keydown 等于把彩蛋锁死在桌面端；
+     这里把菜单里的 <kbd id="gmKeyD">D</kbd> 也绑上，
+     触屏和鼠标都能点，和键盘走同一个计数函数。
+     touchstart + click 双绑：touchstart 让反馈更跟手，
+     click 兜底老 WebView；两者都用 e.repeat 那套防重复逻辑
+     （gmHitD 内部是计数，重复调用只会多加一次，所以这里
+      用 preventDefault 挡掉 touchstart 之后浏览器补发的 click）。 */
+  const keyD=document.getElementById('gmKeyD');
+  if(keyD){
+    let lastTouch=0;
+    /* 直接调 gmCountHit：点得到这个 <kbd> 就说明菜单开着，
+       不必再走 gmMenuVisible 的可见性判断（那一步是给键盘准备的，
+       防止游戏里按 D 向右走时误触）。 */
+    keyD.addEventListener('touchstart',(e)=>{
+      lastTouch=Date.now();
+      if(e.cancelable) e.preventDefault();
+      gmCountHit();
+    },{passive:false});
+    keyD.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      /* touchstart 刚处理过就别再算一次，否则点一下记两次 */
+      if(Date.now()-lastTouch<600) return;
+      gmCountHit();
+    });
+    /* 兜底：某些老 WebView 只派发 pointerdown 不派发 touchstart/click */
+    keyD.addEventListener('pointerdown',(e)=>{
+      if(e.pointerType==='mouse') return;   // 鼠标交给 click，避免双击记两次
+      lastTouch=Date.now();
+      gmCountHit();
+    });
+  }
 }
 
 /* 主菜单 D 键计数。
@@ -492,11 +524,25 @@ function gmMenuVisible(){
 }
 function gmHitD(){
   if(!gmMenuVisible()) return;
+  gmCountHit();
+}
+/* 真正计数的那一步，键盘和点击共用。
+   【为什么不把可见性判断也放进来】点击「D」按键图标时，
+   手指按在菜单上，菜单必然可见；但万一将来把 <kbd> 挪到别处
+   （或者面板被别的层盖住），按可见性判断会直接吞掉点击，
+   又变成「点了没反应」。所以点击入口信任调用方，
+   键盘入口（可能在游戏里按到）才必须查可见性。 */
+function gmCountHit(){
   const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
   if(now-_gmLast>GM_RESET_MS) _gmCount=0;
   _gmLast=now;
   _gmCount++;
-  /* 调试用：控制台里敲 __gm() 就能看到还差几次 */
+  /* 从第 2 次开始给一点反馈：不然连点 15 下全程毫无动静，
+     用户根本分不清是「没绑上」还是「还差几下」。
+     toast 只在开局几次显示，避免最后几次刷屏。 */
+  if(_gmCount>=2 && _gmCount<GM_HITS){
+    try{ toast('GM ' + _gmCount + '/' + GM_HITS); }catch(e){}
+  }
   if(window.__GM_DEBUG) console.log('[GM] '+_gmCount+'/'+GM_HITS);
   if(_gmCount>=GM_HITS){
     _gmCount=0;

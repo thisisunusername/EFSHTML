@@ -855,5 +855,59 @@ background:rgba(90,220,255,.03); cursor:default; }
 <script type="importmap">
 { "imports": { "three": "./three.module.js" } }
 </script>
+<!-- 【启动自检 / 错误捕获】
+     这段是普通脚本（不是 module），会在 module 之前执行。
+     目的：用户反馈「主界面按钮点不动、但按下有蓝圈」。
+     蓝圈是 CSS :active，不需要 JS；说明事件到了按钮，
+     但 onclick 没执行 —— 也就是 JS 整体没跑起来或中途崩了。
+     手机上看不到控制台，所以这里把错误直接画到屏幕上，
+     一眼就能看出是「模块没加载」「某个函数未定义」还是别的。
+     正常情况这段什么都不显示。 -->
+<script>
+(function(){
+  var shown=false;
+  function show(msg){
+    if(shown) return; shown=true;
+    try{
+      var d=document.createElement('div');
+      d.id='__bootdiag';
+      d.style.cssText='position:fixed;left:8px;top:8px;right:8px;z-index:99999;'
+        +'background:rgba(140,20,20,.96);color:#fff;font:12px/1.5 ui-monospace,monospace;'
+        +'padding:10px 12px;border-radius:10px;border:1px solid #ff6a5a;white-space:pre-wrap;'
+        +'max-height:60vh;overflow:auto;';
+      d.textContent='⚠ 启动出错：\n'+msg;
+      (document.body||document.documentElement).appendChild(d);
+    }catch(e){}
+  }
+  /* 1. 普通运行时错误 */
+  window.addEventListener('error', function(e){
+    /* 模块脚本加载失败会以 Event 形式进来，没有 message */
+    if(e && e.target && e.target.tagName==='SCRIPT'){
+      show('脚本加载失败：'+(e.target.src||'(inline module)'));
+      return;
+    }
+    var m=(e && e.message)||'未知错误';
+    var src=(e && e.filename)||'';
+    var ln=(e && e.lineno)||'';
+    show(m+'\n'+(src?src+':'+ln:''));
+  }, true);
+  /* 2. Promise 里未捕获的异常 */
+  window.addEventListener('unhandledrejection', function(e){
+    var r=e && e.reason;
+    show('Promise 未捕获：'+((r && (r.stack||r.message))||String(r)));
+  });
+  /* 3. 兜底心跳：模块若正常跑完，__uiReady 会被置位。
+     5 秒后还没置位，说明 module 压根没执行（多半是 three 加载失败，
+     或者用 file:// 打开被浏览器的模块安全策略拦了）。 */
+  setTimeout(function(){
+    if(!window.__uiReady && !window.__moduleRan){
+      show('模块没有执行。\n常见原因：\n'
+        +'· 用 file:// 直接打开（浏览器禁止 file:// 下的 ES module）\n'
+        +'· three.module.js 不在同目录或没加载成功\n'
+        +'· 浏览器版本过旧，不支持 importmap / module');
+    }
+  }, 5000);
+})();
+</script>
 <script type="module">
 import * as THREE from 'three';

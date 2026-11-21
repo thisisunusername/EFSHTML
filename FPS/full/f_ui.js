@@ -2334,8 +2334,20 @@ function __bindMenuFallback(){
   const backBtn=$('btnBack');
   if(backBtn && !backBtn.onclick){ backBtn.onclick=()=>{ location.href='../'; }; backBtn.__jsBound=true; }
 }
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',__startBindUI);
-else __startBindUI();/* ============ 输入方式自适应 ============
+/* 【bindUI 的调用时机】
+   原来紧跟在 f_ui.js 末尾就调用。而 f_ui.js 后面还有 x_ext / w_weapon /
+   y_audio / _orient / u_i18n / z_render 五个文件没被解析。
+   虽然函数声明会提升，但只要 bindUI 里碰到任何一个用 const/let
+   定义的东西（比如某个常量、或者被 let 声明的状态），
+   就会抛 ReferenceError（暂时性死区），而且是整个模块直接中断。
+   现在改成用 DOMContentLoaded + 微任务推迟到「所有分块都执行完」之后再跑，
+   这样任何函数都肯定已经存在了。 */
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(__startBindUI,0); });
+}else{
+  /* 脚本还没跑完（后面还有几个文件），推迟到当前任务之后再绑 */
+  setTimeout(__startBindUI,0);
+}/* ============ 输入方式自适应 ============
    需求：
      · 检测到键盘 -> 隐藏触摸按键（摇杆 + 右侧按钮）
      · 检测到触摸  -> 重新显示

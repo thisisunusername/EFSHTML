@@ -1,4 +1,10 @@
 /* ============ b_world.js：场景初始化 + 学校地图（还原现实） ============ */
+/* 【模块已执行的证据】
+   a_head.html 里的启动自检脚本会在 5 秒后检查这个标记。
+   模块正常跑起来 = 有标记；没有标记 = module 压根没执行
+   （多半是 three.module.js 没加载，或者用 file:// 打开被浏览器拦了）。
+   放在这里是因为它紧跟 import 之后，是最早能执行的业务代码。 */
+window.__moduleRan=true;
 const $=id=>document.getElementById(id);
 let renderer,scene,camera,clock,ready=false;
 const colliders=[],shootables=[],enemies=[],loots=[];

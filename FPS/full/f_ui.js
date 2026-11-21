@@ -90,26 +90,45 @@ function bindUI(){
     const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
   });
 
-  // 触屏摇杆
-  const joyBase=$('joyBase'), joyStick=$('joyStick');
-  if(joyBase){
-    let jActive=false, jx=0, jy=0;
-    joyBase.addEventListener('touchstart',e=>{
+  // 触屏摇杆（整块 joyZone 都能拖，不必精确按小圆）
+  const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
+  if(joyZone&&joyBase&&joyStick){
+    let jId=null, jx=0, jy=0;
+    const startJoy=(t)=>{
       const r=joyBase.getBoundingClientRect();
-      jActive=true; jx=r.left+r.width/2; jy=r.top+r.height/2;
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      // 摇杆圆心跟着手指走（原位或手指位置），以手指按下点为基准
+      jx=t.clientX; jy=t.clientY;
+      joyBase.style.left=(t.clientX-r.width/2)+'px';
+      joyBase.style.top=(t.clientY-r.height/2)+'px';
+      joyBase.style.bottom='auto';
+      jId=t.identifier;
+      touchMoveX=0; touchMoveY=0;
+    };
+    joyZone.addEventListener('touchstart',e=>{
+      if(jId!==null) return;
+      startJoy(e.changedTouches[0]);
       e.preventDefault();
-    });
-    joyBase.addEventListener('touchmove',e=>{
-      if(!jActive) return;
-      const t=e.touches[0];
-      let dx=t.clientX-jx, dy=t.clientY-jy;
-      const max=45, d=Math.hypot(dx,dy);
-      if(d>max){ dx*=max/d; dy*=max/d; }
-      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      touchMoveX=dx/max; touchMoveY=dy/max;
+    }, {passive:false});
+    joyZone.addEventListener('touchmove',e=>{
+      if(jId===null) return;
+      for(const t of e.changedTouches){
+        if(t.identifier!==jId) continue;
+        let dx=t.clientX-jx, dy=t.clientY-jy;
+        const max=48, d=Math.hypot(dx,dy);
+        if(d>max){ dx*=max/d; dy*=max/d; }
+        joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        touchMoveX=dx/max; touchMoveY=dy/max;
+      }
       e.preventDefault();
-    });
-    joyBase.addEventListener('touchend',()=>{ jActive=false; touchMoveX=0; touchMoveY=0; joyStick.style.transform='translate(-50%,-50%)'; });
+    }, {passive:false});
+    const endJoy=()=>{
+      jId=null; touchMoveX=0; touchMoveY=0;
+      joyStick.style.transform='translate(-50%,-50%)';
+      joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
+    };
+    joyZone.addEventListener('touchend',endJoy);
+    joyZone.addEventListener('touchcancel',endJoy);
   }
 
   // 移动端操作按钮

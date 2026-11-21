@@ -12,7 +12,7 @@
   /* HUD */
   #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
   /* 视角触摸层：覆盖全屏，位于摇杆/按钮之下 */
-  #viewLayer{ position:fixed; inset:0; z-index:5; touch-action:none; }
+  #viewLayer{ position:fixed; inset:0; z-index:5; touch-action:none; background:transparent; }
   /* 游戏内常驻操作提示（手机端小字条） */
   #htip{ position:absolute; left:50%; transform:translateX(-50%); bottom:58px; max-width:94vw; padding:5px 10px; border-radius:8px; background:rgba(10,14,22,.72); border:1px solid rgba(124,92,255,.35); color:#c8d0e0; font-size:10.5px; line-height:1.5; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   #htip.hide{ opacity:0; }
@@ -38,11 +38,11 @@
   /* 加载/错误提示 */
   #loaderr{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ff7a6a; font-size:15px; font-weight:700; text-align:center; z-index:200; background:rgba(20,8,8,.92); padding:16px 22px; border-radius:12px; border:1px solid #c2382a; display:none; max-width:80%; line-height:1.6; }
   /* 摇杆（移动端） */
-  #joyZone{ position:absolute; bottom:0; left:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; }
-  #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.18); }
+  #joyZone{ position:fixed; bottom:0; left:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; touch-action:none; }
+  #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  #actZone{ position:absolute; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; }
+  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; }
   .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; }
   .actbtn:active{ background:var(--accent); }
   #btnFire{ right:30px; bottom:28px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
@@ -100,16 +100,17 @@
   <div id="prompt"></div>
 <div id="toast"></div>
   <div id="htip">📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下</div>
+</div>
 
-  <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
-  <div id="viewLayer"></div>
-  <div id="actZone">
-    <div class="actbtn" id="btnFire">开火</div>
-    <div class="actbtn" id="btnJump">跳</div>
-    <div class="actbtn" id="btnReload">换弹</div>
-    <div class="actbtn" id="btnInteract">拾取</div>
-    <div class="actbtn" id="btnSprint">奔跑</div>
-  </div>
+<!-- 触摸控制层：必须在 #hud 之外，因为 #hud 是 pointer-events:none -->
+<div id="viewLayer"></div>
+<div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
+<div id="actZone">
+  <div class="actbtn" id="btnFire">开火</div>
+  <div class="actbtn" id="btnJump">跳</div>
+  <div class="actbtn" id="btnReload">换弹</div>
+  <div class="actbtn" id="btnInteract">拾取</div>
+  <div class="actbtn" id="btnSprint">奔跑</div>
 </div>
 
 <div id="loaderr"></div>

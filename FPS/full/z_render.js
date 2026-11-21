@@ -29,6 +29,7 @@ function updShake(dt){
 /* ---- 像素预算制分辨率（学自 saltline：锁像素总数而非固定倍率） ---- */
 const PIXEL_BUDGET=2300000; // 约 high 档
 let curPixelScale=1;
+let curW=0, curH=0;   // 记录上次画布尺寸，用于横竖屏切换时强制重建
 function applyPixelBudget(){
   if(typeof renderer==='undefined'||!renderer) return;
   const w=Math.max(2,window.innerWidth), h=Math.max(2,window.innerHeight);
@@ -36,13 +37,24 @@ function applyPixelBudget(){
   const pixels=w*dpr*h*dpr;
   let scale=1;
   if(pixels>PIXEL_BUDGET) scale=Math.sqrt(PIXEL_BUDGET/pixels);
-  if(Math.abs(scale-curPixelScale)>0.01){
-    curPixelScale=scale;
+  if(Math.abs(scale-curPixelScale)>0.01 || curW!==w || curH!==h){
+    curPixelScale=scale; curW=w; curH=h;
     renderer.setPixelRatio(dpr*scale);
     /* 第 3 个参数必须为 true：要同时更新 canvas 的 CSS 尺寸。
        传 false 只改绘制缓冲区，样式尺寸还是旧的，
        移动端高 DPR 下会被拉伸/错位，严重时看起来像整屏发黑。 */
     renderer.setSize(w,h,true);
+  }
+  /* 【横屏必做】旋转屏幕后宽高比彻底变了，
+     这里必须同步更新相机的 aspect 并重算投影矩阵，
+     否则画面会被横向或纵向拉伸成变形（看起来很「错位」）。
+     原来只在 resize 里调 applyPixelBudget，从没动过 aspect。 */
+  if(typeof camera!=='undefined' && camera){
+    const ar=w/h;
+    if(Math.abs((camera.aspect||0)-ar) > 0.001){
+      camera.aspect=ar;
+      camera.updateProjectionMatrix();
+    }
   }
 }
 
@@ -83,8 +95,24 @@ function animate(){
   }
 }
 
-// 窗口尺寸变化时重算像素预算
-window.addEventListener('resize',()=>{ if(ready) applyPixelBudget(); });
+/* 窗口尺寸 / 横竖屏变化时统一走这里。
+   由 f_ui.js 的 bindUI 注册（window.__relayout），
+   它会在 resize 与 orientationchange 里被调用，
+   而且旋转后会延迟补调几次，确保拿到最终尺寸。
+   这里同时重算相机宽高比，否则横屏画面会被拉伸变扁。 */
+window.__relayout=function(){
+  try{
+    applyPixelBudget();
+    if(typeof camera!=='undefined' && camera && window.innerWidth && window.innerHeight){
+      const ar=window.innerWidth/window.innerHeight;
+      if(Math.abs((camera.aspect||0)-ar)>0.001){
+        camera.aspect=ar;
+        camera.updateProjectionMatrix();
+      }
+    }
+  }catch(e){}
+};
+window.addEventListener('resize',()=>{ if(typeof window.__relayout==='function') window.__relayout(); });
 
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

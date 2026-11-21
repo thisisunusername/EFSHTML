@@ -42,6 +42,18 @@ function hideTouchUI(){
 }
 function bindUI(){
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
+  /* 【横屏支持】屏幕旋转时立即重算：
+       1) 画布尺寸与像素预算（applyPixelBudget 里同时修正相机 aspect）
+       2) 摇杆区域占比（横屏时左侧给摇杆 42%，其余归视角拖拽）
+     有些 WebView 在旋转时 resize 事件晚于真实尺寸变化，
+     所以 orientationchange 之后再补两次延迟调用，确保拿到最终尺寸。 */
+  const relayout=()=>{
+    if(window.__relayout) window.__relayout();
+    if(typeof applyPixelBudget==='function' && ready) { try{ applyPixelBudget(); }catch(e){} }
+  };
+  window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
+  window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
+  relayout();
   const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
@@ -206,11 +218,14 @@ function bindUI(){
        这里在 document 上再挂一份：只要触点落在左半屏、
        且当前没有摇杆在拖，就照样启动摇杆。
        优先走 #joyZone 的正常路径，它没收到才由这里接手。 */
+    /* 【横屏适配】摇杆只管屏幕左侧 42% 的区域。
+       原来固定是 50%，横屏后左半屏很宽，手指稍微往中间推就落到视角层，
+       会变成「推着推着视角自己转起来」。 */
     document.addEventListener('touchstart',e=>{
       if(activeId!==null) return;
       if(!window.__joyEnabled) return;    // 还没进游戏（菜单界面）不接管
       const t=e.changedTouches[0]; if(!t) return;
-      if(t.clientX > window.innerWidth*0.5) return;   // 右半屏归视角
+      if(t.clientX > window.innerWidth*(window.__joyZoneRatio||0.42)) return;
       startJoy(t.clientX,t.clientY);
     }, {passive:true});
     document.addEventListener('touchmove',e=>{
@@ -287,11 +302,17 @@ function bindUI(){
       const t=e.changedTouches[0]; if(!t) return;
       vOn=true; vx=t.clientX; vy=t.clientY;
     }, {passive:true});
-    viewLayer.addEventListener('touchmove',e=>{
+    /* 【视角灵敏度】单位是「弧度/像素」。
+       原来触屏用的是 0.005，比鼠标路径的 0.0025/0.003 高出一倍，
+       手机上轻轻一划视角就飞出去，根本瞄不准。
+       这里统一成统一常量，触屏取 0.0026：
+       横向划满一整屏（约 800px）大约转 2.08 弧度 ≈ 119°，符合常见手游手感。 */
+   const TOUCH_SENS=0.0026;
+   viewLayer.addEventListener('touchmove',e=>{
       if(!vOn) return;
       const t=e.changedTouches[0]; if(!t) return;
-      P.yaw-=(t.clientX-vx)*0.005;
-      P.pitch-=(t.clientY-vy)*0.005;
+      P.yaw-=(t.clientX-vx)*TOUCH_SENS;
+      P.pitch-=(t.clientY-vy)*TOUCH_SENS;
       const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
       vx=t.clientX; vy=t.clientY;
     }, {passive:true});

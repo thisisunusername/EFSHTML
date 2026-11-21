@@ -22,9 +22,28 @@ function cyl(rt,rb,h,c,x,y,z,noCol){
   return solid(m);
 }
 /* 平面装饰（球场标线、跑道等，贴地面不碰撞） */
+let decoIndex=0;
 function groundDeco(w,d,c,x,z,opacity){
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshStandardMaterial({color:c,roughness:1,transparent:opacity<1,opacity:opacity!==undefined?opacity:1}));
-  m.rotation.x=-Math.PI/2; m.position.set(x,.02,z); m.receiveShadow=true; scene.add(m); return m;
+  /* 【贴图错位的根因之一】
+     这些装饰面原来全都压在 y=0.02，彼此之间几乎零间距，
+     而地面本体在 y=0。两台设备/不同分辨率下深度缓冲精度不同，
+     0.02 这个间距不够用，就会出现闪烁、条纹、错位（z-fighting）。
+     处理方式双保险：
+       1) 每个装饰面按序号抬一点高度，保证彼此不共面；
+       2) 材质开 polygonOffset，让渲染器优先画它、把共面冲突推给地面。 */
+  decoIndex++;
+  const m=new THREE.Mesh(
+    new THREE.PlaneGeometry(w,d),
+    new THREE.MeshStandardMaterial({
+      color:c, roughness:1,
+      transparent:opacity<1, opacity:opacity!==undefined?opacity:1,
+      polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
+      depthWrite:opacity>=1,
+    })
+  );
+  m.rotation.x=-Math.PI/2;
+  m.position.set(x, 0.06+decoIndex*0.002, z);
+  m.receiveShadow=true; scene.add(m); return m;
 }
 
 /* 渲染器 + 场景 + 光照 + 相机 */
@@ -68,11 +87,19 @@ function init(){
   sun.position.set(45,60,25);
   sun.castShadow=true;
   sun.shadow.mapSize.set(2048,2048);
-  sun.shadow.camera.left=-90; sun.shadow.camera.right=90;
-  sun.shadow.camera.top=90;  sun.shadow.camera.bottom=-90;
-  sun.shadow.camera.far=260; sun.shadow.camera.near=1;
-  sun.shadow.bias=-0.0004;
-  sun.shadow.normalBias=0.02;
+  /* 【阴影精度 & 贴图错位】
+     原来 shadow.camera 覆盖 180×180 米（left/right/top/bottom 都是 ±90），
+     却只给 2048×2048 的贴图 —— 每个像素要管 8.8 厘米，
+     墙根、台阶边缘会出现明显的锯齿、条纹和「影子错位」。
+     校园主体范围约 ±50 米，把相机收到 ±60 就够用，
+     每像素精度提升到约 5.9cm，几乎翻倍；
+     再把贴图提到 3072 并加大 normalBias（沿法线偏移，不产生 peter-panning）。 */
+  sun.shadow.mapSize.set(3072,3072);
+  sun.shadow.camera.left=-60; sun.shadow.camera.right=60;
+  sun.shadow.camera.top=60;  sun.shadow.camera.bottom=-60;
+  sun.shadow.camera.far=200; sun.shadow.camera.near=1;
+  sun.shadow.bias=-0.0002;
+  sun.shadow.normalBias=0.045;
   scene.add(sun);
 
   /* 大地：整个校园地面 */

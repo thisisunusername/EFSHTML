@@ -63,8 +63,14 @@
   #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
   .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
-  /* 按钮图标（SVG，currentColor 跟随主题） */
-  .actbtn .ico{ width:30px; height:30px; fill:currentColor; stroke:none; pointer-events:none; }
+  /* 按钮图标（SVG，currentColor 跟随主题）
+     【统一图标体系】全部改用 Lucide 官方图标（ISC 许可）的描边风格：
+     统一 24×24 viewBox、stroke-width 2、round 端点，
+     不再混用「部分实心填充 + 部分描边」的写法——
+     以前开火是实心子弹、开镜是自绘十字、跳跃是火柴人，
+     线宽和风格各不相同，看起来像拼凑的。
+     描边图标在深色半透明按钮上辨识度更高，也更像正经射击手游的 UI。 */
+  .actbtn .ico{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
   #btnFire .ico{ width:38px; height:38px; }
   #btnJump .ico{ width:30px; height:30px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
@@ -105,6 +111,49 @@
   #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
   #fpscount{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:11px; color:#778; }
   @media (max-width:768px){ .actbtn,.joyZone,.actZone{ } }
+  /* ================= 横屏布局 =================
+     横屏和竖屏的操作区完全不同：
+     竖屏时屏幕窄高，摇杆和按钮分居左右两半，纵向空间够用；
+     横屏时高度只有 360~420px，如果还照竖屏那样往上堆按钮，
+     开镜/换弹/奔跑会直接叠在一起。
+     这里改成「沿底边一字排开」的横屏专用布局，
+     并把整体尺寸按屏幕高度缩放，保证小屏也不遮挡视野。 */
+  @media (orientation:landscape){
+    /* 摇杆挪到左下角偏内一点，避免贴住系统手势区 */
+    #joyBase{ left:120px; top:calc(100% - 118px); width:132px; height:132px; }
+    #joyStick{ width:62px; height:62px; }
+    /* 右下角按钮整体缩小并沿底边排布，不再纵向堆叠 */
+    .actbtn{ width:58px; height:58px; }
+    .actbtn .ico{ width:26px; height:26px; }
+    #btnFire{ right:22px; bottom:22px; width:82px; height:82px; }
+    #btnFire .ico{ width:36px; height:36px; }
+    #btnAim{ right:112px; bottom:26px; width:58px; height:58px; }
+    #btnReload{ right:26px; bottom:112px; width:58px; height:58px; }
+    #btnJump{ right:104px; bottom:96px; width:54px; height:54px; }
+    #btnInteract{ right:176px; bottom:22px; width:54px; height:54px; }
+    #btnSprint{ right:176px; bottom:86px; width:54px; height:54px; }
+    /* 横屏视野更宽，准星和提示位置同步微调 */
+    #prompt{ bottom:96px; }
+    #toast{ bottom:104px; }
+    #htip{ bottom:14px; font-size:10px; }
+    /* 菜单卡片在横屏下更扁，避免超出屏幕需要滚动 */
+    #menu{ padding:12px; }
+    #menu .box{ max-width:640px; max-height:94vh; padding:16px 20px; }
+    #menu h1{ font-size:20px; }
+    /* 屏幕特别矮（如 360px 高的手机横屏）再压一档 */
+    @media (max-height:400px){
+      #btnFire{ width:70px; height:70px; right:18px; bottom:18px; }
+      #btnFire .ico{ width:30px; height:30px; }
+      #btnAim{ right:96px; bottom:20px; width:50px; height:50px; }
+      #btnJump{ right:88px; bottom:78px; width:48px; height:48px; }
+      #btnReload{ right:20px; bottom:96px; width:50px; height:50px; }
+      #btnInteract{ right:150px; bottom:18px; width:48px; height:48px; }
+      #btnSprint{ right:150px; bottom:74px; width:48px; height:48px; }
+      .actbtn .ico{ width:22px; height:22px; }
+      #joyBase{ left:96px; top:calc(100% - 96px); width:112px; height:112px; }
+      #joyStick{ width:52px; height:52px; }
+    }
+  }
 </style>
 </head>
 <body>
@@ -133,22 +182,54 @@
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
 <div id="actZone">
   <div class="actbtn" id="btnFire" title="开火">
-    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2c-.7 0-1.3.4-1.6 1L9 6H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1l1.4 8.3c.1.9.8 1.5 1.7 1.5h5.8c.9 0 1.6-.6 1.7-1.5L18 10h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-4l-1.4-3c-.3-.6-.9-1-1.6-1z"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide crosshair：外圈 + 四向刻度线 -->
+      <circle cx="12" cy="12" r="9"/>
+      <line x1="20.5" x2="16.5" y1="12" y2="12"/>
+      <line x1="7.5" x2="3.5" y1="12" y2="12"/>
+      <line x1="12" x2="12" y1="7.5" y2="3.5"/>
+      <line x1="12" x2="12" y1="20.5" y2="16.5"/>
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnAim" title="开镜">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="1.7"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide target：三环同心 -->
+      <circle cx="12" cy="12" r="9"/>
+      <circle cx="12" cy="12" r="5"/>
+      <circle cx="12" cy="12" r="1.4"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnJump" title="跳跃">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="4" r="2.2"/><path d="M12 7.2v5.6M12 12.8l-3 4.2M12 12.8l3 4.2M12 8.8l-4 2.4M12 8.8l4 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide move-up：向上箭头 -->
+      <path d="M8 6L12 2L16 6"/>
+      <path d="M12 2V17"/>
+      <path d="M7 22h10"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnReload" title="换弹">
-    <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="7.6" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="12.2" y="8.5" width="3.3" height="7.5" rx="1"/><path d="M17.5 12a5.5 5.5 0 0 0-9.4-3.9M6.5 12a5.5 5.5 0 0 0 9.4 3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8.1 5.9l-.2 2.6 2.5-.7M15.9 18.1l.2-2.6-2.5.7" fill="currentColor"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide rotate-ccw：逆时针回转箭头 -->
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+      <path d="M3 3v5h5"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnInteract" title="拾取">
-    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2.5 3 6.5v6c0 4.4 3.6 7.6 9 9 5.4-1.4 9-4.6 9-9v-6l-9-4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v5M9.5 10.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide hand-metal：手部拾取 -->
+      <path d="M18 12.5V10a2 2 0 0 0-4 0v1.4"/>
+      <path d="M14 11V9a2 2 0 1 0-4 0v2"/>
+      <path d="M10 10.5V5a2 2 0 1 0-4 0v9"/>
+      <path d="m7 15-1.76-1.76a2 2 0 0 0-2.83 2.82l3.6 3.6C7.5 21.14 9.2 22 12 22h2a8 8 0 0 0 8-8V7a2 2 0 1 0-4 0v5"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnSprint" title="奔跑">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="14" cy="4" r="2.2"/><path d="M6 21l3.2-5.2 2.6-2.2-1.3-4.6-2.8 1.6L6 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.5 9l3.6-2 2.4 2.6 2.5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.6 15l-1.4 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide footprints：脚印 -->
+      <path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/>
+      <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/>
+    </svg>
   </div>
 </div>
 
@@ -230,9 +311,28 @@ function cyl(rt,rb,h,c,x,y,z,noCol){
   return solid(m);
 }
 /* 平面装饰（球场标线、跑道等，贴地面不碰撞） */
+let decoIndex=0;
 function groundDeco(w,d,c,x,z,opacity){
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshStandardMaterial({color:c,roughness:1,transparent:opacity<1,opacity:opacity!==undefined?opacity:1}));
-  m.rotation.x=-Math.PI/2; m.position.set(x,.02,z); m.receiveShadow=true; scene.add(m); return m;
+  /* 【贴图错位的根因之一】
+     这些装饰面原来全都压在 y=0.02，彼此之间几乎零间距，
+     而地面本体在 y=0。两台设备/不同分辨率下深度缓冲精度不同，
+     0.02 这个间距不够用，就会出现闪烁、条纹、错位（z-fighting）。
+     处理方式双保险：
+       1) 每个装饰面按序号抬一点高度，保证彼此不共面；
+       2) 材质开 polygonOffset，让渲染器优先画它、把共面冲突推给地面。 */
+  decoIndex++;
+  const m=new THREE.Mesh(
+    new THREE.PlaneGeometry(w,d),
+    new THREE.MeshStandardMaterial({
+      color:c, roughness:1,
+      transparent:opacity<1, opacity:opacity!==undefined?opacity:1,
+      polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
+      depthWrite:opacity>=1,
+    })
+  );
+  m.rotation.x=-Math.PI/2;
+  m.position.set(x, 0.06+decoIndex*0.002, z);
+  m.receiveShadow=true; scene.add(m); return m;
 }
 
 /* 渲染器 + 场景 + 光照 + 相机 */
@@ -276,11 +376,19 @@ function init(){
   sun.position.set(45,60,25);
   sun.castShadow=true;
   sun.shadow.mapSize.set(2048,2048);
-  sun.shadow.camera.left=-90; sun.shadow.camera.right=90;
-  sun.shadow.camera.top=90;  sun.shadow.camera.bottom=-90;
-  sun.shadow.camera.far=260; sun.shadow.camera.near=1;
-  sun.shadow.bias=-0.0004;
-  sun.shadow.normalBias=0.02;
+  /* 【阴影精度 & 贴图错位】
+     原来 shadow.camera 覆盖 180×180 米（left/right/top/bottom 都是 ±90），
+     却只给 2048×2048 的贴图 —— 每个像素要管 8.8 厘米，
+     墙根、台阶边缘会出现明显的锯齿、条纹和「影子错位」。
+     校园主体范围约 ±50 米，把相机收到 ±60 就够用，
+     每像素精度提升到约 5.9cm，几乎翻倍；
+     再把贴图提到 3072 并加大 normalBias（沿法线偏移，不产生 peter-panning）。 */
+  sun.shadow.mapSize.set(3072,3072);
+  sun.shadow.camera.left=-60; sun.shadow.camera.right=60;
+  sun.shadow.camera.top=60;  sun.shadow.camera.bottom=-60;
+  sun.shadow.camera.far=200; sun.shadow.camera.near=1;
+  sun.shadow.bias=-0.0002;
+  sun.shadow.normalBias=0.045;
   scene.add(sun);
 
   /* 大地：整个校园地面 */
@@ -920,6 +1028,18 @@ function hideTouchUI(){
 }
 function bindUI(){
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
+  /* 【横屏支持】屏幕旋转时立即重算：
+       1) 画布尺寸与像素预算（applyPixelBudget 里同时修正相机 aspect）
+       2) 摇杆区域占比（横屏时左侧给摇杆 42%，其余归视角拖拽）
+     有些 WebView 在旋转时 resize 事件晚于真实尺寸变化，
+     所以 orientationchange 之后再补两次延迟调用，确保拿到最终尺寸。 */
+  const relayout=()=>{
+    if(window.__relayout) window.__relayout();
+    if(typeof applyPixelBudget==='function' && ready) { try{ applyPixelBudget(); }catch(e){} }
+  };
+  window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
+  window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
+  relayout();
   const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
@@ -1084,11 +1204,14 @@ function bindUI(){
        这里在 document 上再挂一份：只要触点落在左半屏、
        且当前没有摇杆在拖，就照样启动摇杆。
        优先走 #joyZone 的正常路径，它没收到才由这里接手。 */
+    /* 【横屏适配】摇杆只管屏幕左侧 42% 的区域。
+       原来固定是 50%，横屏后左半屏很宽，手指稍微往中间推就落到视角层，
+       会变成「推着推着视角自己转起来」。 */
     document.addEventListener('touchstart',e=>{
       if(activeId!==null) return;
       if(!window.__joyEnabled) return;    // 还没进游戏（菜单界面）不接管
       const t=e.changedTouches[0]; if(!t) return;
-      if(t.clientX > window.innerWidth*0.5) return;   // 右半屏归视角
+      if(t.clientX > window.innerWidth*(window.__joyZoneRatio||0.42)) return;
       startJoy(t.clientX,t.clientY);
     }, {passive:true});
     document.addEventListener('touchmove',e=>{
@@ -1165,11 +1288,17 @@ function bindUI(){
       const t=e.changedTouches[0]; if(!t) return;
       vOn=true; vx=t.clientX; vy=t.clientY;
     }, {passive:true});
-    viewLayer.addEventListener('touchmove',e=>{
+    /* 【视角灵敏度】单位是「弧度/像素」。
+       原来触屏用的是 0.005，比鼠标路径的 0.0025/0.003 高出一倍，
+       手机上轻轻一划视角就飞出去，根本瞄不准。
+       这里统一成统一常量，触屏取 0.0026：
+       横向划满一整屏（约 800px）大约转 2.08 弧度 ≈ 119°，符合常见手游手感。 */
+   const TOUCH_SENS=0.0026;
+   viewLayer.addEventListener('touchmove',e=>{
       if(!vOn) return;
       const t=e.changedTouches[0]; if(!t) return;
-      P.yaw-=(t.clientX-vx)*0.005;
-      P.pitch-=(t.clientY-vy)*0.005;
+      P.yaw-=(t.clientX-vx)*TOUCH_SENS;
+      P.pitch-=(t.clientY-vy)*TOUCH_SENS;
       const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
       vx=t.clientX; vy=t.clientY;
     }, {passive:true});
@@ -1568,6 +1697,7 @@ function updShake(dt){
 /* ---- 像素预算制分辨率（学自 saltline：锁像素总数而非固定倍率） ---- */
 const PIXEL_BUDGET=2300000; // 约 high 档
 let curPixelScale=1;
+let curW=0, curH=0;   // 记录上次画布尺寸，用于横竖屏切换时强制重建
 function applyPixelBudget(){
   if(typeof renderer==='undefined'||!renderer) return;
   const w=Math.max(2,window.innerWidth), h=Math.max(2,window.innerHeight);
@@ -1575,13 +1705,24 @@ function applyPixelBudget(){
   const pixels=w*dpr*h*dpr;
   let scale=1;
   if(pixels>PIXEL_BUDGET) scale=Math.sqrt(PIXEL_BUDGET/pixels);
-  if(Math.abs(scale-curPixelScale)>0.01){
-    curPixelScale=scale;
+  if(Math.abs(scale-curPixelScale)>0.01 || curW!==w || curH!==h){
+    curPixelScale=scale; curW=w; curH=h;
     renderer.setPixelRatio(dpr*scale);
     /* 第 3 个参数必须为 true：要同时更新 canvas 的 CSS 尺寸。
        传 false 只改绘制缓冲区，样式尺寸还是旧的，
        移动端高 DPR 下会被拉伸/错位，严重时看起来像整屏发黑。 */
     renderer.setSize(w,h,true);
+  }
+  /* 【横屏必做】旋转屏幕后宽高比彻底变了，
+     这里必须同步更新相机的 aspect 并重算投影矩阵，
+     否则画面会被横向或纵向拉伸成变形（看起来很「错位」）。
+     原来只在 resize 里调 applyPixelBudget，从没动过 aspect。 */
+  if(typeof camera!=='undefined' && camera){
+    const ar=w/h;
+    if(Math.abs((camera.aspect||0)-ar) > 0.001){
+      camera.aspect=ar;
+      camera.updateProjectionMatrix();
+    }
   }
 }
 
@@ -1622,8 +1763,24 @@ function animate(){
   }
 }
 
-// 窗口尺寸变化时重算像素预算
-window.addEventListener('resize',()=>{ if(ready) applyPixelBudget(); });
+/* 窗口尺寸 / 横竖屏变化时统一走这里。
+   由 f_ui.js 的 bindUI 注册（window.__relayout），
+   它会在 resize 与 orientationchange 里被调用，
+   而且旋转后会延迟补调几次，确保拿到最终尺寸。
+   这里同时重算相机宽高比，否则横屏画面会被拉伸变扁。 */
+window.__relayout=function(){
+  try{
+    applyPixelBudget();
+    if(typeof camera!=='undefined' && camera && window.innerWidth && window.innerHeight){
+      const ar=window.innerWidth/window.innerHeight;
+      if(Math.abs((camera.aspect||0)-ar)>0.001){
+        camera.aspect=ar;
+        camera.updateProjectionMatrix();
+      }
+    }
+  }catch(e){}
+};
+window.addEventListener('resize',()=>{ if(typeof window.__relayout==='function') window.__relayout(); });
 
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

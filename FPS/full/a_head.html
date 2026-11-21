@@ -63,8 +63,14 @@
   #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
   .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
-  /* 按钮图标（SVG，currentColor 跟随主题） */
-  .actbtn .ico{ width:30px; height:30px; fill:currentColor; stroke:none; pointer-events:none; }
+  /* 按钮图标（SVG，currentColor 跟随主题）
+     【统一图标体系】全部改用 Lucide 官方图标（ISC 许可）的描边风格：
+     统一 24×24 viewBox、stroke-width 2、round 端点，
+     不再混用「部分实心填充 + 部分描边」的写法——
+     以前开火是实心子弹、开镜是自绘十字、跳跃是火柴人，
+     线宽和风格各不相同，看起来像拼凑的。
+     描边图标在深色半透明按钮上辨识度更高，也更像正经射击手游的 UI。 */
+  .actbtn .ico{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
   #btnFire .ico{ width:38px; height:38px; }
   #btnJump .ico{ width:30px; height:30px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
@@ -105,6 +111,49 @@
   #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
   #fpscount{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:11px; color:#778; }
   @media (max-width:768px){ .actbtn,.joyZone,.actZone{ } }
+  /* ================= 横屏布局 =================
+     横屏和竖屏的操作区完全不同：
+     竖屏时屏幕窄高，摇杆和按钮分居左右两半，纵向空间够用；
+     横屏时高度只有 360~420px，如果还照竖屏那样往上堆按钮，
+     开镜/换弹/奔跑会直接叠在一起。
+     这里改成「沿底边一字排开」的横屏专用布局，
+     并把整体尺寸按屏幕高度缩放，保证小屏也不遮挡视野。 */
+  @media (orientation:landscape){
+    /* 摇杆挪到左下角偏内一点，避免贴住系统手势区 */
+    #joyBase{ left:120px; top:calc(100% - 118px); width:132px; height:132px; }
+    #joyStick{ width:62px; height:62px; }
+    /* 右下角按钮整体缩小并沿底边排布，不再纵向堆叠 */
+    .actbtn{ width:58px; height:58px; }
+    .actbtn .ico{ width:26px; height:26px; }
+    #btnFire{ right:22px; bottom:22px; width:82px; height:82px; }
+    #btnFire .ico{ width:36px; height:36px; }
+    #btnAim{ right:112px; bottom:26px; width:58px; height:58px; }
+    #btnReload{ right:26px; bottom:112px; width:58px; height:58px; }
+    #btnJump{ right:104px; bottom:96px; width:54px; height:54px; }
+    #btnInteract{ right:176px; bottom:22px; width:54px; height:54px; }
+    #btnSprint{ right:176px; bottom:86px; width:54px; height:54px; }
+    /* 横屏视野更宽，准星和提示位置同步微调 */
+    #prompt{ bottom:96px; }
+    #toast{ bottom:104px; }
+    #htip{ bottom:14px; font-size:10px; }
+    /* 菜单卡片在横屏下更扁，避免超出屏幕需要滚动 */
+    #menu{ padding:12px; }
+    #menu .box{ max-width:640px; max-height:94vh; padding:16px 20px; }
+    #menu h1{ font-size:20px; }
+    /* 屏幕特别矮（如 360px 高的手机横屏）再压一档 */
+    @media (max-height:400px){
+      #btnFire{ width:70px; height:70px; right:18px; bottom:18px; }
+      #btnFire .ico{ width:30px; height:30px; }
+      #btnAim{ right:96px; bottom:20px; width:50px; height:50px; }
+      #btnJump{ right:88px; bottom:78px; width:48px; height:48px; }
+      #btnReload{ right:20px; bottom:96px; width:50px; height:50px; }
+      #btnInteract{ right:150px; bottom:18px; width:48px; height:48px; }
+      #btnSprint{ right:150px; bottom:74px; width:48px; height:48px; }
+      .actbtn .ico{ width:22px; height:22px; }
+      #joyBase{ left:96px; top:calc(100% - 96px); width:112px; height:112px; }
+      #joyStick{ width:52px; height:52px; }
+    }
+  }
 </style>
 </head>
 <body>
@@ -133,22 +182,54 @@
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
 <div id="actZone">
   <div class="actbtn" id="btnFire" title="开火">
-    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2c-.7 0-1.3.4-1.6 1L9 6H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1l1.4 8.3c.1.9.8 1.5 1.7 1.5h5.8c.9 0 1.6-.6 1.7-1.5L18 10h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-4l-1.4-3c-.3-.6-.9-1-1.6-1z"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide crosshair：外圈 + 四向刻度线 -->
+      <circle cx="12" cy="12" r="9"/>
+      <line x1="20.5" x2="16.5" y1="12" y2="12"/>
+      <line x1="7.5" x2="3.5" y1="12" y2="12"/>
+      <line x1="12" x2="12" y1="7.5" y2="3.5"/>
+      <line x1="12" x2="12" y1="20.5" y2="16.5"/>
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnAim" title="开镜">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="1.7"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide target：三环同心 -->
+      <circle cx="12" cy="12" r="9"/>
+      <circle cx="12" cy="12" r="5"/>
+      <circle cx="12" cy="12" r="1.4"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnJump" title="跳跃">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="4" r="2.2"/><path d="M12 7.2v5.6M12 12.8l-3 4.2M12 12.8l3 4.2M12 8.8l-4 2.4M12 8.8l4 2.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide move-up：向上箭头 -->
+      <path d="M8 6L12 2L16 6"/>
+      <path d="M12 2V17"/>
+      <path d="M7 22h10"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnReload" title="换弹">
-    <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="7.6" y="8.5" width="3.3" height="7.5" rx="1"/><rect x="12.2" y="8.5" width="3.3" height="7.5" rx="1"/><path d="M17.5 12a5.5 5.5 0 0 0-9.4-3.9M6.5 12a5.5 5.5 0 0 0 9.4 3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8.1 5.9l-.2 2.6 2.5-.7M15.9 18.1l.2-2.6-2.5.7" fill="currentColor"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide rotate-ccw：逆时针回转箭头 -->
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+      <path d="M3 3v5h5"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnInteract" title="拾取">
-    <svg viewBox="0 0 24 24" class="ico"><path d="M12 2.5 3 6.5v6c0 4.4 3.6 7.6 9 9 5.4-1.4 9-4.6 9-9v-6l-9-4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v5M9.5 10.5h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide hand-metal：手部拾取 -->
+      <path d="M18 12.5V10a2 2 0 0 0-4 0v1.4"/>
+      <path d="M14 11V9a2 2 0 1 0-4 0v2"/>
+      <path d="M10 10.5V5a2 2 0 1 0-4 0v9"/>
+      <path d="m7 15-1.76-1.76a2 2 0 0 0-2.83 2.82l3.6 3.6C7.5 21.14 9.2 22 12 22h2a8 8 0 0 0 8-8V7a2 2 0 1 0-4 0v5"/>
+    </svg>
   </div>
   <div class="actbtn" id="btnSprint" title="奔跑">
-    <svg viewBox="0 0 24 24" class="ico"><circle cx="14" cy="4" r="2.2"/><path d="M6 21l3.2-5.2 2.6-2.2-1.3-4.6-2.8 1.6L6 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.5 9l3.6-2 2.4 2.6 2.5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M10.6 15l-1.4 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- Lucide footprints：脚印 -->
+      <path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/>
+      <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/>
+    </svg>
   </div>
 </div>
 

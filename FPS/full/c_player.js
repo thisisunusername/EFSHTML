@@ -6,6 +6,14 @@ const P={
   hp:100, armor:0,
   ammo:{ammo:90,med:0,cash:0,gun:120},
   inv:{gun:true,med:0},
+  /* 【搜打撤基础装备】撤离类游戏的核心是「带什么进去、能带回什么」。
+     bag 是按 id 聚合的物品表：{ itemId: 数量 }。
+     装备栏单独存 id，护甲/头盔提供减伤和额外血量（见 dmgPlayer）。
+     背包有容量上限，买太多就会卡住提示「背包已满」。 */
+  bag:{},                 // { 'med': 3, 'ammo_pistol': 60, ... }
+  bagCap:24,              // 背包容量（格）
+  equip:{ helmet:null, armorVest:null, backpack:'pouch' },  // 装备中的 id
+  helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣耐久）
   speed:6, sprint:10,
   onGround:true,
   shooting:false, reload:false, reloadT:0,

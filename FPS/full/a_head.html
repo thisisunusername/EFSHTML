@@ -55,8 +55,13 @@
   #toast{ position:absolute; bottom:140px; left:50%; transform:translateX(-50%); color:#7ee8a0; font-size:14px; font-weight:600; opacity:0; text-shadow:0 1px 3px #000; white-space:nowrap; }
   /* 加载/错误提示 */
   #loaderr{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ff7a6a; font-size:15px; font-weight:700; text-align:center; z-index:200; background:rgba(20,8,8,.92); padding:16px 22px; border-radius:12px; border:1px solid #c2382a; display:none; max-width:80%; line-height:1.6; }
-  /* 摇杆（移动端） */
-  #joyZone{ position:fixed; bottom:0; left:0; width:50%; height:100%; display:none; pointer-events:auto; z-index:60; touch-action:none; background:transparent; }
+  /* 摇杆（移动端）
+     【摇杆固定】原来 #joyZone 是 left:0 / width:50% / height:100% 的整块半屏，
+      它会盖住左下角一大片，和右侧操作区在窄屏/横屏时直接重叠，
+      视觉上就像「摇杆穿模到交互按钮里」。
+       现在改成：摇杆区域 = 摇杆本体 + 一圈触摸余量的小方块，
+       尺寸随 #joyBase 走，位置固定在左下角，绝不外溢到按钮区。 */
+  #joyZone{ position:fixed; left:0; bottom:0; width:210px; height:210px; display:none; pointer-events:auto; z-index:60; touch-action:none; background:transparent; }
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
@@ -107,6 +112,64 @@
   .shoprow{ display:flex; align-items:center; gap:10px; padding:10px; border:1px solid rgba(255,255,255,.1); border-radius:10px; margin-top:8px; background:rgba(255,255,255,.03); }
   .shoprow .info{ flex:1; } .shoprow .n{ font-weight:700; font-size:14px; } .shoprow .d{ font-size:12px; color:#98a0b0; }
   .shoprow .price{ font-weight:800; color:#ffd54a; white-space:nowrap; }
+  /* ================= 商店 / 背包 浮层 =================
+     【为什么以前「商店点不动」】
+     #shop 原来只是一个 <div id="shop" style="display:none"></div>，
+     既没有 position:fixed，也没有 z-index。
+     toggleShop() 把它设成 display:flex 时，它只是文档流里的一个普通块，
+     高度由内容撑开、被画在页面最上方，并且被 #menu(100)/#hud(10)/#death(90)
+     这些层完整盖住 —— 功能其实跑了，但屏幕上什么都看不见，
+     表现就是「点了没反应」。
+     现在给它完整的全屏遮罩 + 足够高的层级 + 可滚动内容区。 */
+  #shop, #bag{ position:fixed; inset:0; z-index:210; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px); }
+  #shop .box, #bag .box{ width:100%; max-width:560px; max-height:88vh;
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
+  #shop .box::-webkit-scrollbar, #bag .box::-webkit-scrollbar{ width:8px; }
+  #shop .box::-webkit-scrollbar-thumb, #bag .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  #shop h1, #bag h1{ font-size:19px; margin-bottom:4px; }
+  /* 顶部货币条 */
+  .shophead{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .shophead .cash{ font-weight:800; color:#ffd54a; font-size:15px; white-space:nowrap; }
+  /* 分类标签页 */
+  .tabs{ display:flex; gap:6px; overflow-x:auto; margin:10px 0 4px; padding-bottom:4px;
+    scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{ flex:0 0 auto; padding:7px 13px; border-radius:9px; font-size:12.5px; font-weight:700;
+    background:rgba(255,255,255,.07); border:1px solid transparent; color:#c8d0e0; cursor:pointer; }
+  .tab.on{ background:rgba(124,92,255,.3); border-color:var(--accent); color:#fff; }
+  /* 商品行：图标 + 名称/说明 + 价格 + 按钮 */
+  .item{ display:flex; align-items:center; gap:11px; padding:10px 11px;
+    border:1px solid rgba(255,255,255,.09); border-radius:11px; margin-top:7px;
+    background:rgba(255,255,255,.028); }
+  .item .ic{ width:34px; height:34px; flex:0 0 34px; display:flex; align-items:center; justify-content:center;
+    border-radius:9px; background:rgba(124,92,255,.16); color:var(--accent2); font-size:17px; }
+  .item .info{ flex:1; min-width:0; }
+  .item .n{ font-weight:700; font-size:13.5px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .item .d{ font-size:11.5px; color:#98a0b0; line-height:1.45; margin-top:2px; }
+  .item .owned{ font-size:10.5px; font-weight:700; color:#7ee8a0;
+    background:rgba(126,232,160,.14); border-radius:5px; padding:1px 6px; }
+  .item .price{ font-weight:800; color:#ffd54a; white-space:nowrap; font-size:13px; }
+  .item.locked{ opacity:.5; }
+  /* 紧凑按钮 */
+  .btn.sm{ padding:7px 12px; font-size:12.5px; border-radius:8px; min-width:auto; white-space:nowrap; }
+  /* 背包格子 */
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:8px; margin-top:10px; }
+  .cell{ aspect-ratio:1; border-radius:11px; background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.1); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3px; padding:5px; position:relative; }
+  .cell.eq{ border-color:rgba(124,92,255,.65); background:rgba(124,92,255,.14); }
+  .cell .ci{ font-size:20px; line-height:1; }
+  .cell .cn{ font-size:9.5px; color:#b8c0d0; text-align:center; line-height:1.2;
+    max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cell .cq{ position:absolute; right:4px; bottom:3px; font-size:10px; font-weight:800; color:#ffd54a; }
+  .cell .lk{ position:absolute; top:4px; right:5px; font-size:9px; }
   #death{ position:fixed; inset:0; z-index:90; background:rgba(120,10,10,.6); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
   #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
   #fpscount{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:11px; color:#778; }
@@ -120,6 +183,7 @@
      并把整体尺寸按屏幕高度缩放，保证小屏也不遮挡视野。 */
   @media (orientation:landscape){
     /* 摇杆挪到左下角偏内一点，避免贴住系统手势区 */
+    #joyZone{ width:250px; height:250px; }
     #joyBase{ left:120px; top:calc(100% - 118px); width:132px; height:132px; }
     #joyStick{ width:62px; height:62px; }
     /* 右下角按钮整体缩小并沿底边排布，不再纵向堆叠 */
@@ -150,6 +214,7 @@
       #btnInteract{ right:150px; bottom:18px; width:48px; height:48px; }
       #btnSprint{ right:150px; bottom:74px; width:48px; height:48px; }
       .actbtn .ico{ width:22px; height:22px; }
+      #joyZone{ width:210px; height:210px; }
       #joyBase{ left:96px; top:calc(100% - 96px); width:112px; height:112px; }
       #joyStick{ width:52px; height:52px; }
     }
@@ -164,8 +229,10 @@
     <div class="pill" id="weaponPill">🔫 <span id="wpnName">手枪</span></div>
     <div class="pill" id="ammoPill"><span id="ammo">12</span> / <span id="ammoReserve">36</span></div>
     <div class="pill" id="hpwrap">❤️ <span id="hpNum">100</span><div id="hpbar"><div id="hpfill"></div></div></div>
+    <div class="pill" id="armorPill" style="display:none">🛡️ <b>0</b></div>
     <div class="pill">⏱ <span id="timer">00:00</span></div>
     <div class="pill" id="sndBtn" style="cursor:pointer">🔊 <span id="sndTxt">开</span></div>
+    <div class="pill" id="bagBtn" style="cursor:pointer">🎒 <span>背包</span></div>
   </div>
   <div id="crosshair"></div>
   <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>
@@ -194,10 +261,12 @@
   </div>
   <div class="actbtn" id="btnAim" title="开镜">
     <svg viewBox="0 0 24 24" class="ico">
-      <!-- Lucide target：三环同心 -->
-      <circle cx="12" cy="12" r="9"/>
-      <circle cx="12" cy="12" r="5"/>
-      <circle cx="12" cy="12" r="1.4"/>
+      <!-- 开镜：四角准镜框（比三环更像「瞄准镜」，不再是同心圆传送门） -->
+      <path d="M3 8V5a2 2 0 0 1 2-2h3"/>
+      <path d="M16 3h3a2 2 0 0 1 2 2v3"/>
+      <path d="M21 16v3a2 2 0 0 1-2 2h-3"/>
+      <path d="M8 21H5a2 2 0 0 1-2-2v-3"/>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
     </svg>
   </div>
   <div class="actbtn" id="btnJump" title="跳跃">
@@ -274,6 +343,8 @@
 </div>
 <!-- 商店 -->
 <div id="shop" style="display:none"></div>
+<!-- 背包（局内 Tab / B 打开） -->
+<div id="bag" style="display:none"></div>
 <!-- 死亡界面 -->
 <div id="death">
 <h2>💀 你阵亡了</h2>

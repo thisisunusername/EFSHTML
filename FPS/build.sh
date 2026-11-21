@@ -61,3 +61,13 @@ if command -v node >/dev/null 2>&1 && [ -f smoke_test.js ]; then
   fi
   echo "SMOKE_OK: 摇杆四方向均可移动，updP 无运行期异常"
 fi
+# 商店/背包测试：验证购买、装备、容量上限、护甲减伤、使用消耗
+if command -v node >/dev/null 2>&1 && [ -f shop_test.js ]; then
+  SHOP=$(node shop_test.js 2>&1)
+  if echo "$SHOP" | grep -q '❌'; then
+    echo "商店/背包测试失败："
+    echo "$SHOP" | grep '❌'
+    exit 1
+  fi
+  echo "SHOP_BAG_OK: 商店/背包/护甲全部通过"
+fi

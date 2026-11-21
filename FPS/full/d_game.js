@@ -55,12 +55,36 @@ function updReload(dt){
 
 /* ---- 受伤 ---- */
 function damageP(n){
+  /* 【护甲减伤】穿着头盔/护甲时：
+     1) 先按装备的减伤比例削掉一部分伤害（头盔管头部，这里统一按加权算）
+     2) 再扣装备耐久，耐久归零则装备失效并自动卸下
+     原来的 P.armor 是旧的护盾值，保留兼容。 */
+  let reduce=0;
+  if(P.equip){
+    if(P.equip.helmet && P.helmetDur>0) reduce += (SHOP_ITEMS[P.equip.helmet]?.reduce||0)*0.4;
+    if(P.equip.armorVest && P.vestDur>0) reduce += (SHOP_ITEMS[P.equip.armorVest]?.reduce||0)*0.6;
+  }
+  if(reduce>0) n = n*(1-Math.min(0.75,reduce));
+
   if(P.armor>0){
     const a=Math.min(P.armor,n*.6);
     P.armor-=a; n-=a;
   }
+
+  /* 扣耐久：伤害的一半转到护甲耐久上 */
+  if(P.equip){
+    if(P.equip.armorVest && P.vestDur>0){
+      P.vestDur=Math.max(0,P.vestDur-n*0.5);
+      if(P.vestDur<=0){ P.equip.armorVest=null; toast('护甲已损坏'); }
+    } else if(P.equip.helmet && P.helmetDur>0){
+      P.helmetDur=Math.max(0,P.helmetDur-n*0.5);
+      if(P.helmetDur<=0){ P.equip.helmet=null; toast('头盔已损坏'); }
+    }
+  }
+
   P.hp-=n;
   sfxHurt();
+  refreshHUD();
   if(P.hp<=0){ P.hp=0; onDeath(); }
 }
 function onDeath(){

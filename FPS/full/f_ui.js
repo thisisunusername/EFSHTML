@@ -2217,8 +2217,78 @@ function __startBindUI(){
 }
 /* 主菜单按钮兜底绑定：只做最容易失效、也最要紧的那几个 */
 function __bindMenuFallback(){
+  /* 【事件委托兜底 —— 最关键的一层】
+     不管 bindUI 有没有跑完、有没有绑 onclick，只要点到这些 id
+     就能触发对应功能。这是最后一个保险丝：
+       · 用捕获阶段（capture=true）先拿到事件，避免被别的层吞掉；
+       · 靠 e.target 向上找 id，不依赖任何按钮是否被绑定过；
+       · 每个分支各自 try，互不影响。
+     用户的实际现象是「按下有蓝圈（CSS :active）但没反应」，
+     说明事件确实到达了按钮，只是没有 JS 处理 ——
+     这层委托正是针对这个情况。 */
+  const pick=(t)=>{
+    let n=t;
+    while(n && n.nodeType===1){
+      if(n.id) return n.id;
+      n=n.parentElement;
+    }
+    return null;
+  };
+  const handler=(e)=>{
+    const id=pick(e.target);
+    if(!id) return;
+    /* 【去重】如果这个按钮已经有 onclick 并且真的执行过，
+       就不要再走委托，否则点一次会触发两次（比如买两件、
+       开两次面板、跳两次页面）。
+       判断依据：元素上有 __jsBound 标记（绑定成功时打上）。
+       没标记 = onclick 没绑上 = 正是委托要救的场景。 */
+    const el=(e.target && e.target.closest)? e.target.closest('#'+id) : e.target;
+    if(el && el.__jsBound) return;
+    try{
+      switch(id){
+        case 'btnPlay': {
+          try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(x){}
+          const m=$('menu'); if(m) m.style.display='none';
+          try{ audioInit(); audioResume(); sfxUI(); }catch(x){}
+          window.__inGame=true;
+          if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(x){} }
+          try{ init(); }catch(x){ console.error('init failed', x); }
+          try{ applyInputMode(inputMode, true); }catch(x){}
+          break;
+        }
+        case 'btnShop':      try{ toggleShop(); }catch(x){ console.error(x); } break;
+        case 'btnStash':     try{ sfxUI(); toggleStash(); }catch(x){ console.error(x); } break;
+        case 'btnGunsmith':  try{ sfxUI(); closeShop();
+                                   const st=$('stash'); if(st) st.style.display='none';
+                                   toggleGunsmith(); }catch(x){ console.error(x); } break;
+        case 'btnExport':    exportSave(); break;
+        case 'btnImport': {
+          const row=$('saveRow'), f=$('saveFile');
+          if(row) row.style.display='flex';
+          if(f){ f.value=''; try{ f.click(); }catch(x){} }
+          importSave();
+          break;
+        }
+        case 'btnPickSave': { const f=$('saveFile'); if(f) f.click(); break; }
+        case 'btnReset':
+          if(!confirm('确认重置所有数据？')) return;
+          try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(x){}
+          try{ localStorage.removeItem('efs_fps_save_v1'); }catch(x){}
+          location.reload();
+          break;
+        case 'btnBack': location.href='../'; break;
+      }
+    }catch(x){ console.error('menu delegate failed for '+id, x); }
+  };
+  /* 幂等：只挂一次 */
+  if(!window.__menuDelegated){
+    window.__menuDelegated=true;
+    document.addEventListener('click', handler, true);
+  }
+  /* 下面这些是为「明确绑定」留的，有 delegate 在就算没绑上也能用，
+     但保留 onclick 可以让绑定的语义更清晰（也兼容旧逻辑）。 */
   const play=$('btnPlay');
-  if(play && !play.onclick) play.onclick=()=>{
+  if(play && !play.onclick){ play.onclick=()=>{
     try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(e){}
     const m=$('menu'); if(m) m.style.display='none';
     try{ audioInit(); audioResume(); sfxUI(); }catch(e){}
@@ -2226,32 +2296,43 @@ function __bindMenuFallback(){
     if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(e){} }
     try{ init(); }catch(e){ console.error('init failed', e); }
     try{ applyInputMode(inputMode, true); }catch(e){}
-  };
+  }; play.__jsBound=true; }
   const shopBtn=$('btnShop');
-  if(shopBtn && !shopBtn.onclick) shopBtn.onclick=()=>{ try{ toggleShop(); }catch(e){ console.error(e); } };
+  if(shopBtn && !shopBtn.onclick){ shopBtn.onclick=()=>{ try{ toggleShop(); }catch(e){ console.error(e); } }; shopBtn.__jsBound=true; }
   const stashBtn=$('btnStash');
-  if(stashBtn && !stashBtn.onclick) stashBtn.onclick=()=>{ try{ sfxUI(); toggleStash(); }catch(e){ console.error(e); } };
+  if(stashBtn && !stashBtn.onclick){ stashBtn.onclick=()=>{ try{ sfxUI(); toggleStash(); }catch(e){ console.error(e); } }; stashBtn.__jsBound=true; }
   const gsBtn=$('btnGunsmith');
-  if(gsBtn && !gsBtn.onclick) gsBtn.onclick=()=>{
-    try{ sfxUI(); closeShop(); const st=$('stash'); if(st) st.style.display='none'; toggleGunsmith(); }
-    catch(e){ console.error(e); }
-  };
-  const exportBtn=$('btnExport'); if(exportBtn && !exportBtn.onclick) exportBtn.onclick=exportSave;
+  if(gsBtn && !gsBtn.onclick){
+    gsBtn.onclick=()=>{
+      try{ sfxUI(); closeShop(); const st=$('stash'); if(st) st.style.display='none'; toggleGunsmith(); }
+      catch(e){ console.error(e); }
+    };
+    gsBtn.__jsBound=true;
+  }
+  const exportBtn=$('btnExport');
+  if(exportBtn && !exportBtn.onclick){ exportBtn.onclick=exportSave; exportBtn.__jsBound=true; }
   const importBtn=$('btnImport');
-  if(importBtn && !importBtn.onclick) importBtn.onclick=()=>{
-    const row=$('saveRow'), f=$('saveFile');
-    if(row) row.style.display='flex';
-    if(f){ f.value=''; try{ f.click(); }catch(e){} }
-    importSave();
-  };
+  if(importBtn && !importBtn.onclick){
+    importBtn.onclick=()=>{
+      const row=$('saveRow'), f=$('saveFile');
+      if(row) row.style.display='flex';
+      if(f){ f.value=''; try{ f.click(); }catch(e){} }
+      importSave();
+    };
+    importBtn.__jsBound=true;
+  }
   const resetBtn=$('btnReset');
-  if(resetBtn && !resetBtn.onclick) resetBtn.onclick=()=>{
-    if(!confirm('确认重置所有数据？')) return;
-    try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
-    try{ localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
-    location.reload();
-  };
-  const backBtn=$('btnBack'); if(backBtn && !backBtn.onclick) backBtn.onclick=()=>{ location.href='../'; };
+  if(resetBtn && !resetBtn.onclick){
+    resetBtn.onclick=()=>{
+      if(!confirm('确认重置所有数据？')) return;
+      try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
+      try{ localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
+      location.reload();
+    };
+    resetBtn.__jsBound=true;
+  }
+  const backBtn=$('btnBack');
+  if(backBtn && !backBtn.onclick){ backBtn.onclick=()=>{ location.href='../'; }; backBtn.__jsBound=true; }
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',__startBindUI);
 else __startBindUI();/* ============ 输入方式自适应 ============

@@ -10542,47 +10542,80 @@ const GRID_MAPS = (function(){
    相邻的墙格合并成一整块（否则 42x16 会生成几百个 1 米小盒子，
    手机直接卡死），水平方向按最长连续段合并。 */
 function buildGridWalls(m, y, g, wallColor, doorAt){
-  /* doorAt: {gx, gw} 指定在最后一行（南墙）上开口的格子位置，
-     用来和主楼正门门洞（世界 x=0 附近）对齐。
-     不加这一步的话，格子地图的外墙是封闭的 ——
-     玩家虽然从主楼门洞进了楼，却会被自己家里的外墙挡在外面。 */
-  const X0 = -(m.w)/2, Z0 = Z_BASE - (m.h - 1);   /* 格(ix,0) 左上角世界坐标：x 居中，z 从南端往回推 */
+  /* doorAt: {gx, gw} 在南墙（最后一行）上开口的位置。
+     ============ 为什么重写成「两次合并」============
+     旧版只沿着「行」合并连续墙格，于是：
+       · 横向墙 -> 能合成一整条（正常）
+       · 纵向墙 -> 每格各自建一小段，一堵 6 米长的隔墙变成
+         6 个 1x0.3 的方块叠在一起。
+     实测 1F 的 75 段墙里有 59 段是单格（79%），看起来就是
+     「屋子里插了一排排墙柱子、到处是墙」。
+     现在改成两步：
+       ① 先按行合并横向段，把「横向占主导」的墙一次建完；
+       ② 再把没建过的格子按列合并纵向段。
+     这样一堵墙就是一个整体，段数会大幅下降。 */
+  const X0 = -(m.w)/2, Z0 = Z_BASE - (m.h - 1);
   const WT=0.30;          /* 墙厚 30cm */
-  const WH=FLOOR_H-0.1;   /* 墙高：略低于天花板，留缝给顶灯 */
+  const WH=FLOOR_H-0.1;   /* 墙高：略低于天花板 */
   const col = wallColor || 0xd8d2c4;
-  /* 【只建主楼范围内的墙】各层地图进深不同（16 或 18 格），
-     18 格的那三层北端会达 z=-31，比主楼北墙（z=-30）多出 1 米。
-     那 1 米在主楼外面，玩家永远走不到，建出来只会是一排悬空的墙。
-     所以这里按世界 z 过滤：超出 -30 的行直接跳过。 */
+  /* 超出主楼北墙那一行不建 */
+  const rowOK = function(iy){ return (Z_BASE - (m.h - 1 - iy)) >= -30; };
+  const isDoorGap = function(iy, gx){
+    if(!doorAt || iy !== m.h-1) return false;
+    const halfG = (doorAt.gw||4)/2;
+    return gx >= doorAt.gx-halfG && gx < doorAt.gx+halfG;
+  };
+  /* 这个格算不算「实心墙」 */
+  const solidAt = function(ix, iy){
+    if(ix<0 || iy<0 || ix>=m.w || iy>=m.h) return false;
+    if(!rowOK(iy)) return false;
+    if(isDoorGap(iy, ix)) return false;
+    return m.g[iy][ix]===1;
+  };
+  /* 已建过标记，避免两步重复建 */
+  const done = {};
+  const key = function(ix,iy){ return iy*m.w+ix; };
+
+  /* ---- 第①步：横向合并 ---- */
   for(let iy=0; iy<m.h; iy++){
-    const rowZ = Z_BASE - (m.h - 1 - iy);      /* 这一行所在的世界 z */
-    if(rowZ < -30) continue;                    /* 超出主楼北墙，不建 */
-    /* 【门洞判定必须做成函数，并在两处都调用】
-       上一版的 bug：只在「起点格」判断门洞，而合并循环
-       while(j+1<m.w && m.g[iy][j+1]===1) j++ 会一路吞并到行尾，
-       结果 1F 南墙（整行 32 格全实心）被合成一根 32 米长的墙段，
-       doorAt 跳过的 4 格被包在里面 —— 门口依然是一堵墙。 */
-    const isDoorGap = function(gx){
-      if(!doorAt || iy !== m.h-1) return false;
-      const halfG = (doorAt.gw||4)/2;
-      return gx >= doorAt.gx-halfG && gx < doorAt.gx+halfG;
-    };
     let ix=0;
     while(ix<m.w){
-      if(isDoorGap(ix)){ ix++; continue; }
-      if(m.g[iy][ix]!==1){ ix++; continue; }
-      /* 往右合并连续墙格 —— 遇到门洞格必须断开 */
+      if(!solidAt(ix,iy) || done[key(ix,iy)]){ ix++; continue; }
+      /* 往右吞并，但遇到门洞/边界/已建就停 */
       let j=ix;
-      while(j+1<m.w && m.g[iy][j+1]===1 && !isDoorGap(j+1)) j++;
-      const len = j-ix+1;
-      const cx = X0 + ix + len/2;
-      const cz = Z0 + iy + 0.5;
-      box(len, WH, WT, col, cx, y+WH/2, cz, false);
+      while(solidAt(j+1,iy) && !done[key(j+1,iy)]) j++;
+      const len=j-ix+1;
+      /* 【只有横向连成 2 格以上才在这里建】
+         单格墙先跳过，留给第②步尝试纵向合并 ——
+         否则每个竖墙都会先被当成 1 格横向段建掉。 */
+      if(len>=2){
+        for(let t=ix;t<=j;t++) done[key(t,iy)]=1;
+        const cx = X0 + ix + len/2;
+        const cz = Z0 + iy + 0.5;
+        box(len, WH, WT, col, cx, y+WH/2, cz, false);
+      }
       ix = j+1;
     }
   }
-}
 
+  /* ---- 第②步：纵向合并（剩下的格子） ---- */
+  for(let ix=0; ix<m.w; ix++){
+    let iy=0;
+    while(iy<m.h){
+      if(!solidAt(ix,iy) || done[key(ix,iy)]){ iy++; continue; }
+      /* 往下吞并 */
+      let k=iy;
+      while(solidAt(ix,k+1) && !done[key(ix,k+1)]) k++;
+      const lenV=k-iy+1;
+      for(let t=iy;t<=k;t++) done[key(ix,t)]=1;
+      /* 纵向墙：x 方向是墙厚，z 方向是长度 */
+      const cx = X0 + ix + 0.5;
+      const cz = Z0 + iy + lenV/2;
+      box(WT, WH, lenV, col, cx, y+WH/2, cz, false);
+      iy = k+1;
+    }
+  }
+}
 /* 格子坐标 -> 世界坐标 */
 /* 格子坐标 -> 世界坐标。
    【必须每层各自居中】主楼 x 范围是 -30..30（宽 60 米），
@@ -10634,6 +10667,11 @@ function gridToWorld(gx, gy, m){
 /* 按房间 style 放家具。每个房间用自己的中心点，避免互相穿插。
    corridor / hall / stairs 不放家具，保证通行。 */
 function buildRoomsFurniture(m, y, g, depth){
+  /* 【家具基准】以前这里用硬编码的 -29，但墙体改成 Z_BASE 之后，
+     18 格层（1F/B1/B2）的北基准变成了 -31，家具整体比房间偏了 2 米 ——
+     讲台跑到隔壁、内墙从房间中间穿过去，看起来就像「墙特别多」。
+     统一改用 NB = Z_BASE - (m.h - 1)，和 buildGridWalls 同一个基准。 */
+  const NB = Z_BASE - (m.h - 1);
   for(const r of m.rooms){
     const OX = gridOriginX(m);
     const cx = OX + (r.x0 + r.x1)/2 + 0.5;
@@ -10654,28 +10692,28 @@ function buildRoomsFurniture(m, y, g, depth){
             box(.42,.05,.42, 0x7a6a52, dx, y+.44, dz+0.62, true);
           }
         }
-        box(2.0,.85,.7, 0x8a6a45, cx, y+.43, (-29+r.y0)+0.9, true);
-        box(Math.min(rw-1,5),1.6,.08, 0x2f4a3a, cx, y+1.5, (-29+r.y0)+0.2, true);
+        box(2.0,.85,.7, 0x8a6a45, cx, y+.43, (NB+r.y0)+0.9, true);
+        box(Math.min(rw-1,5),1.6,.08, 0x2f4a3a, cx, y+1.5, (NB+r.y0)+0.2, true);
         break; }
       case 'office': {
         box(1.8,.78,.9, 0x8a6a45, cx, y+.39, cz, true);
         box(.5,.9,.5, 0x6a5a48, cx, y+.45, cz+1.0, true);
-        box(.4,1.9,.9, 0x7a6a52, -29+r.x0+0.7, y+.95, cz, true);
+        box(.4,1.9,.9, 0x7a6a52, NB+r.x0+0.7, y+.95, cz, true);
         break; }
       case 'toilet': {
         box(.08,1.9,Math.min(1.8,rd-1), 0xcfd6dd, cx-0.9, y+.95, cz, true);
-        box(1.2,.15,.5, 0xe8eef4, cx+0.6, y+.85, (-29+r.y0)+0.7, true);
+        box(1.2,.15,.5, 0xe8eef4, cx+0.6, y+.85, (NB+r.y0)+0.7, true);
         break; }
       case 'utility': {
-        box(Math.min(rw-2,2.6),1.9,.45, 0x7a6a8a, cx, y+.95, (-29+r.y0)+0.6, true);
+        box(Math.min(rw-2,2.6),1.9,.45, 0x7a6a8a, cx, y+.95, (NB+r.y0)+0.6, true);
         box(.7,.7,.7, 0x8a7a62, cx-0.9, y+.35, cz+0.8, true);
         break; }
       case 'gym': {
-        box(.2,3.0,.2, 0x9aa0a8, cx, y+1.5, (-29+r.y0)+0.5, true);
-        box(.9,.06,.9, 0xff8a3a, cx, y+2.9, (-29+r.y0)+0.9, true);
+        box(.2,3.0,.2, 0x9aa0a8, cx, y+1.5, (NB+r.y0)+0.5, true);
+        box(.9,.06,.9, 0xff8a3a, cx, y+2.9, (NB+r.y0)+0.9, true);
         break; }
       case 'library': {
-        box(Math.min(rw-2,3.0),2.0,.4, 0x7a5c3a, cx, y+1.0, (-29+r.y0)+0.5, true);
+        box(Math.min(rw-2,3.0),2.0,.4, 0x7a5c3a, cx, y+1.0, (NB+r.y0)+0.5, true);
         box(1.2,.45,.6, 0x9a7b52, cx, y+.22, cz, true);
         break; }
       case 'garage': {
@@ -10683,15 +10721,32 @@ function buildRoomsFurniture(m, y, g, depth){
         break; }
       case 'craft': {
         box(2.4,.9,.8, 0x8a6a45, cx, y+.45, cz, true);
-        box(2.4,.06,.1, 0x9fb3c8, cx, y+1.6, (-29+r.y0)+0.3, true);
+        box(2.4,.06,.1, 0x9fb3c8, cx, y+1.6, (NB+r.y0)+0.3, true);
         break; }
       case 'shop': {
-        box(Math.min(rw-2,3.0),1.9,.5, 0x7a6a8a, cx, y+.95, (-29+r.y0)+0.6, true);
+        box(Math.min(rw-2,3.0),1.9,.5, 0x7a6a8a, cx, y+.95, (NB+r.y0)+0.6, true);
         box(2.0,.9,.7, 0x9a7b52, cx, y+.45, cz+0.9, true);
         break; }
       case 'basement': {
         box(3.0,1.2,1.0, 0x6a6a6a, cx-4, y+.6, cz-2, true);
         box(2.0,1.4,2.0, 0x6a6a6a, cx+5, y+.7, cz+2, true);
+        /* 地下室再补几排杂物，避免空荡荡 */
+        for(let t=0; t<3; t++){
+          box(1.6,1.0,1.2, 0x5a5a5a, cx-6+t*2.4, y+.5, cz-4.5, true);
+        }
+        box(1.2,1.8,1.2, 0x6a5a48, cx+7, y+.9, cz-3, true);
+        break; }
+      /* 【大厅】2D 里 hall 就是走廊连接处，放长椅/告示牌/盆栽 */
+      case 'hall': {
+        box(2.2,.45,.7, 0x8a6a45, cx, y+.22, cz, true);
+        box(2.2,.06,.1, 0x9fb3c8, cx, y+1.5, (NB+r.y0)+0.3, true);
+        box(.5,.9,.5, 0x6a5a48, cx-2.2, y+.45, cz, true);
+        break; }
+      /* 【楼梯间】2D 里 stairs 房间本身只有楼梯，这里补扶手和告示 */
+      case 'stairs': {
+        box(.12,1.0,.12, 0x9aa0a8, cx-1.6, y+.5, cz, true);
+        box(.12,1.0,.12, 0x9aa0a8, cx+1.6, y+.5, cz, true);
+        box(1.2,1.6,.8, 0x6a6a5a, cx, y+.8, (NB+r.y0)+0.7, true);
         break; }
       default: break;
     }

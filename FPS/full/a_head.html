@@ -52,8 +52,8 @@
   #menu .box::-webkit-scrollbar{ width:8px; }
   #menu .box::-webkit-scrollbar-track{ background:rgba(255,255,255,.06); border-radius:4px; }
   #menu .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
-  .keysbox{ margin-top:18px; padding:14px; border-radius:12px; background:rgba(124,92,255,.09); border:1px solid rgba(124,92,255,.28); }
-  .keysbox-t{ font-size:12px; letter-spacing:.08em; color:var(--accent2); margin-bottom:10px; font-weight:700; }
+  .keysbox{ margin:4px 0 14px; padding:14px; border-radius:12px; background:rgba(124,92,255,.13); border:1px solid rgba(124,92,255,.42); box-shadow:0 0 0 1px rgba(124,92,255,.1) inset; }
+  .keysbox-t{ font-size:12.5px; letter-spacing:.08em; color:#b9a6ff; margin-bottom:10px; font-weight:700; }
   .keysgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
   .kk{ display:flex; align-items:center; gap:5px; font-size:12px; color:#c8d0e0; }
   .kk kbd{ display:inline-block; min-width:20px; padding:2px 6px; font:600 11px/1.4 ui-monospace,monospace; text-align:center; color:#e8ecf5; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-bottom-width:2px; border-radius:5px; }
@@ -112,21 +112,6 @@
   <div class="box">
     <h1>🔫 FPS <span>搜打撤</span> · 学校 3D</h1>
     <p class="sub">搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。</p>
-    <div class="row">
-      <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
-      <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
-      <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
-    </div>
-    <div class="row">
-      <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
-      <button class="btn ghost" id="btnShop">🛒 商店</button>
-    </div>
-    <div class="row">
-      <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
-      <button class="btn ghost small" id="btnImport">⬆️ 加密导入</button>
-      <button class="btn danger small" id="btnReset">♻️ 重置数据</button>
-      <button class="btn ghost small" id="btnBack">← 返回原版</button>
-    </div>
     <div class="keysbox">
       <div class="keysbox-t">⌨️ 操作说明</div>
       <div class="keysgrid">
@@ -141,6 +126,21 @@
         <div class="kk"><kbd>Esc</kbd><span>菜单</span></div>
       </div>
       <div class="keysbox-note">📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击</div>
+    </div>
+    <div class="row">
+      <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
+      <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
+      <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
+      <button class="btn ghost" id="btnShop">🛒 商店</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
+      <button class="btn ghost small" id="btnImport">⬆️ 加密导入</button>
+      <button class="btn danger small" id="btnReset">♻️ 重置数据</button>
+      <button class="btn ghost small" id="btnBack">← 返回原版</button>
     </div>
   </div>
 </div>

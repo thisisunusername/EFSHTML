@@ -54,19 +54,32 @@ function bindUI(){
 
   // 指针锁定视角
   const cv=$('c');
-  let dragging=false, lx=0, ly=0;
+  let dragging=false, lx=0, ly=0, locked=false;
   cv.addEventListener('mousedown',e=>{
     if(!ready) return;
     dragging=true; lx=e.clientX; ly=e.clientY;
-    if(cv.requestPointerLock) cv.requestPointerLock();
+    // 只有左键/中键才请求锁定，避免右键菜单干扰
+    if(!locked && cv.requestPointerLock) cv.requestPointerLock();
+  });
+  document.addEventListener('pointerlockchange',()=>{
+    locked=(document.pointerLockElement===cv);
+    document.body.classList.toggle('locked',locked);
   });
   addEventListener('mouseup',()=>{ dragging=false; });
   addEventListener('mousemove',e=>{
-    if(!dragging) return;
-    P.yaw-=(e.clientX-lx)*0.003;
-    P.pitch-=(e.clientY-ly)*0.003;
+    // 锁定态优先用 movementX/Y（clientX 在锁定下是冻结的）
+    if(locked){
+      const dx=e.movementX||0, dy=e.movementY||0;
+      if(dx===0&&dy===0) return;
+      P.yaw-=dx*0.0025;
+      P.pitch-=dy*0.0025;
+    }else{
+      if(!dragging) return;
+      P.yaw-=(e.clientX-lx)*0.003;
+      P.pitch-=(e.clientY-ly)*0.003;
+      lx=e.clientX; ly=e.clientY;
+    }
     const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
-    lx=e.clientX; ly=e.clientY;
   });
 
   // 触屏摇杆

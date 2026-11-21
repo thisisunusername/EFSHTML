@@ -329,10 +329,36 @@ function moveAndCollide(dt){
      表现就是「一下到地下室就被弹回地面」。
      所以兜底改成「当前楼层的地板高度」，楼层系统没接上时
      （floorBaseY 取不到）仍然退回 0，保持原行为。 */
-  const floorBaseY=(typeof floorY==='function' && typeof curFloor==='number')
-    ? floorY(curFloor) : 0;
-  /* 楼内时，兜底地板就是本层楼板；楼外仍然是 y=0 的大地。
-     注意 floorBaseY 可能为负，所以用 max 而不是直接比较。 */
+  /* 【【楼外不能用楼层高度兜底】】——这就是「人一直在天上」的真因
+     以前这里写的是：
+       const floorBaseY = floorY(curFloor);
+       const minStand = eyeH + floorBaseY;
+       if(standY < minStand) standY = minStand;
+     完全没有判断「玩家在不在楼里」。而 curFloor 初始值是 1（1F，
+     FLOORS[1].y = 8），于是：
+       · 玩家站在楼外操场地面 y=0，脚底 feetY=0
+       · 兜底算出 minStand = 1.6 + 8 = 9.6
+       · standY(0) < 9.6 → standY = 9.6
+       · ny < 9.6 → ny = 9.6，P.onGround = true
+     于是人站在操场上也被强行抬到 9.6 米高空，且被标记为「已落地」，
+     所以跳也跳不下来，人就悬在半空。
+     这完全符合现象，而前几轮修不好的原因也就清楚了：
+     我一直在改「楼层显示」和「出生点重置」，
+     而把人托上去的是这条位于物理循环里的兜底。
+
+     修法：楼外兜底永远是大地 y=0（所以 lookBaseY = 0）；
+     只有真正在楼里（inBuilding）才用本层楼板。
+     inBuilding 由 u_floors.js 的 updFloors() 每帧维护，
+     它在 z:-29..-15 的主楼范围内为 true。 */
+  let floorBaseY = 0;
+  try{
+    const inB = (typeof inBuilding==='boolean') ? inBuilding : false;
+    if(inB && typeof floorY==='function' && typeof curFloor==='number'){
+      floorBaseY = floorY(curFloor);
+    }
+  }catch(e){ floorBaseY = 0; }
+  /* 注意 floorBaseY 可能为负（B3 在 -4 米），
+     所以不能写 max(0,...)，否则地下室里会被下面的 minStand 顶回地面。 */
   const minStand = eyeH + floorBaseY;
   if(standY < minStand) standY = minStand;
 

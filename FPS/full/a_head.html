@@ -143,12 +143,66 @@
   #btnFire .ico{ width:38px; height:38px; }
   #btnJump .ico{ width:30px; height:30px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
-  #btnFire{ right:26px; bottom:26px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
-  #btnAim{ right:118px; bottom:96px; width:62px; height:62px; border-color:#7c5cff; }
-  #btnJump{ right:126px; bottom:22px; }
-  #btnReload{ right:30px; bottom:126px; }
-  #btnInteract{ right:204px; bottom:34px; width:58px; height:58px; }
-  #btnSprint{ right:196px; bottom:110px; width:58px; height:58px; }
+  /* 开火键的配色单独留下：这只是颜色和字号，不涉及 right/bottom 定位。
+     定位仍然全部交给上面那套 calc 公式。 */
+  #btnFire{ border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+/* 【已删除的旧定位】这里原本还有一套
+       #btnFire{right:26px;bottom:26px;...}
+       #btnAim{right:118px;bottom:96px;...}
+       #btnJump{right:126px;bottom:22px;}
+       #btnReload{right:30px;bottom:126px;}
+       #btnInteract{right:204px;bottom:34px;...}
+       #btnSprint{right:196px;bottom:110px;...}
+     选择器权重和上面那套 calc 公式完全相同，而它们在文件里更靠后，
+     于是后写的这一套直接生效 —— 上面精心算好的两列方阵被整个推翻，
+     按钮又散回原来那种「各按各的像素值」的摆法，窄屏就叠在一起。
+     这是「按键重叠」反复出现、改了没用 的根本原因。
+     ​现在统一由上面的 CSS 变量 + calc 决定位置，这里不再重复定义。 */
+
+  /* ===== 底部中间：武器切换条 =====
+     按用户要求「直接在下面的中间」。
+     三个格子：主武器 / 手枪 / 副武器。
+     空槽变暗不可点，当前手持那个高亮。
+     位置钉在屏幕底部正中，夹在左摇杆和右按键群之间，
+     所以宽度要收紧一点（最多 3 格 × 58px + 间距），
+     并且在窄屏上自动缩小，避免和摇杆/开火键撞上。 */
+  #wpnBar{ position:fixed; left:50%; transform:translateX(-50%);
+           bottom:14px; display:flex; gap:6px; z-index:36;
+           pointer-events:auto; }
+  #wpnBar .ws{
+    width:58px; height:52px; border-radius:11px;
+    background:rgba(14,18,28,.86); border:2px solid rgba(255,255,255,.16);
+    color:#cfd6e6; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1px;
+    cursor:pointer; touch-action:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    transition:border-color .12s, background .12s, transform .08s;
+  }
+  #wpnBar .ws .wi{ font-size:19px; line-height:1; }
+  #wpnBar .ws .wn{ font-size:9.5px; line-height:1; letter-spacing:.02em;
+                   opacity:.8; white-space:nowrap; max-width:54px;
+                   overflow:hidden; text-overflow:ellipsis; }
+  /* 当前手持 */
+  #wpnBar .ws.on{ border-color:#7c5cff; background:rgba(124,92,255,.3);
+                  color:#fff; box-shadow:0 0 12px rgba(124,92,255,.45); }
+  #wpnBar .ws.on .wn{ opacity:1; }
+  /* 空槽：不能点，明显变暗 */
+  #wpnBar .ws.empty{ opacity:.34; cursor:default; border-style:dashed; }
+  #wpnBar .ws:active{ transform:scale(.94); }
+  #wpnBar .ws.empty:active{ transform:none; }
+
+  /* 窄屏：底部中间夹在摇杆和按键之间，宽度必须收一收，
+     否则 3×58=174px 加上间距会和开火键撞上。 */
+  @media (max-width:520px){
+    #wpnBar{ bottom:10px; gap:4px; }
+    #wpnBar .ws{ width:46px; height:42px; border-radius:9px; }
+    #wpnBar .ws .wi{ font-size:15px; }
+    #wpnBar .ws .wn{ font-size:8px; max-width:42px; }
+  }
+  @media (max-width:380px){
+    #wpnBar .ws{ width:38px; height:36px; }
+    #wpnBar .ws .wn{ font-size:7px; max-width:34px; }
+  }
 
   /* 菜单 */
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -195,6 +249,18 @@
     border-radius:16px; padding:18px;
     box-shadow:0 18px 50px rgba(0,0,0,.6);
     scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
+  /* 局内背包用的是仓库那套 .stk 结构，而不是 .box。
+     .stk 里写了 height:100%，但 #bag 是 flex 居中的全屏遮罩，
+     没有给子元素确定高度 -> height:100% 解析成 auto -> 整块塌成 0 高。
+     表现就是「背包能打开，但格子一个都点不动」（其实根本没渲染出尺寸）。
+     这里给 .stk 一个明确的高度来源。 */
+  #bag .stk{ height:min(88vh, 620px); max-height:88vh; }
+  /* 面板必须自己吃掉触摸/鼠标事件，否则底下的视角拖拽层（#viewLayer, z-index:25）
+     和摇杆会抢走手势，表现为「点在格子上没反应」或「点一下视角还转了」。
+     touch-action 也要显式放开，不然滚动和点击会被浏览器当成手势丢掉。 */
+  #shop, #bag, #stash{ touch-action:auto; pointer-events:auto; }
+  #bag .stkg, #stash .stkg{ cursor:pointer; touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent; }
   #shop .box::-webkit-scrollbar, #bag .box::-webkit-scrollbar{ width:8px; }
   #shop .box::-webkit-scrollbar-thumb, #bag .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
   #shop h1, #bag h1{ font-size:19px; margin-bottom:4px; }
@@ -447,6 +513,11 @@
     </svg>
   </div>
 </div>
+
+<!-- 底部中间：武器切换条（主武器 / 手枪 / 副武器）
+     放在 #actZone 外面，因为它不跟随右下按键的布局，
+     而是独立钉在屏幕底部正中。内容由 buildWpnBar() 动态生成。 -->
+<div id="wpnBar"></div>
 
 <div id="loaderr"></div>
 <div id="fpscount"></div>

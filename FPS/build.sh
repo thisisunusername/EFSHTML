@@ -146,3 +146,27 @@ if command -v node >/dev/null 2>&1 && [ -f input_test.js ]; then
     exit 1
   fi
 fi
+
+# 站立/落地判定（遁地、板子飞天）
+if command -v node >/dev/null 2>&1 && [ -f stand_test.js ]; then
+  ST=$(node stand_test.js 2>&1)
+  if echo "$ST" | grep -q 'STAND_OK'; then
+    echo "STAND_OK: 平地/屋顶都能正确站立，不会遁地也不会悬空"
+  else
+    echo "$ST" | tail -20
+    echo "站立测试失败"
+    exit 1
+  fi
+fi
+
+# 武器槽切换
+if command -v node >/dev/null 2>&1 && [ -f wpn_test.js ]; then
+  WP=$(node wpn_test.js 2>&1)
+  if echo "$WP" | grep -q 'WPN_OK'; then
+    echo "WPN_OK: 主武器/手枪/副武器 可互切，弹药与伤害各自独立"
+  else
+    echo "$WP" | tail -20
+    echo "武器切换测试失败"
+    exit 1
+  fi
+fi

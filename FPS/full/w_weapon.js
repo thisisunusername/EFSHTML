@@ -1,5 +1,5 @@
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
-let weaponRoot=null, weaponPistol=null, weaponRifle=null, wsk=null;
+let weaponRoot=null, weaponPistol=null, weaponRifle=null, weaponKnife=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
 /* 奔跑/瞄准姿态的平滑插值量。
    【必须在这里声明】本项目所有分块被打包进同一个 <script type="module">，
@@ -119,6 +119,39 @@ function buildHand(isLeft){
   return g;
 }
 
+/* 战术小刀：刀刃 + 刀柄 + 护手。
+   melee 槽的视觉表现。近战武器在 FPS 里视角要更靠中间，
+   所以整体往画面中心挪一点，握持角度也换成「反手握」的侧面姿态。 */
+function buildKnife(){
+  const g=new THREE.Group();
+  const steel=mat(0xc9d3e0,0.35,0.65);
+  const grip=mat(0x23272e,0.95,0.05);
+  const rim=mat(0x8a939f,0.5,0.4);
+
+  // 刀柄（带指槽）
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.030,0.115,0.030), grip);
+  handle.position.set(0,-0.03,0.02); g.add(handle);
+  for(let i=0;i<3;i++){
+    const groove=new THREE.Mesh(new THREE.BoxGeometry(0.034,0.008,0.032), rim);
+    groove.position.set(0,-0.065+i*0.028,0.02); g.add(groove);
+  }
+  // 护手
+  const guard=new THREE.Mesh(new THREE.BoxGeometry(0.062,0.012,0.034), rim);
+  guard.position.set(0,0.032,0.02); g.add(guard);
+  // 刀刃：底宽顶窄，用两段近似（没有自定义几何体时这样最省）
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.026,0.20,0.010), steel);
+  blade.position.set(0,0.14,0.02); blade.rotation.x=-0.04; g.add(blade);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.014,0.055,4), steel);
+  tip.position.set(0,0.265,0.018); tip.rotation.y=Math.PI/4; g.add(tip);
+
+  /* 握刀的手：右手掌心包住刀柄 */
+  const hand=buildHand(false);
+  hand.position.set(0,-0.075,0.045);
+  hand.rotation.x=-0.15;
+  g.add(hand);
+  return g;
+}
+
 /* 初始化武器（挂在相机上，跟随视角） */
 function initWeapon(){
   if(weaponRoot) return;
@@ -128,7 +161,9 @@ function initWeapon(){
 
   weaponPistol=buildPistol();
   weaponRifle=buildRifle();
+  weaponKnife=buildKnife();
   weaponRifle.visible=false;
+  weaponKnife.visible=false;
 
   // 左右手分别挂在枪上，随枪一起动
   const rHand=buildHand(false); rHand.position.set(0.012,-0.115,0.10);
@@ -138,31 +173,152 @@ function initWeapon(){
   weaponPistol.add(lHand.clone());
   weaponRifle.add(rHand.clone());
   weaponRifle.add(lHand.clone());
+  /* 刀已经自带一只握刀的手，另一只手不用挂 */
 
   weaponRoot.add(weaponPistol);
   weaponRoot.add(weaponRifle);
+  weaponRoot.add(weaponKnife);
 
   camera.add(weaponRoot);
   if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
-  wsk={pistol:weaponPistol, rifle:weaponRifle};
+  wsk={pistol:weaponPistol, rifle:weaponRifle, knife:weaponKnife};
   syncWeapon();
+}
+
+/* ===== 手持武器槽：切换与查询 =====
+   三个可用槽位，优先级就是数组顺序：
+     primary   主武器（步枪/冲锋枪/狙击）—— 耗对应步枪弹
+     secondary 手枪                      —— 耗手枪弹
+     melee     副武器（小刀/警棍）        —— 永不耗弹，近战
+
+   为什么不再用 P.inv.gun 布尔：
+     那个布尔只能表达「有长枪 / 只有手枪」两种情况，
+     玩家买了步枪之后就没法切回手枪，也没法掏刀。
+     现在改成「当前手持哪一把」，装备槽里有什么就能切什么。 */
+
+const WSLOTS=['primary','secondary','melee'];
+
+/* 这一槽当前装的是哪把武器（item id），没有就是 null */
+function slotItem(slot){ return (P.equip && P.equip[slot]) || null; }
+/* 这一槽能不能用：装了东西才算 */
+function slotUsable(slot){
+  const id=slotItem(slot);
+  if(!id) return false;
+  return !!SHOP_ITEMS[id];
+}
+/* 当前手持武器是否远程（近战不耗弹、不用换弹） */
+function curIsMelee(){ return P.slot==='melee'; }
+function curIsPrimary(){ return P.slot==='primary'; }
+/* 当前武器用的弹匣字段：near=主武器步枪弹 / secondary=手枪弹 / melee=无 */
+function curAmmoKey(){
+  if(curIsMelee()) return null;
+  return curIsPrimary() ? 'gun' : 'ammo';
+}
+function curReserveKey(){
+  if(curIsMelee()) return null;
+  return curIsPrimary() ? 'rifle' : 'pistol';
+}
+/* 当前武器的伤害（数据来自物品表，买更好的枪就更疼） */
+function curDamage(){
+  if(curIsMelee()) return 40;          // 近战固定伤害（够一刀砍死普通敌人）
+  const id=slotItem(P.slot);
+  const it=id&&SHOP_ITEMS[id];
+  return (it&&it.dmg) || (curIsPrimary()?26:14);
+}
+/* 开火间隔：主武器快、手枪慢、近战更慢 */
+function curFireCd(){
+  if(curIsMelee()) return 0.42;
+  return curIsPrimary() ? 0.12 : 0.18;
+}
+
+/* 切到指定槽位。返回是否切换成功（没装备就切不过去）。 */
+function switchSlot(slot, quiet){
+  if(!WSLOTS.includes(slot)) return false;
+  if(slot===P.slot) return false;
+  if(!slotUsable(slot)){
+    if(!quiet) toast(slotName(slot)+'槽是空的');
+    return false;
+  }
+  /* 换枪要打断换弹：换弹到一半切成别的枪，
+     那颗子弹应该留在原来那把枪里，不能凭空装上。 */
+  if(P.reload){ P.reload=false; P.reloadT=0; }
+  P.slot=slot;
+  P.slotT=0;              // 触发抬枪动画
+  P.shootCd=Math.max(P.shootCd, curFireCd()); // 切枪后有个最小间隔，防止瞬间连射
+  sfxUI();
+  syncWeapon();
+  refreshHUD();
+  refreshWpnBar();     // 底部切换条同步高亮
+  if(!quiet) toast('切到 '+slotName(slot));
+  return true;
+}
+
+/* 中文名，给 HUD 和提示用 */
+function slotName(slot){
+  return slot==='primary'?'主武器':slot==='secondary'?'手枪':'副武器';
+}
+function slotIcon(slot){
+  return slot==='primary'?'🔫':slot==='secondary'?'🔫':'🔪';
+}
+
+/* 循环切到下一把可用的武器（按主武器 -> 手枪 -> 刀 的顺序）
+   给手机上「点一下切枪」这种单键操作准备。 */
+function cycleSlot(){
+  const cur=WSLOTS.indexOf(P.slot);
+  for(let i=1;i<=WSLOTS.length;i++){
+    const s=WSLOTS[(cur+i)%WSLOTS.length];
+    if(slotUsable(s)) return switchSlot(s);
+  }
+  toast('没有可切换的武器');
+  return false;
+}
+
+/* 出门时校正一次：装备槽里空空如也的话，P.slot 可能指向一个空槽，
+   这时自动落回第一个可用槽，避免开局拿着空气。 */
+function fixSlot(){
+  if(slotUsable(P.slot)) return P.slot;
+  for(const s of WSLOTS){
+    if(slotUsable(s)){ P.slot=s; return s; }
+  }
+  P.slot='melee';   // 连刀都没有的极端情况，至少别崩
+  return P.slot;
 }
 
 /* 根据当前武器切换显示 */
 function syncWeapon(){
   if(!wsk) return;
-  const hasGun=!!(P&&P.inv&&P.inv.gun);
-  wsk.pistol.visible=!hasGun;
-  wsk.rifle.visible=hasGun;
+  /* 现在三把模型：rifle / pistol / knife。
+     melee 用刀，别的按主副武器分。 */
+  const s=P.slot;
+  const showRifle = s==='primary';
+  const showPistol = s==='secondary';
+  const showKnife = s==='melee';
+  if(wsk.rifle) wsk.rifle.visible=showRifle;
+  if(wsk.pistol) wsk.pistol.visible=showPistol;
+  if(wsk.knife) wsk.knife.visible=showKnife;
+  /* 换枪瞬间把武器往下甩一点（P.slotT 控制），
+     0 -> 1 表示「放下旧枪又抬上新枪」的过渡。
+     updWeapon 里会读这个值做下坠位移。 */
+  if(P.slotT!==undefined) P.slotT=Math.min(1,P.slotT);
 }
 
 /* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 */
 function updWeapon(dt){
   if(!weaponRoot||!wsk) return;
 
-  // 想用的枪
-  const wantRifle=!!(P&&P.inv&&P.inv.gun);
-  if(wsk.rifle.visible!==wantRifle) syncWeapon();
+  /* 想用的枪：以 P.slot 为准，不再看 inv.gun 布尔。
+     这里只做「检测到不一致就同步一次」，不要每帧 syncWeapon ——
+     那会每帧遍历三个模型改 visible，白费性能。 */
+  const wantRifle = (P.slot==='primary');
+  const wantPistol = (P.slot==='secondary');
+  const wantKnife = (P.slot==='melee');
+  if(wsk.rifle.visible!==wantRifle || wsk.pistol.visible!==wantPistol
+     || (wsk.knife && wsk.knife.visible!==wantKnife)) syncWeapon();
+
+  /* 换枪动画：切槽后 P.slotT 从 0 涨到 1，
+     这段时间武器整体往下沉，做「放下旧枪、抬起新枪」的观感。 */
+  if(P.slotT<1) P.slotT=Math.min(1, P.slotT + dt*3.2);
+  const swapDip=(1-P.slotT)*0.22;   // 0 -> 0.22 米的下坠量
 
   const spd=Math.hypot(P.vel.x,P.vel.z);
   const moving=spd>0.5&&P.onGround;
@@ -192,7 +348,7 @@ function updWeapon(dt){
   const bobRun=Math.sin(wBobT*1.0)*0.028*s;
 
   weaponRoot.position.x=(0.19+bobX) - 0.055*s;
-  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun;
+  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun - swapDip;
   weaponRoot.position.z=(-0.38+wRecoil*0.06) + 0.055*s;
 
   // 奔跑时枪口朝左下压，形成「抱着枪跑」的观感

@@ -143,12 +143,66 @@
   #btnFire .ico{ width:38px; height:38px; }
   #btnJump .ico{ width:30px; height:30px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
-  #btnFire{ right:26px; bottom:26px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
-  #btnAim{ right:118px; bottom:96px; width:62px; height:62px; border-color:#7c5cff; }
-  #btnJump{ right:126px; bottom:22px; }
-  #btnReload{ right:30px; bottom:126px; }
-  #btnInteract{ right:204px; bottom:34px; width:58px; height:58px; }
-  #btnSprint{ right:196px; bottom:110px; width:58px; height:58px; }
+  /* 开火键的配色单独留下：这只是颜色和字号，不涉及 right/bottom 定位。
+     定位仍然全部交给上面那套 calc 公式。 */
+  #btnFire{ border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+/* 【已删除的旧定位】这里原本还有一套
+       #btnFire{right:26px;bottom:26px;...}
+       #btnAim{right:118px;bottom:96px;...}
+       #btnJump{right:126px;bottom:22px;}
+       #btnReload{right:30px;bottom:126px;}
+       #btnInteract{right:204px;bottom:34px;...}
+       #btnSprint{right:196px;bottom:110px;...}
+     选择器权重和上面那套 calc 公式完全相同，而它们在文件里更靠后，
+     于是后写的这一套直接生效 —— 上面精心算好的两列方阵被整个推翻，
+     按钮又散回原来那种「各按各的像素值」的摆法，窄屏就叠在一起。
+     这是「按键重叠」反复出现、改了没用 的根本原因。
+     ​现在统一由上面的 CSS 变量 + calc 决定位置，这里不再重复定义。 */
+
+  /* ===== 底部中间：武器切换条 =====
+     按用户要求「直接在下面的中间」。
+     三个格子：主武器 / 手枪 / 副武器。
+     空槽变暗不可点，当前手持那个高亮。
+     位置钉在屏幕底部正中，夹在左摇杆和右按键群之间，
+     所以宽度要收紧一点（最多 3 格 × 58px + 间距），
+     并且在窄屏上自动缩小，避免和摇杆/开火键撞上。 */
+  #wpnBar{ position:fixed; left:50%; transform:translateX(-50%);
+           bottom:14px; display:flex; gap:6px; z-index:36;
+           pointer-events:auto; }
+  #wpnBar .ws{
+    width:58px; height:52px; border-radius:11px;
+    background:rgba(14,18,28,.86); border:2px solid rgba(255,255,255,.16);
+    color:#cfd6e6; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1px;
+    cursor:pointer; touch-action:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    transition:border-color .12s, background .12s, transform .08s;
+  }
+  #wpnBar .ws .wi{ font-size:19px; line-height:1; }
+  #wpnBar .ws .wn{ font-size:9.5px; line-height:1; letter-spacing:.02em;
+                   opacity:.8; white-space:nowrap; max-width:54px;
+                   overflow:hidden; text-overflow:ellipsis; }
+  /* 当前手持 */
+  #wpnBar .ws.on{ border-color:#7c5cff; background:rgba(124,92,255,.3);
+                  color:#fff; box-shadow:0 0 12px rgba(124,92,255,.45); }
+  #wpnBar .ws.on .wn{ opacity:1; }
+  /* 空槽：不能点，明显变暗 */
+  #wpnBar .ws.empty{ opacity:.34; cursor:default; border-style:dashed; }
+  #wpnBar .ws:active{ transform:scale(.94); }
+  #wpnBar .ws.empty:active{ transform:none; }
+
+  /* 窄屏：底部中间夹在摇杆和按键之间，宽度必须收一收，
+     否则 3×58=174px 加上间距会和开火键撞上。 */
+  @media (max-width:520px){
+    #wpnBar{ bottom:10px; gap:4px; }
+    #wpnBar .ws{ width:46px; height:42px; border-radius:9px; }
+    #wpnBar .ws .wi{ font-size:15px; }
+    #wpnBar .ws .wn{ font-size:8px; max-width:42px; }
+  }
+  @media (max-width:380px){
+    #wpnBar .ws{ width:38px; height:36px; }
+    #wpnBar .ws .wn{ font-size:7px; max-width:34px; }
+  }
 
   /* 菜单 */
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -195,6 +249,18 @@
     border-radius:16px; padding:18px;
     box-shadow:0 18px 50px rgba(0,0,0,.6);
     scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
+  /* 局内背包用的是仓库那套 .stk 结构，而不是 .box。
+     .stk 里写了 height:100%，但 #bag 是 flex 居中的全屏遮罩，
+     没有给子元素确定高度 -> height:100% 解析成 auto -> 整块塌成 0 高。
+     表现就是「背包能打开，但格子一个都点不动」（其实根本没渲染出尺寸）。
+     这里给 .stk 一个明确的高度来源。 */
+  #bag .stk{ height:min(88vh, 620px); max-height:88vh; }
+  /* 面板必须自己吃掉触摸/鼠标事件，否则底下的视角拖拽层（#viewLayer, z-index:25）
+     和摇杆会抢走手势，表现为「点在格子上没反应」或「点一下视角还转了」。
+     touch-action 也要显式放开，不然滚动和点击会被浏览器当成手势丢掉。 */
+  #shop, #bag, #stash{ touch-action:auto; pointer-events:auto; }
+  #bag .stkg, #stash .stkg{ cursor:pointer; touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent; }
   #shop .box::-webkit-scrollbar, #bag .box::-webkit-scrollbar{ width:8px; }
   #shop .box::-webkit-scrollbar-thumb, #bag .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
   #shop h1, #bag h1{ font-size:19px; margin-bottom:4px; }
@@ -448,6 +514,11 @@
   </div>
 </div>
 
+<!-- 底部中间：武器切换条（主武器 / 手枪 / 副武器）
+     放在 #actZone 外面，因为它不跟随右下按键的布局，
+     而是独立钉在屏幕底部正中。内容由 buildWpnBar() 动态生成。 -->
+<div id="wpnBar"></div>
+
 <div id="loaderr"></div>
 <div id="fpscount"></div>
 <!-- 主菜单 -->
@@ -648,7 +719,15 @@ function buildSchool(){
   /* 正门已交给 carveMainDoor() 建造真实可开的门，
      这里不能再放一块 6x3.6 的装饰门板 —— 它正好把门洞堵死，
      玩家开了门也进不去（这正是「只能在教学楼外活动」的真正原因）。 */
-  box(1.8,.3,2.5,0x8a7a5a,0,4.0,-15.0);         // 门楣/雨棚
+  /* 门楣/雨棚：这块板子挂在门洞正上方 y=4.0 处，是个纯装饰件。
+     【为什么它之前看起来「飞天」】它被 solid() 注册成了碰撞体，
+     而旧代码没有「站在顶面上」的概念，玩家既不会被它挡住，
+     也不会被它托住 —— 于是一块实心板子悬在 4 米高的空中，
+     人从下面走过去时完全穿透，视觉上就是「板子飘在天上」。
+     现在它不再参与碰撞（noCol=true），纯装饰；
+     同时贴合门洞上沿（门高 3.6，板子厚 0.3，中心 3.75 才刚好接上），
+     原来放 4.0 会留 0.25 米缝隙，看起来像悬空的。 */
+  box(3.2,.3,1.2,0x8a7a5a,0,3.75,-14.4,true);   // 门楣/雨棚（不碰撞，贴门洞上沿）
 
   /* ---- 东教学楼（x=-34）----
      【尺寸修正】原来 44 米长（z 从 -20 到 24），
@@ -685,7 +764,11 @@ function buildSchool(){
   // 校门（南墙中央开口 + 门柱 + 牌坊）
   box(1.4,3.6,1,0x555555,-5,1.8,-46);
   box(1.4,3.6,1,0x555555,5,1.8,-46);
-  box(12,.5,1.2,0x7a4a2a,-0+0,4.2,-46);               // 门额横梁
+  /* 门额横梁：架在两根门柱（高 3.6）顶上，纯装饰。
+     同样的问题：以前它是实心碰撞体却悬在 4.2 米，
+     玩家既踩不上去也穿得过去，看着像凭空浮着的板子。
+     改成不碰撞，并且把高度对准门柱顶面（3.6 + 0.25）。 */
+  box(12,.5,1.2,0x7a4a2a,0,3.85,-46,true);            // 门额横梁（不碰撞，架在门柱上）
   // 校门内石碑（原在 z=-40，正对主楼门前主干道；挪到路边免得挡人）
   box(3,1.8,.8,0xb0b8c0,-9,.9,-40);
 
@@ -808,6 +891,15 @@ const P={
   equip:{ helmet:null, armorVest:null, backpack:'bp_small',
           primary:null, secondary:'pis_default', melee:'melee_knife', chest:null },
   helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
+  /* 【当前手持武器槽】三个可用槽：primary / secondary / melee
+     P.slot 决定现在拿哪把：
+       'primary'   主武器（步枪/冲锋枪/狙击）—— 有才可选
+       'secondary' 手枪 —— 有才可选
+       'melee'     副武器小刀/警棍 —— 永不耗弹
+     切换逻辑见 switchSlot()。原来的实现只有 P.inv.gun 一个布尔，
+     只能表达「有枪/没枪」，做不了多武器切换。 */
+  slot:'secondary',        // 初始拿手枪（新手只有手枪+小刀）
+  slotT:0,                 // 切换动画计时（抬枪放下再抬起）
   speed:6, sprint:10,
   onGround:true,
   shooting:false, reload:false, reloadT:0,
@@ -985,9 +1077,52 @@ function moveAndCollide(dt){
      身体判定区间还是站立的尺寸，钻不过矮处也躲不掉子弹。 */
   const eyeH = P.eyeH;
   const feetY=ny-eyeH, headY=ny;
-  // 地面
-  P.onGround=false;              // 先假设离地，落地时再置 true
-  if(ny<eyeH){ ny=eyeH; P.vel.y=0; P.onGround=true; }
+
+  /* ================= 垂直方向：落地判定 =================
+     【原来这里只有一个 `if(ny<eyeH) ny=eyeH`】
+     它只认得「地面 y=0」这一个平面。于是出现了两个严重问题：
+
+       1) 遁地：屋顶、台阶、看台、走廊地板这些物体，
+          逻辑上应该能踩上去，但代码里根本没有「站在某个顶面」
+          这个概念。玩家走到台阶上，脚下没有支撑判定，
+          就一直往下掉，最后被 y=0 那一行兜住 —— 表现就是
+          「明明站在楼上却掉到楼里」「走两步突然掉下去」。
+
+       2) 板子飞天：反过来说，悬在空中的装饰板（雨棚、门额横梁）
+          被当成实心体，但玩家又不会被它挡住/托住，
+          于是它看起来就是「飘在天上、人能穿过去」。
+
+     现在补上真正的顶面判定：
+       对每个碰撞体算出它的顶面 top，
+       如果玩家这一帧的脚底从 top 上方落到 top 下方（跨过顶面），
+       而且水平方向在它范围内，就落在 top 上。
+     这一步必须在水平推进「之前」用旧位置算，
+     否则人会先被侧面推开、再也对不上顶面。 */
+  let standY=1;                       // 至少站在 y=0 地面上（眼睛高度）
+  const r0=0.4;
+  for(const m of colliders){
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfH=(bb.max.y-bb.min.y)/2;
+    const top=m.position.y+halfH;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2;
+    const mx=m.position.x, mz=m.position.z;
+    /* 水平方向必须在物体范围内（留一点边，不然贴边站不住） */
+    if(P.pos.x < mx-halfW-r0*0.6 || P.pos.x > mx+halfW+r0*0.6) continue;
+    if(P.pos.z < mz-halfD-r0*0.6 || P.pos.z > mz+halfD+r0*0.6) continue;
+    /* 这一帧脚底有没有从 top 上方跨到下方（或本来就踩在 top 上） */
+    const prevFeet=P.pos.y-P.eyeH;
+    const landTop=top+eyeH;           // 站在这个顶面上时，眼睛应该在的高度
+    if(prevFeet>=top-0.08 && ny<=landTop && P.vel.y<=0){
+      if(landTop>standY) standY=landTop;
+    }
+  }
+  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理） */
+  if(standY<eyeH) standY=eyeH;
+
+  P.onGround=false;
+  if(ny<standY){ ny=standY; P.vel.y=0; P.onGround=true; }
   const canBlock=(m)=>{
     if(!m.geometry) return false;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
@@ -1042,23 +1177,30 @@ function moveAndCollide(dt){
 /* ============ d_game.js：敌人 AI + 物资 + 撤离 + 射击 ============ */
 let enemyTick=0;
 
-/* ---- 射击 ---- */
+/* ---- 射击 ----
+   现在支持三种手持状态：
+     primary   主武器：耗 P.ammo.gun，高伤害、快射速
+     secondary 手枪  ：耗 P.ammo.ammo，低伤害、慢射速
+     melee     副武器：不耗弹、射速慢、只能近身（射线限 3 米） */
 function fire(){
   if(P.reload) return;
-  const t=P.inv.gun?'gun':'ammo';
   if(P.shootCd>0) return;
-  if((P.ammo[t]||0)<=0){ sfxEmpty(); startReload(); return; }
-  P.ammo[t]--;
-  P.shootCd=P.inv.gun?0.12:0.18;
+
+  const melee=curIsMelee();
+  const t=curAmmoKey();             // melee 时为 null
+  if(!melee && (P.ammo[t]|0)<=0){ sfxEmpty(); startReload(); return; }
+
+  if(!melee) P.ammo[t]--;
+  P.shootCd=curFireCd();
   P.shooting=true;
   sfxShoot();
-  addShake(P.inv.gun?0.55:0.9);
+  addShake(melee?0.35:(curIsPrimary()?0.55:0.9));
   weaponKick();
 
-  // 射线检测
+  // 射线检测（近战只打到 3 米内）
   const dir=lookDir();
   const origin=camera.position.clone();
-  const raycaster=new THREE.Raycaster(origin,dir,0.2,120);
+  const raycaster=new THREE.Raycaster(origin,dir,0.2, melee?3.0:120);
   const hits=raycaster.intersectObjects(shootables,true);
   if(hits.length>0){
     const hit=hits[0];
@@ -1066,10 +1208,10 @@ function fire(){
     // 命中敌人（body/head）
     for(const e of enemies){
       if(e.body===obj||e.head===obj){
-        const dmg=P.inv.gun?34:10;
+        const dmg=curDamage();
         e.hp-=dmg;
         e.aggro=true;
-        if(obj===e.head) sfxHeadshot(); else sfxHit();
+        if(obj===e.head && !melee) sfxHeadshot(); else sfxHit();
         if(e.hp<=0){ e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill(); }
         break;
       }
@@ -1078,8 +1220,11 @@ function fire(){
   // 枪口火光（简单后续可扩展）
 }
 
-/* ---- 换弹 ---- */
+/* ---- 换弹 ----
+   近战不需要换弹，直接忽略。
+   弹匣容量按武器数据里的 mag 取，没写就用默认值。 */
 function startReload(){
+  if(curIsMelee()) return;          // 刀不换弹
   if(P.reload||P.shootCd>0) return;
   P.reload=true; P.reloadT=1.2;
   sfxReload();
@@ -1089,8 +1234,27 @@ function updReload(dt){
   P.reloadT-=dt;
   if(P.reloadT<=0){
     P.reload=false;
-    const t=P.inv.gun?'gun':'ammo';
-    P.ammo[t]=P.inv.gun?30:120; // 上限
+    /* 换弹时再取一次当前槽：万一换弹中途切了枪，
+       这里装填的应该是「现在手上这把」，而不是开始换弹那把。
+       同时要检查这把枪还在不在（可能被切走了）。 */
+    if(curIsMelee()) return;
+    const t=curAmmoKey();
+    const rk=curReserveKey();
+    const id=slotItem(P.slot);
+    const it=id&&SHOP_ITEMS[id];
+    const mag=(it&&it.mag)||(curIsPrimary()?30:12);
+    /* 从后备弹里扣：有后备就用后备，没有就按旧逻辑白给满弹匣，
+       避免新手手枪打空后彻底没法玩。 */
+    const have=(P.ammo[rk]|0);
+    if(have>0){
+      const need=Math.max(0,mag-(P.ammo[t]|0));
+      const take=Math.min(have,need);
+      P.ammo[t]=(P.ammo[t]|0)+take;
+      P.ammo[rk]=have-take;
+    }else if(!(P.ammo[t]|0)){
+      P.ammo[t]=mag;    // 兜底：完全没弹了给满一梭子，不然新手卡死
+    }
+    refreshHUD();
   }
 }
 
@@ -1313,14 +1477,30 @@ let touchMoveX=0, touchMoveY=0;
 function refreshHUD(){
   const hp=$('hpNum'); if(hp) hp.textContent=Math.round(P.hp);
   const hf=$('hpfill'); if(hf){ hf.style.width=Math.max(0,P.hp)+'%'; hf.classList.toggle('low',P.hp<30); }
-  const am=$('ammo'); if(am) am.textContent=(P.inv.gun?P.ammo.gun:P.ammo.ammo);
-  /* 【备弹显示】原来写死 '30'/'120'，现在按枪种取真实储备：
-     步枪读 P.ammo.rifle，手枪读 P.ammo.pistol，没有就退回旧字段。 */
+  /* 【弹药 HUD】按当前手持槽取数：
+     主武器 -> P.ammo.gun / 后备 P.ammo.rifle
+     手枪   -> P.ammo.ammo / 后备 P.ammo.pistol
+     ​副武器 -> 不显示弹药，显示「近战」 */
+  const am=$('ammo');
   const ar=$('ammoReserve');
-  if(ar) ar.textContent = P.inv.gun ? ((P.ammo.rifle|0)||(P.ammo.ammo|0)) : ((P.ammo.pistol|0)||(P.ammo.ammo|0));
+  const ak=curAmmoKey(), rk=curReserveKey();
+  if(am){
+    if(ak===null) am.textContent='∞';
+    else am.textContent=(P.ammo[ak]|0);
+  }
+  if(ar){
+    if(rk===null) ar.textContent='近战';
+    else ar.textContent=((P.ammo[rk]|0)||(P.ammo.ammo|0));
+  }
   const money=$('money'); if(money) money.textContent=P.ammo.cash;
   const mm=$('mMoney'); if(mm) mm.textContent=P.ammo.cash;
-  const wpn=$('wpnName'); if(wpn) wpn.textContent=P.inv.gun?'步枪':'手枪';
+  /* 武器名：显示当前手持的实际枪名，而不是笼统的「步枪/手枪」 */
+  const wpn=$('wpnName');
+  if(wpn){
+    const id=slotItem(P.slot);
+    const it=id&&SHOP_ITEMS[id];
+    wpn.textContent = it ? it.name : slotName(P.slot);
+  }
   /* 【护甲 HUD】穿戴头盔/护甲后在地血条旁显示剩余耐久 */
   const av=$('armorPill');
   if(av){
@@ -1351,6 +1531,8 @@ function showTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='block';
   const az=$('actZone'); if(az) az.style.display='block';
   window.__joyEnabled=true;   // 允许 document 兜底监听接管左半屏
+  buildWpnBar();
+  setWpnBarVisible(true);
   const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
 }
 /* 主菜单/死亡界面时把摇杆和操作按钮收起来。
@@ -1359,6 +1541,7 @@ function showTouchUI(){
 function hideTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='none';
   const az=$('actZone'); if(az) az.style.display='none';
+  setWpnBarVisible(false);
   window.__joyEnabled=false;
   if(window.__joyTouch) window.__joyTouch.active=false;
 }
@@ -1491,6 +1674,12 @@ if(window.__uiBound) return; window.__uiBound=true;
     if(e.code==='Space'&&!e.repeat) doJump();
     /* 趴下：Shift（左右都行），切换式 */
     if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat) toggleProne();
+    /* 数字键 1/2/3 = 主武器 / 手枪 / 副武器（和底部切换条一一对应） */
+    if(e.code==='Digit1'&&!e.repeat) switchSlot('primary');
+    if(e.code==='Digit2'&&!e.repeat) switchSlot('secondary');
+    if(e.code==='Digit3'&&!e.repeat) switchSlot('melee');
+    /* X = 循环切枪，懒得记槽位时用 */
+    if(e.code==='KeyX'&&!e.repeat) cycleSlot();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
   });
   addEventListener('keyup',e=>{
@@ -2274,7 +2463,43 @@ function toggleBag(){
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }
 
-/* ============ 局内背包（布局与仓库一模一样） ============ */
+/* ============ 底部中间：武器切换条 ============
+   三个格子对应三个武器槽。点一下就切过去。
+   空槽显示为虚线变暗、点了没反应（不是隐藏，让玩家知道「这槽能装东西」）。 */
+function buildWpnBar(){
+  const el=$('wpnBar'); if(!el) return;
+  let h='';
+  for(const s of WSLOTS){
+    const id=slotItem(s);
+    const it=id&&SHOP_ITEMS[id];
+    const usable=slotUsable(s);
+    const on = (P.slot===s);
+    const cls='ws'+(on?' on':'')+(usable?'':' empty');
+    /* 名字优先显示具体枪名（突击步枪/制式手枪），
+       太长就靠 CSS ellipsis 截断；空槽显示槽位名。 */
+    const nm = it ? it.name : slotName(s);
+    const ic = it ? it.icon : slotIcon(s);
+    h+='<div class="'+cls+'" data-slot="'+s+'" title="'+slotName(s)+'">'
+      +'<span class="wi">'+ic+'</span>'
+      +'<span class="wn">'+nm+'</span>'
+      +'</div>';
+  }
+  el.innerHTML=h;
+  el.querySelectorAll('[data-slot]').forEach(node=>{
+    node.onclick=()=>{
+      const s=node.dataset.slot;
+      /* switchSlot 内部会处理「空槽」「已经是当前槽」这些情况 */
+      switchSlot(s);
+    };
+  });
+}
+
+/* 武器条跟着摇杆/按键一起显示隐藏，主菜单上不该出现 */
+function setWpnBarVisible(v){
+  const el=$('wpnBar'); if(!el) return;
+  el.style.display = v ? 'flex' : 'none';
+}
+function refreshWpnBar(){ buildWpnBar(); }
 /* 用户要求「局内背包就是仓库的左边，一模一样就行」。
    所以这里直接复用仓库那套 .stk / .stkleft / .stkright / .stkgrid
    的视觉结构，保证两个界面看起来是同一个系统，只是数据源不同：
@@ -2327,8 +2552,10 @@ function buildBagNew(){
   const cellTotal=Math.max(48, P.bagCap>0?P.bagCap:48);
   for(const id of owned){
     const it=SHOP_ITEMS[id];
-    /* 可用的（回血/投掷）高亮，不可用的置灰——但依然能点，点了给提示 */
-    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke');
+    /* 可以点的：回血 / 投掷 / 弹药（弹药点了补备弹）。
+       其余置灰但仍可点击，点了会明确提示为什么不能用。 */
+    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke'
+                  || (it.cat==='ammo' && it.ammo));
     h+='<div class="stkg'+(usable?'':' dim')+'" data-use="'+id+'">'
       +'<span class="stkgi">'+it.icon+'</span>'
       +'<b class="stkgq">'+P.pouch[id]+'</b>'
@@ -2347,14 +2574,27 @@ function buildBagNew(){
   const bk=$('bagBack');
   if(bk) bk.onclick=()=>{ toggleBag(); };
 
-  /* 点物品 = 使用 */
-  el.querySelectorAll('[data-use]').forEach(node=>{
-    node.onclick=()=>{
-      const id=node.dataset.use;
+  /* 点物品 = 使用。
+     【为什么改成在容器上做委托，而不是给每个格子绑 onclick】
+     原来的写法是 `el.querySelectorAll('[data-use]').forEach(n=>n.onclick=...)`，
+     看起来没问题，但 useItem() 内部自己又调了一次 buildBagNew()，
+     等于「点一下 → 重建 DOM」，刚绑上的节点立刻被 innerHTML 覆盖成新节点，
+     新节点上又要等下一轮循环才绑事件，中间有一次点击是打空的。
+     更稳的做法是在 #bag 上挂一次委托，用 closest 找目标格子 ——
+     无论 DOM 被重建多少次，监听器都挂在没被替换掉的父节点上。 */
+  if(!el.__useBound){
+    el.__useBound=true;
+    el.addEventListener('click', ev=>{
+      const g=ev.target && ev.target.closest ? ev.target.closest('[data-use]') : null;
+      if(!g) return;
+      /* 只读的装备槽（data-ro）不要触发使用 */
+      if(g.dataset.ro) return;
+      const id=g.dataset.use;
+      if(!id) return;
+      ev.stopPropagation();
       useItem(id);
-      buildBagNew();
-    };
-  });
+    });
+  }
 }
 
 function cellOf(id, label, fb){
@@ -2382,6 +2622,23 @@ function useItem(id){
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
     sfxPickup(); toast('已投掷 '+it.name); buildBagNew(); return;
+  }
+  /* 【弹药物品】点一下就把备弹补到对应枪里。
+     以前弹药走到这里只会提示「局内无法直接使用」，
+     玩家身上背着一堆子弹却打不出去，看起来就像背包坏了。 */
+  if(it.cat==='ammo' && it.ammo){
+    const key={rifle:'rifle',pistol:'pistol',sniper:'sniper',shot:'shot'}[it.ammo]||it.ammo;
+    const add=it.count||30;
+    P.ammo[key]=(P.ammo[key]|0)+add;
+    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    sfxPickup(); toast('装填 '+it.name+' +'+add);
+    refreshHUD(); buildBagNew(); return;
+  }
+  /* 【装备类】这里不允许换装（换装是局外仓库的事），
+     但要明确告诉玩家为什么点了没用，而不是静默失败。 */
+  if(it.cat==='gun'||it.cat==='pistol'||it.cat==='melee'
+     || it.cat==='chest'||it.cat==='backpack'||it.cat==='helmet'||it.cat==='vest'){
+    toast(it.name+'：局内不能换装，回仓库再装备'); sfxDeny(); return;
   }
   toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
@@ -2451,6 +2708,7 @@ function applyInputMode(mode, force){
     /* 键盘模式：整块触摸 UI 收起，画面干净 */
     if(jz) jz.style.display='none';
     if(az) az.style.display='none';
+    setWpnBarVisible(false);
     window.__joyEnabled=false;
     if(window.__joyTouch) window.__joyTouch.active=false;
     /* 正在拖摇杆的手指如果卡住了，一并清掉，避免人「自己一直往前走」 */
@@ -2467,6 +2725,8 @@ function applyInputMode(mode, force){
     if(window.__inGame){
       if(jz) jz.style.display='block';
       if(az) az.style.display='block';
+      buildWpnBar();
+      setWpnBarVisible(true);
     }
     window.__joyEnabled=true;
     const tip=$('htip');
@@ -2849,7 +3109,7 @@ function bindDoorHint(){
 }
 
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
-let weaponRoot=null, weaponPistol=null, weaponRifle=null, wsk=null;
+let weaponRoot=null, weaponPistol=null, weaponRifle=null, weaponKnife=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
 /* 奔跑/瞄准姿态的平滑插值量。
    【必须在这里声明】本项目所有分块被打包进同一个 <script type="module">，
@@ -2969,6 +3229,39 @@ function buildHand(isLeft){
   return g;
 }
 
+/* 战术小刀：刀刃 + 刀柄 + 护手。
+   melee 槽的视觉表现。近战武器在 FPS 里视角要更靠中间，
+   所以整体往画面中心挪一点，握持角度也换成「反手握」的侧面姿态。 */
+function buildKnife(){
+  const g=new THREE.Group();
+  const steel=mat(0xc9d3e0,0.35,0.65);
+  const grip=mat(0x23272e,0.95,0.05);
+  const rim=mat(0x8a939f,0.5,0.4);
+
+  // 刀柄（带指槽）
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.030,0.115,0.030), grip);
+  handle.position.set(0,-0.03,0.02); g.add(handle);
+  for(let i=0;i<3;i++){
+    const groove=new THREE.Mesh(new THREE.BoxGeometry(0.034,0.008,0.032), rim);
+    groove.position.set(0,-0.065+i*0.028,0.02); g.add(groove);
+  }
+  // 护手
+  const guard=new THREE.Mesh(new THREE.BoxGeometry(0.062,0.012,0.034), rim);
+  guard.position.set(0,0.032,0.02); g.add(guard);
+  // 刀刃：底宽顶窄，用两段近似（没有自定义几何体时这样最省）
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.026,0.20,0.010), steel);
+  blade.position.set(0,0.14,0.02); blade.rotation.x=-0.04; g.add(blade);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.014,0.055,4), steel);
+  tip.position.set(0,0.265,0.018); tip.rotation.y=Math.PI/4; g.add(tip);
+
+  /* 握刀的手：右手掌心包住刀柄 */
+  const hand=buildHand(false);
+  hand.position.set(0,-0.075,0.045);
+  hand.rotation.x=-0.15;
+  g.add(hand);
+  return g;
+}
+
 /* 初始化武器（挂在相机上，跟随视角） */
 function initWeapon(){
   if(weaponRoot) return;
@@ -2978,7 +3271,9 @@ function initWeapon(){
 
   weaponPistol=buildPistol();
   weaponRifle=buildRifle();
+  weaponKnife=buildKnife();
   weaponRifle.visible=false;
+  weaponKnife.visible=false;
 
   // 左右手分别挂在枪上，随枪一起动
   const rHand=buildHand(false); rHand.position.set(0.012,-0.115,0.10);
@@ -2988,31 +3283,152 @@ function initWeapon(){
   weaponPistol.add(lHand.clone());
   weaponRifle.add(rHand.clone());
   weaponRifle.add(lHand.clone());
+  /* 刀已经自带一只握刀的手，另一只手不用挂 */
 
   weaponRoot.add(weaponPistol);
   weaponRoot.add(weaponRifle);
+  weaponRoot.add(weaponKnife);
 
   camera.add(weaponRoot);
   if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
-  wsk={pistol:weaponPistol, rifle:weaponRifle};
+  wsk={pistol:weaponPistol, rifle:weaponRifle, knife:weaponKnife};
   syncWeapon();
+}
+
+/* ===== 手持武器槽：切换与查询 =====
+   三个可用槽位，优先级就是数组顺序：
+     primary   主武器（步枪/冲锋枪/狙击）—— 耗对应步枪弹
+     secondary 手枪                      —— 耗手枪弹
+     melee     副武器（小刀/警棍）        —— 永不耗弹，近战
+
+   为什么不再用 P.inv.gun 布尔：
+     那个布尔只能表达「有长枪 / 只有手枪」两种情况，
+     玩家买了步枪之后就没法切回手枪，也没法掏刀。
+     现在改成「当前手持哪一把」，装备槽里有什么就能切什么。 */
+
+const WSLOTS=['primary','secondary','melee'];
+
+/* 这一槽当前装的是哪把武器（item id），没有就是 null */
+function slotItem(slot){ return (P.equip && P.equip[slot]) || null; }
+/* 这一槽能不能用：装了东西才算 */
+function slotUsable(slot){
+  const id=slotItem(slot);
+  if(!id) return false;
+  return !!SHOP_ITEMS[id];
+}
+/* 当前手持武器是否远程（近战不耗弹、不用换弹） */
+function curIsMelee(){ return P.slot==='melee'; }
+function curIsPrimary(){ return P.slot==='primary'; }
+/* 当前武器用的弹匣字段：near=主武器步枪弹 / secondary=手枪弹 / melee=无 */
+function curAmmoKey(){
+  if(curIsMelee()) return null;
+  return curIsPrimary() ? 'gun' : 'ammo';
+}
+function curReserveKey(){
+  if(curIsMelee()) return null;
+  return curIsPrimary() ? 'rifle' : 'pistol';
+}
+/* 当前武器的伤害（数据来自物品表，买更好的枪就更疼） */
+function curDamage(){
+  if(curIsMelee()) return 40;          // 近战固定伤害（够一刀砍死普通敌人）
+  const id=slotItem(P.slot);
+  const it=id&&SHOP_ITEMS[id];
+  return (it&&it.dmg) || (curIsPrimary()?26:14);
+}
+/* 开火间隔：主武器快、手枪慢、近战更慢 */
+function curFireCd(){
+  if(curIsMelee()) return 0.42;
+  return curIsPrimary() ? 0.12 : 0.18;
+}
+
+/* 切到指定槽位。返回是否切换成功（没装备就切不过去）。 */
+function switchSlot(slot, quiet){
+  if(!WSLOTS.includes(slot)) return false;
+  if(slot===P.slot) return false;
+  if(!slotUsable(slot)){
+    if(!quiet) toast(slotName(slot)+'槽是空的');
+    return false;
+  }
+  /* 换枪要打断换弹：换弹到一半切成别的枪，
+     那颗子弹应该留在原来那把枪里，不能凭空装上。 */
+  if(P.reload){ P.reload=false; P.reloadT=0; }
+  P.slot=slot;
+  P.slotT=0;              // 触发抬枪动画
+  P.shootCd=Math.max(P.shootCd, curFireCd()); // 切枪后有个最小间隔，防止瞬间连射
+  sfxUI();
+  syncWeapon();
+  refreshHUD();
+  refreshWpnBar();     // 底部切换条同步高亮
+  if(!quiet) toast('切到 '+slotName(slot));
+  return true;
+}
+
+/* 中文名，给 HUD 和提示用 */
+function slotName(slot){
+  return slot==='primary'?'主武器':slot==='secondary'?'手枪':'副武器';
+}
+function slotIcon(slot){
+  return slot==='primary'?'🔫':slot==='secondary'?'🔫':'🔪';
+}
+
+/* 循环切到下一把可用的武器（按主武器 -> 手枪 -> 刀 的顺序）
+   给手机上「点一下切枪」这种单键操作准备。 */
+function cycleSlot(){
+  const cur=WSLOTS.indexOf(P.slot);
+  for(let i=1;i<=WSLOTS.length;i++){
+    const s=WSLOTS[(cur+i)%WSLOTS.length];
+    if(slotUsable(s)) return switchSlot(s);
+  }
+  toast('没有可切换的武器');
+  return false;
+}
+
+/* 出门时校正一次：装备槽里空空如也的话，P.slot 可能指向一个空槽，
+   这时自动落回第一个可用槽，避免开局拿着空气。 */
+function fixSlot(){
+  if(slotUsable(P.slot)) return P.slot;
+  for(const s of WSLOTS){
+    if(slotUsable(s)){ P.slot=s; return s; }
+  }
+  P.slot='melee';   // 连刀都没有的极端情况，至少别崩
+  return P.slot;
 }
 
 /* 根据当前武器切换显示 */
 function syncWeapon(){
   if(!wsk) return;
-  const hasGun=!!(P&&P.inv&&P.inv.gun);
-  wsk.pistol.visible=!hasGun;
-  wsk.rifle.visible=hasGun;
+  /* 现在三把模型：rifle / pistol / knife。
+     melee 用刀，别的按主副武器分。 */
+  const s=P.slot;
+  const showRifle = s==='primary';
+  const showPistol = s==='secondary';
+  const showKnife = s==='melee';
+  if(wsk.rifle) wsk.rifle.visible=showRifle;
+  if(wsk.pistol) wsk.pistol.visible=showPistol;
+  if(wsk.knife) wsk.knife.visible=showKnife;
+  /* 换枪瞬间把武器往下甩一点（P.slotT 控制），
+     0 -> 1 表示「放下旧枪又抬上新枪」的过渡。
+     updWeapon 里会读这个值做下坠位移。 */
+  if(P.slotT!==undefined) P.slotT=Math.min(1,P.slotT);
 }
 
 /* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 */
 function updWeapon(dt){
   if(!weaponRoot||!wsk) return;
 
-  // 想用的枪
-  const wantRifle=!!(P&&P.inv&&P.inv.gun);
-  if(wsk.rifle.visible!==wantRifle) syncWeapon();
+  /* 想用的枪：以 P.slot 为准，不再看 inv.gun 布尔。
+     这里只做「检测到不一致就同步一次」，不要每帧 syncWeapon ——
+     那会每帧遍历三个模型改 visible，白费性能。 */
+  const wantRifle = (P.slot==='primary');
+  const wantPistol = (P.slot==='secondary');
+  const wantKnife = (P.slot==='melee');
+  if(wsk.rifle.visible!==wantRifle || wsk.pistol.visible!==wantPistol
+     || (wsk.knife && wsk.knife.visible!==wantKnife)) syncWeapon();
+
+  /* 换枪动画：切槽后 P.slotT 从 0 涨到 1，
+     这段时间武器整体往下沉，做「放下旧枪、抬起新枪」的观感。 */
+  if(P.slotT<1) P.slotT=Math.min(1, P.slotT + dt*3.2);
+  const swapDip=(1-P.slotT)*0.22;   // 0 -> 0.22 米的下坠量
 
   const spd=Math.hypot(P.vel.x,P.vel.z);
   const moving=spd>0.5&&P.onGround;
@@ -3042,7 +3458,7 @@ function updWeapon(dt){
   const bobRun=Math.sin(wBobT*1.0)*0.028*s;
 
   weaponRoot.position.x=(0.19+bobX) - 0.055*s;
-  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun;
+  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun - swapDip;
   weaponRoot.position.z=(-0.38+wRecoil*0.06) + 0.055*s;
 
   // 奔跑时枪口朝左下压，形成「抱着枪跑」的观感

@@ -28,6 +28,15 @@ const P={
   equip:{ helmet:null, armorVest:null, backpack:'bp_small',
           primary:null, secondary:'pis_default', melee:'melee_knife', chest:null },
   helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
+  /* 【当前手持武器槽】三个可用槽：primary / secondary / melee
+     P.slot 决定现在拿哪把：
+       'primary'   主武器（步枪/冲锋枪/狙击）—— 有才可选
+       'secondary' 手枪 —— 有才可选
+       'melee'     副武器小刀/警棍 —— 永不耗弹
+     切换逻辑见 switchSlot()。原来的实现只有 P.inv.gun 一个布尔，
+     只能表达「有枪/没枪」，做不了多武器切换。 */
+  slot:'secondary',        // 初始拿手枪（新手只有手枪+小刀）
+  slotT:0,                 // 切换动画计时（抬枪放下再抬起）
   speed:6, sprint:10,
   onGround:true,
   shooting:false, reload:false, reloadT:0,
@@ -205,9 +214,52 @@ function moveAndCollide(dt){
      身体判定区间还是站立的尺寸，钻不过矮处也躲不掉子弹。 */
   const eyeH = P.eyeH;
   const feetY=ny-eyeH, headY=ny;
-  // 地面
-  P.onGround=false;              // 先假设离地，落地时再置 true
-  if(ny<eyeH){ ny=eyeH; P.vel.y=0; P.onGround=true; }
+
+  /* ================= 垂直方向：落地判定 =================
+     【原来这里只有一个 `if(ny<eyeH) ny=eyeH`】
+     它只认得「地面 y=0」这一个平面。于是出现了两个严重问题：
+
+       1) 遁地：屋顶、台阶、看台、走廊地板这些物体，
+          逻辑上应该能踩上去，但代码里根本没有「站在某个顶面」
+          这个概念。玩家走到台阶上，脚下没有支撑判定，
+          就一直往下掉，最后被 y=0 那一行兜住 —— 表现就是
+          「明明站在楼上却掉到楼里」「走两步突然掉下去」。
+
+       2) 板子飞天：反过来说，悬在空中的装饰板（雨棚、门额横梁）
+          被当成实心体，但玩家又不会被它挡住/托住，
+          于是它看起来就是「飘在天上、人能穿过去」。
+
+     现在补上真正的顶面判定：
+       对每个碰撞体算出它的顶面 top，
+       如果玩家这一帧的脚底从 top 上方落到 top 下方（跨过顶面），
+       而且水平方向在它范围内，就落在 top 上。
+     这一步必须在水平推进「之前」用旧位置算，
+     否则人会先被侧面推开、再也对不上顶面。 */
+  let standY=1;                       // 至少站在 y=0 地面上（眼睛高度）
+  const r0=0.4;
+  for(const m of colliders){
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfH=(bb.max.y-bb.min.y)/2;
+    const top=m.position.y+halfH;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2;
+    const mx=m.position.x, mz=m.position.z;
+    /* 水平方向必须在物体范围内（留一点边，不然贴边站不住） */
+    if(P.pos.x < mx-halfW-r0*0.6 || P.pos.x > mx+halfW+r0*0.6) continue;
+    if(P.pos.z < mz-halfD-r0*0.6 || P.pos.z > mz+halfD+r0*0.6) continue;
+    /* 这一帧脚底有没有从 top 上方跨到下方（或本来就踩在 top 上） */
+    const prevFeet=P.pos.y-P.eyeH;
+    const landTop=top+eyeH;           // 站在这个顶面上时，眼睛应该在的高度
+    if(prevFeet>=top-0.08 && ny<=landTop && P.vel.y<=0){
+      if(landTop>standY) standY=landTop;
+    }
+  }
+  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理） */
+  if(standY<eyeH) standY=eyeH;
+
+  P.onGround=false;
+  if(ny<standY){ ny=standY; P.vel.y=0; P.onGround=true; }
   const canBlock=(m)=>{
     if(!m.geometry) return false;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();

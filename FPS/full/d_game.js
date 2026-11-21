@@ -1,23 +1,30 @@
 /* ============ d_game.js：敌人 AI + 物资 + 撤离 + 射击 ============ */
 let enemyTick=0;
 
-/* ---- 射击 ---- */
+/* ---- 射击 ----
+   现在支持三种手持状态：
+     primary   主武器：耗 P.ammo.gun，高伤害、快射速
+     secondary 手枪  ：耗 P.ammo.ammo，低伤害、慢射速
+     melee     副武器：不耗弹、射速慢、只能近身（射线限 3 米） */
 function fire(){
   if(P.reload) return;
-  const t=P.inv.gun?'gun':'ammo';
   if(P.shootCd>0) return;
-  if((P.ammo[t]||0)<=0){ sfxEmpty(); startReload(); return; }
-  P.ammo[t]--;
-  P.shootCd=P.inv.gun?0.12:0.18;
+
+  const melee=curIsMelee();
+  const t=curAmmoKey();             // melee 时为 null
+  if(!melee && (P.ammo[t]|0)<=0){ sfxEmpty(); startReload(); return; }
+
+  if(!melee) P.ammo[t]--;
+  P.shootCd=curFireCd();
   P.shooting=true;
   sfxShoot();
-  addShake(P.inv.gun?0.55:0.9);
+  addShake(melee?0.35:(curIsPrimary()?0.55:0.9));
   weaponKick();
 
-  // 射线检测
+  // 射线检测（近战只打到 3 米内）
   const dir=lookDir();
   const origin=camera.position.clone();
-  const raycaster=new THREE.Raycaster(origin,dir,0.2,120);
+  const raycaster=new THREE.Raycaster(origin,dir,0.2, melee?3.0:120);
   const hits=raycaster.intersectObjects(shootables,true);
   if(hits.length>0){
     const hit=hits[0];
@@ -25,10 +32,10 @@ function fire(){
     // 命中敌人（body/head）
     for(const e of enemies){
       if(e.body===obj||e.head===obj){
-        const dmg=P.inv.gun?34:10;
+        const dmg=curDamage();
         e.hp-=dmg;
         e.aggro=true;
-        if(obj===e.head) sfxHeadshot(); else sfxHit();
+        if(obj===e.head && !melee) sfxHeadshot(); else sfxHit();
         if(e.hp<=0){ e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill(); }
         break;
       }
@@ -37,8 +44,11 @@ function fire(){
   // 枪口火光（简单后续可扩展）
 }
 
-/* ---- 换弹 ---- */
+/* ---- 换弹 ----
+   近战不需要换弹，直接忽略。
+   弹匣容量按武器数据里的 mag 取，没写就用默认值。 */
 function startReload(){
+  if(curIsMelee()) return;          // 刀不换弹
   if(P.reload||P.shootCd>0) return;
   P.reload=true; P.reloadT=1.2;
   sfxReload();
@@ -48,8 +58,27 @@ function updReload(dt){
   P.reloadT-=dt;
   if(P.reloadT<=0){
     P.reload=false;
-    const t=P.inv.gun?'gun':'ammo';
-    P.ammo[t]=P.inv.gun?30:120; // 上限
+    /* 换弹时再取一次当前槽：万一换弹中途切了枪，
+       这里装填的应该是「现在手上这把」，而不是开始换弹那把。
+       同时要检查这把枪还在不在（可能被切走了）。 */
+    if(curIsMelee()) return;
+    const t=curAmmoKey();
+    const rk=curReserveKey();
+    const id=slotItem(P.slot);
+    const it=id&&SHOP_ITEMS[id];
+    const mag=(it&&it.mag)||(curIsPrimary()?30:12);
+    /* 从后备弹里扣：有后备就用后备，没有就按旧逻辑白给满弹匣，
+       避免新手手枪打空后彻底没法玩。 */
+    const have=(P.ammo[rk]|0);
+    if(have>0){
+      const need=Math.max(0,mag-(P.ammo[t]|0));
+      const take=Math.min(have,need);
+      P.ammo[t]=(P.ammo[t]|0)+take;
+      P.ammo[rk]=have-take;
+    }else if(!(P.ammo[t]|0)){
+      P.ammo[t]=mag;    // 兜底：完全没弹了给满一梭子，不然新手卡死
+    }
+    refreshHUD();
   }
 }
 

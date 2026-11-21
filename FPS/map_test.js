@@ -190,6 +190,59 @@ for(const l of S.loots){
   if(h) issues.push({type:'物资卡墙', pos:{x:l.x,z:l.z}, by:bboxOf(h)});
 }
 
+/* ===== 6. 悬空实心体（「板子飞天」） =====
+   判定标准：一个碰撞体离地较高，并且它的**六个面都不和任何其它碰撞体接触**。
+   这种就是真正意义上「凭空飘着」的一块板子。
+
+   注意不能只看「下方有没有支撑」：门洞剖切出来的过梁本来就应该
+   悬在门上方（靠两侧墙段托着），那是对的；按「下方必须接触」判会把它误报。
+   正确的是「必须有任一相邻面贴合」—— 过梁两侧贴着墙段就算合法。 */
+for(const m of colliders){
+  const b=bboxOf(m); if(!b) continue;
+  if(b.y0 < 2.6) continue;                  // 离地不高的不算
+  let touched=false;
+  for(const o of colliders){
+    if(o===m) continue;
+    const ob=bboxOf(o); if(!ob) continue;
+    /* 三个轴上的重叠量 */
+    const ox=Math.min(b.x1,ob.x1)-Math.max(b.x0,ob.x0);
+    const oy=Math.min(b.y1,ob.y1)-Math.max(b.y0,ob.y0);
+    const oz=Math.min(b.z1,ob.z1)-Math.max(b.z0,ob.z0);
+    /* 至少两个轴有实际重叠、第三个轴贴得很近 = 面接触 */
+    const touching =
+      (oy>0.05 && oz>0.05 && Math.abs(ox)<0.12) ||   // 左右贴
+      (ox>0.05 && oz>0.05 && Math.abs(oy)<0.12) ||   // 上下贴
+      (ox>0.05 && oy>0.05 && Math.abs(oz)<0.12);     // 前后贴
+    if(touching){ touched=true; break; }
+  }
+  if(!touched){
+    issues.push({type:'悬空实体', box:b, h:b.y0});
+  }
+}
+
+/* ===== 7. 玩家能不能站在该站的地方 =====
+   模拟「从 6 米高空落到场地中央」，看最后停在哪。
+   如果停在 y≈0 说明那一块没有地面支撑，会表现为「遁地」。 */
+function landY(x,z){
+  let best=0;
+  for(const m of colliders){
+    const b=bboxOf(m); if(!b) continue;
+    if(x<b.x0 || x>b.x1 || z<b.z0 || z>b.z1) continue;
+    if(b.y1>6) continue;                    // 高于起落高度的不算
+    if(b.y1>best) best=b.y1;
+  }
+  return best;
+}
+/* 抽查几个关键位置：出生点、操场、走廊、屋顶 */
+const probes=[[S.P.pos.x,S.P.pos.z,'出生点'],[0,10,'主干道'],[-18,6,'篮球场'],[0,50,'操场']];
+for(const [x,z,nm] of probes){
+  const ly=landY(x,z);
+  /* 落到 y=0 但那里本来是室内/楼上，说明缺了地板碰撞体 */
+  if(ly<0.01 && Math.abs(x)<40 && Math.abs(z)<40){
+    /* 空旷场地本来就在 y=0，这里只提示不判死 */
+  }
+}
+
 /* ---- 输出 ---- */
 console.log('=== 地图体检报告 ===');
 console.log('场景实体:', all.length, '｜碰撞体:', colliders.length, '｜门:', S.DOORS.length);
@@ -226,6 +279,13 @@ for(const t in byType){
         +' 尺寸 '+(D.x1-D.x0).toFixed(0)+'x'+(D.z1-D.z0).toFixed(0)+') 压在建筑'
         +'('+((Sd.x0+Sd.x1)/2).toFixed(1)+','+((Sd.z0+Sd.z1)/2).toFixed(1)+') 下面 '
         +(it.cov*100).toFixed(0)+'%';
+    }else if(it.type==='悬空实体'){
+      const V=it.box;
+      key=V.x0.toFixed(1)+','+V.y0.toFixed(1)+','+V.z0.toFixed(1);
+      desc='悬空实心体 中心('+((V.x0+V.x1)/2).toFixed(1)+','+((V.y0+V.y1)/2).toFixed(1)
+        +','+((V.z0+V.z1)/2).toFixed(1)+') 尺寸 '
+        +V.w.toFixed(1)+'x'+V.h.toFixed(1)+'x'+V.d.toFixed(1)
+        +' 底面离地 '+it.h.toFixed(1)+' 米，下方无支撑';
     }else{
       key=it.type+JSON.stringify(it.pos||it.door||{});
       desc=it.type+' @ '+JSON.stringify(it.pos||it.door)

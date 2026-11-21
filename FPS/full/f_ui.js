@@ -4,14 +4,30 @@ let touchMoveX=0, touchMoveY=0;
 function refreshHUD(){
   const hp=$('hpNum'); if(hp) hp.textContent=Math.round(P.hp);
   const hf=$('hpfill'); if(hf){ hf.style.width=Math.max(0,P.hp)+'%'; hf.classList.toggle('low',P.hp<30); }
-  const am=$('ammo'); if(am) am.textContent=(P.inv.gun?P.ammo.gun:P.ammo.ammo);
-  /* 【备弹显示】原来写死 '30'/'120'，现在按枪种取真实储备：
-     步枪读 P.ammo.rifle，手枪读 P.ammo.pistol，没有就退回旧字段。 */
+  /* 【弹药 HUD】按当前手持槽取数：
+     主武器 -> P.ammo.gun / 后备 P.ammo.rifle
+     手枪   -> P.ammo.ammo / 后备 P.ammo.pistol
+     ​副武器 -> 不显示弹药，显示「近战」 */
+  const am=$('ammo');
   const ar=$('ammoReserve');
-  if(ar) ar.textContent = P.inv.gun ? ((P.ammo.rifle|0)||(P.ammo.ammo|0)) : ((P.ammo.pistol|0)||(P.ammo.ammo|0));
+  const ak=curAmmoKey(), rk=curReserveKey();
+  if(am){
+    if(ak===null) am.textContent='∞';
+    else am.textContent=(P.ammo[ak]|0);
+  }
+  if(ar){
+    if(rk===null) ar.textContent='近战';
+    else ar.textContent=((P.ammo[rk]|0)||(P.ammo.ammo|0));
+  }
   const money=$('money'); if(money) money.textContent=P.ammo.cash;
   const mm=$('mMoney'); if(mm) mm.textContent=P.ammo.cash;
-  const wpn=$('wpnName'); if(wpn) wpn.textContent=P.inv.gun?'步枪':'手枪';
+  /* 武器名：显示当前手持的实际枪名，而不是笼统的「步枪/手枪」 */
+  const wpn=$('wpnName');
+  if(wpn){
+    const id=slotItem(P.slot);
+    const it=id&&SHOP_ITEMS[id];
+    wpn.textContent = it ? it.name : slotName(P.slot);
+  }
   /* 【护甲 HUD】穿戴头盔/护甲后在地血条旁显示剩余耐久 */
   const av=$('armorPill');
   if(av){
@@ -42,6 +58,8 @@ function showTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='block';
   const az=$('actZone'); if(az) az.style.display='block';
   window.__joyEnabled=true;   // 允许 document 兜底监听接管左半屏
+  buildWpnBar();
+  setWpnBarVisible(true);
   const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
 }
 /* 主菜单/死亡界面时把摇杆和操作按钮收起来。
@@ -50,6 +68,7 @@ function showTouchUI(){
 function hideTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='none';
   const az=$('actZone'); if(az) az.style.display='none';
+  setWpnBarVisible(false);
   window.__joyEnabled=false;
   if(window.__joyTouch) window.__joyTouch.active=false;
 }
@@ -182,6 +201,12 @@ if(window.__uiBound) return; window.__uiBound=true;
     if(e.code==='Space'&&!e.repeat) doJump();
     /* 趴下：Shift（左右都行），切换式 */
     if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat) toggleProne();
+    /* 数字键 1/2/3 = 主武器 / 手枪 / 副武器（和底部切换条一一对应） */
+    if(e.code==='Digit1'&&!e.repeat) switchSlot('primary');
+    if(e.code==='Digit2'&&!e.repeat) switchSlot('secondary');
+    if(e.code==='Digit3'&&!e.repeat) switchSlot('melee');
+    /* X = 循环切枪，懒得记槽位时用 */
+    if(e.code==='KeyX'&&!e.repeat) cycleSlot();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
   });
   addEventListener('keyup',e=>{
@@ -965,7 +990,43 @@ function toggleBag(){
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }
 
-/* ============ 局内背包（布局与仓库一模一样） ============ */
+/* ============ 底部中间：武器切换条 ============
+   三个格子对应三个武器槽。点一下就切过去。
+   空槽显示为虚线变暗、点了没反应（不是隐藏，让玩家知道「这槽能装东西」）。 */
+function buildWpnBar(){
+  const el=$('wpnBar'); if(!el) return;
+  let h='';
+  for(const s of WSLOTS){
+    const id=slotItem(s);
+    const it=id&&SHOP_ITEMS[id];
+    const usable=slotUsable(s);
+    const on = (P.slot===s);
+    const cls='ws'+(on?' on':'')+(usable?'':' empty');
+    /* 名字优先显示具体枪名（突击步枪/制式手枪），
+       太长就靠 CSS ellipsis 截断；空槽显示槽位名。 */
+    const nm = it ? it.name : slotName(s);
+    const ic = it ? it.icon : slotIcon(s);
+    h+='<div class="'+cls+'" data-slot="'+s+'" title="'+slotName(s)+'">'
+      +'<span class="wi">'+ic+'</span>'
+      +'<span class="wn">'+nm+'</span>'
+      +'</div>';
+  }
+  el.innerHTML=h;
+  el.querySelectorAll('[data-slot]').forEach(node=>{
+    node.onclick=()=>{
+      const s=node.dataset.slot;
+      /* switchSlot 内部会处理「空槽」「已经是当前槽」这些情况 */
+      switchSlot(s);
+    };
+  });
+}
+
+/* 武器条跟着摇杆/按键一起显示隐藏，主菜单上不该出现 */
+function setWpnBarVisible(v){
+  const el=$('wpnBar'); if(!el) return;
+  el.style.display = v ? 'flex' : 'none';
+}
+function refreshWpnBar(){ buildWpnBar(); }
 /* 用户要求「局内背包就是仓库的左边，一模一样就行」。
    所以这里直接复用仓库那套 .stk / .stkleft / .stkright / .stkgrid
    的视觉结构，保证两个界面看起来是同一个系统，只是数据源不同：
@@ -1018,8 +1079,10 @@ function buildBagNew(){
   const cellTotal=Math.max(48, P.bagCap>0?P.bagCap:48);
   for(const id of owned){
     const it=SHOP_ITEMS[id];
-    /* 可用的（回血/投掷）高亮，不可用的置灰——但依然能点，点了给提示 */
-    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke');
+    /* 可以点的：回血 / 投掷 / 弹药（弹药点了补备弹）。
+       其余置灰但仍可点击，点了会明确提示为什么不能用。 */
+    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke'
+                  || (it.cat==='ammo' && it.ammo));
     h+='<div class="stkg'+(usable?'':' dim')+'" data-use="'+id+'">'
       +'<span class="stkgi">'+it.icon+'</span>'
       +'<b class="stkgq">'+P.pouch[id]+'</b>'
@@ -1038,14 +1101,27 @@ function buildBagNew(){
   const bk=$('bagBack');
   if(bk) bk.onclick=()=>{ toggleBag(); };
 
-  /* 点物品 = 使用 */
-  el.querySelectorAll('[data-use]').forEach(node=>{
-    node.onclick=()=>{
-      const id=node.dataset.use;
+  /* 点物品 = 使用。
+     【为什么改成在容器上做委托，而不是给每个格子绑 onclick】
+     原来的写法是 `el.querySelectorAll('[data-use]').forEach(n=>n.onclick=...)`，
+     看起来没问题，但 useItem() 内部自己又调了一次 buildBagNew()，
+     等于「点一下 → 重建 DOM」，刚绑上的节点立刻被 innerHTML 覆盖成新节点，
+     新节点上又要等下一轮循环才绑事件，中间有一次点击是打空的。
+     更稳的做法是在 #bag 上挂一次委托，用 closest 找目标格子 ——
+     无论 DOM 被重建多少次，监听器都挂在没被替换掉的父节点上。 */
+  if(!el.__useBound){
+    el.__useBound=true;
+    el.addEventListener('click', ev=>{
+      const g=ev.target && ev.target.closest ? ev.target.closest('[data-use]') : null;
+      if(!g) return;
+      /* 只读的装备槽（data-ro）不要触发使用 */
+      if(g.dataset.ro) return;
+      const id=g.dataset.use;
+      if(!id) return;
+      ev.stopPropagation();
       useItem(id);
-      buildBagNew();
-    };
-  });
+    });
+  }
 }
 
 function cellOf(id, label, fb){
@@ -1073,6 +1149,23 @@ function useItem(id){
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
     sfxPickup(); toast('已投掷 '+it.name); buildBagNew(); return;
+  }
+  /* 【弹药物品】点一下就把备弹补到对应枪里。
+     以前弹药走到这里只会提示「局内无法直接使用」，
+     玩家身上背着一堆子弹却打不出去，看起来就像背包坏了。 */
+  if(it.cat==='ammo' && it.ammo){
+    const key={rifle:'rifle',pistol:'pistol',sniper:'sniper',shot:'shot'}[it.ammo]||it.ammo;
+    const add=it.count||30;
+    P.ammo[key]=(P.ammo[key]|0)+add;
+    P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
+    sfxPickup(); toast('装填 '+it.name+' +'+add);
+    refreshHUD(); buildBagNew(); return;
+  }
+  /* 【装备类】这里不允许换装（换装是局外仓库的事），
+     但要明确告诉玩家为什么点了没用，而不是静默失败。 */
+  if(it.cat==='gun'||it.cat==='pistol'||it.cat==='melee'
+     || it.cat==='chest'||it.cat==='backpack'||it.cat==='helmet'||it.cat==='vest'){
+    toast(it.name+'：局内不能换装，回仓库再装备'); sfxDeny(); return;
   }
   toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
@@ -1142,6 +1235,7 @@ function applyInputMode(mode, force){
     /* 键盘模式：整块触摸 UI 收起，画面干净 */
     if(jz) jz.style.display='none';
     if(az) az.style.display='none';
+    setWpnBarVisible(false);
     window.__joyEnabled=false;
     if(window.__joyTouch) window.__joyTouch.active=false;
     /* 正在拖摇杆的手指如果卡住了，一并清掉，避免人「自己一直往前走」 */
@@ -1158,6 +1252,8 @@ function applyInputMode(mode, force){
     if(window.__inGame){
       if(jz) jz.style.display='block';
       if(az) az.style.display='block';
+      buildWpnBar();
+      setWpnBarVisible(true);
     }
     window.__joyEnabled=true;
     const tip=$('htip');

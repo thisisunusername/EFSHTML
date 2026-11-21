@@ -29,9 +29,12 @@ function mkDoor(x,z,w,h,color,axis){
   }
   const gw = (axis==='x') ? w : 0.18;
   const gd = (axis==='x') ? 0.18 : w;
+  /* 门板也走程序化材质：原来只有 color+roughness+metalness，
+     现在按颜色自动选金属/木/混凝土，尺寸小的门用 unit=1.2 保证纹理不过密 */
+  const panelMat=matGetForSize(color, gw, h, gd, { unit:1.2 });
   const panel=new THREE.Mesh(
     new THREE.BoxGeometry(gw,h,gd),
-    new THREE.MeshStandardMaterial({color,roughness:.6,metalness:.05})
+    panelMat
   );
   panel.position.set(x,h/2,z);
   panel.castShadow=true; panel.receiveShadow=true;

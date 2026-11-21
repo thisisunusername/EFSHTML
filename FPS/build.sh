@@ -12,6 +12,8 @@ OUT=index.html
   printf '\n'
   # i18n 核心必须第一个：T() 在 b_world 起就被调用（物品名/场景标签）
   cat ../i18n/i18n_core.js; printf '\n'
+  # 程序化材质系统：b_world 的 box()/cyl() 要调 matGetForSize，必须排在它之前
+  cat full/aa_mat.js;    printf '\n'
   cat full/b_world.js;   printf '\n'
   cat full/c_player.js;  printf '\n'
   cat full/d_game.js;    printf '\n'

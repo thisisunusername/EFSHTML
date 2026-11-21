@@ -7,16 +7,22 @@ let exfil=null;
 /* 造实体：加入场景 + 作为碰撞体 */
 function solid(m){ m.castShadow=m.receiveShadow=true; scene.add(m); colliders.push(m); return m; }
 
-/* 箱子（墙体/建筑块）。noCol=true 时只显示不碰撞（如窗户玻璃） */
+/* 箱子（墙体/建筑块）。noCol=true 时只显示不碰撞（如窗户玻璃）
+   【材质】以前是 `new MeshStandardMaterial({color:c,roughness:.85})` —— 一个纯色块。
+   现在交给 aa_mat.js 的 matGetForSize：按颜色自动选混凝土/砖/沥青/草地/木头/金属/瓷砖，
+   并按几何体尺寸算纹理重复（60 米宽的墙不会把一张贴图拉成马赛克）。
+   noCol=true 的通常是窗户玻璃，走 plain 分支保持纯色，否则玻璃上会长出砖缝。 */
 function box(w,h,d,c,x,y,z,noCol){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:.85}));
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    matGetForSize(c, w, h, d, { plain:noCol?true:false, transparent:false }));
   m.position.set(x,y,z);
   if(noCol){ scene.add(m); return m; }
   return solid(m);
 }
 /* 圆柱（路灯/树/柱子） */
 function cyl(rt,rb,h,c,x,y,z,noCol){
-  const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,12),new THREE.MeshStandardMaterial({color:c,roughness:.8}));
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,12),
+    matGetForSize(c, rt*2, h, rt*2, { plain:noCol?true:false }));
   m.position.set(x,y,z);
   if(noCol){ scene.add(m); return m; }
   return solid(m);
@@ -32,15 +38,18 @@ function groundDeco(w,d,c,x,z,opacity){
        1) 每个装饰面按序号抬一点高度，保证彼此不共面；
        2) 材质开 polygonOffset，让渲染器优先画它、把共面冲突推给地面。 */
   decoIndex++;
-  const m=new THREE.Mesh(
-    new THREE.PlaneGeometry(w,d),
-    new THREE.MeshStandardMaterial({
-      color:c, roughness:1,
-      transparent:opacity<1, opacity:opacity!==undefined?opacity:1,
-      polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
-      depthWrite:opacity>=1,
-    })
-  );
+  /* 材质走 matGetForSize，但保留全部防 z-fighting 字段：
+     polygonOffset + 逐面抬高。opacity<1 的（球场标线、淡色涂装）
+     走 plain 分支保持纯色 —— 半透明贴图会算错排序。 */
+  /* 【必须 clone】matGetForSize 返回的是全局缓存对象，如果直接往上写
+     polygonOffset，会把所有共用这个材质的墙体一起改掉。
+     所以每个装饰面 clone 一份，只改自己那份。 */
+  const mt=matGetForSize(c, w, 1, d, { plain:opacity<1 }).clone();
+  mt.transparent=opacity<1;
+  mt.opacity=opacity!==undefined?opacity:1;
+  mt.polygonOffset=true; mt.polygonOffsetFactor=-2; mt.polygonOffsetUnits=-2;
+  mt.depthWrite=opacity>=1;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d), mt);
   m.rotation.x=-Math.PI/2;
   m.position.set(x, 0.06+decoIndex*0.002, z);
   m.receiveShadow=true; scene.add(m); return m;
@@ -80,13 +89,20 @@ function init(){
 
   /* 光照 */
   /* 光照：saltline 是强烈日光 + 明显阴影，不是均匀平光。
-     半球光压低（负责暗部补色），主光加强并产生硬阴影，对比就出来了。 */
-  scene.add(new THREE.HemisphereLight(0xcfe4ff,0x6b5f47,0.55));
-  scene.add(new THREE.AmbientLight(0xffffff,0.16));   // 极轻的环境底，避免暗部死黑
-  const sun=new THREE.DirectionalLight(0xfff4e0,2.6);
+     半球光压低（负责暗部补色），主光加强并产生硬阴影，对比就出来了。
+
+     【加贴图后回调】以前墙面是纯色，2.6 的主光正好；
+     现在墙上有砖缝、雨痕、颗粒这些高频细节，2.6 的光会把它们全糊成一片白，
+     等于白做了贴图。这里把主光降到 2.15、环境光降到 0.13，
+     让贴图的明暗层次能透出来，同时保留硬阴影的方向感。 */
+  scene.add(new THREE.HemisphereLight(0xcfe4ff,0x6b5f47,0.5));
+  scene.add(new THREE.AmbientLight(0xffffff,0.13));   // 极轻的环境底，避免暗部死黑
+  const sun=new THREE.DirectionalLight(0xfff4e0,2.15);
   sun.position.set(45,60,25);
   sun.castShadow=true;
-  sun.shadow.mapSize.set(2048,2048);
+  /* 阴影贴图尺寸只在下面 3072 那一处设定。
+     （以前这里还有一行 2048，紧接着又被 3072 覆盖，
+       属于历史遗留的重复设置，容易让人误以为精度是 2048，已删除） */
   /* 【阴影精度 & 贴图错位】
      原来 shadow.camera 覆盖 180×180 米（left/right/top/bottom 都是 ±90），
      却只给 2048×2048 的贴图 —— 每个像素要管 8.8 厘米，
@@ -102,8 +118,13 @@ function init(){
   sun.shadow.normalBias=0.045;
   scene.add(sun);
 
-  /* 大地：整个校园地面 */
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshStandardMaterial({color:0x6c8f5e,roughness:1}));
+  /* 大地：整个校园地面
+     【为什么单独处理】它是 300×300 的平面，如果走 matGetForSize 的
+     3.5 米一次，会被 clamp 到 24 次上限，等于每 12.5 米才一个纹理周期，
+     草地看起来还是糊的。这里明确指定 unit=6（每 6 米一次），
+     重复 50 次，既有细节又不会因为次数太多产生摩尔纹。 */
+  const groundMat=matGet(0x6c8f5e, { kind:'grass', repeat:50 });
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(300,300), groundMat);
   ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
   buildSchool();
@@ -202,7 +223,9 @@ function buildSchool(){
   /* ---- 树木（围墙内侧一圈） ---- */
   function tree(x,z){
     cyl(.22,.3,1.8,0x6b4a2a,x,.9,z,true);
-    const c1=new THREE.Mesh(new THREE.SphereGeometry(1.4,8,8),new THREE.MeshStandardMaterial({color:0x3f7a3a,roughness:1}));
+    /* 树冠：走 grass 材质（有斑驳明暗），比纯色球体自然得多 */
+    const c1=new THREE.Mesh(new THREE.SphereGeometry(1.4,8,8),
+      matGet(0x3f7a3a, { kind:'grass', repeat:2 }));
     c1.position.set(x,2.6,z); c1.castShadow=true; scene.add(c1);
   }
   const trees=[[-50,-38],[-40,-38],[-30,-38],[-20,-38],[-10,-38],[-8,-36],[8,-36],[10,-38],[20,-38],[30,-38],[40,-38],[50,-38],[-55,14],[-55,30],[-55,42],[55,14],[55,30],[55,42],[-40,46],[-20,46],[0,46],[20,46],[40,46]];
@@ -210,7 +233,10 @@ function buildSchool(){
 
   /* ---- 路灯（主干道两侧） ---- */
   for(const lx of[-14,0,14]){
-    const pole=cyl(.1,.14,4.5,0x555,lx,2.25,0,true);
+    /* 【修了个旧 bug】这里原来写的是 0x555 —— 那是 0x000555，#000555，
+       实际是近乎黑的深蓝，不是想要的深灰。路灯杆一直有点偏蓝就是这个原因。
+       正确写法是 0x555555。 */
+    const pole=cyl(.1,.14,4.5,0x555555,lx,2.25,0,true);
     const lamp=new THREE.Mesh(new THREE.SphereGeometry(.4,8,8),new THREE.MeshStandardMaterial({color:0xfff5d0,emissive:0xffeaa0,emissiveIntensity:.5}));
     lamp.position.set(lx,4.6,0); scene.add(lamp);
   }

@@ -105,6 +105,24 @@ function updP(dt){
   // 玩家朝向跟随视角
   camera.position.set(P.pos.x,P.pos.y,P.pos.z);
   lookAtYawPitch();
+
+  /* 调试：把摇杆活值和速度显示在 HUD 上，直接看数据而不是猜。
+     位置固定右下角，字体很小，不影响游戏。 */
+  if(!window.__dbgEl){
+    const d=document.createElement('div');
+    d.id='__dbg';
+    d.style.cssText='position:fixed;left:6px;bottom:6px;z-index:9999;color:#9fe6ff;font:10px monospace;background:rgba(0,0,0,.55);padding:3px 6px;border-radius:4px;pointer-events:none;line-height:1.35;white-space:pre';
+    document.body.appendChild(d);
+    window.__dbgEl=d;
+  }
+  if(window.__dbgEl){
+    const t=window.__joyTouch||{};
+    window.__dbgEl.textContent=
+      'joyX='+(P.joyX||0).toFixed(2)+' joyY='+(P.joyY||0).toFixed(2)+'\n'+
+      'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
+      'pos='+P.pos.x.toFixed(1)+','+P.pos.z.toFixed(1)+'\n'+
+      'touch='+(t.active?'Y':'N')+' id='+(t.active?(t.sx|0):'-');
+  }
 }
 
 /* 简单的地面碰撞：只检测与 colliders（BOX）的 XZ 平面重叠 */
@@ -118,29 +136,49 @@ function moveAndCollide(dt){
   P.onGround=false;              // 先假设离地，落地时再置 true
   if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
 
-  // 与建筑碰撞：简单按给定 XZ 判断
-  // 采用逐 collider 的 AABB 近似（colliders 里是 box/cyl 的 mesh）
-  let px=nx, pz=nz;
+  /* 分轴推进：先试 X，再试 Z。
+     整体一起判定的写法在角落里会把两轴一起弹回原位，
+     表现就是「贴着墙走不动」甚至「一出生就动不了」。
+     分轴的好处是被挡住时还能沿墙滑行，手感也顺。 */
+  let px=P.pos.x, pz=P.pos.z;
+
+  // ---- X 轴 ----
+  let tx=nx, blockedX=false;
   for(const m of colliders){
     if(!m.geometry) continue;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    const bb=m.geometry.boundingBox;
-    if(!bb) continue;
-    // 世界坐标 AABB（只处理未旋转的，旋转的（如篮板）跳过）
-    const halfW=bb.max.x/2, halfD=bb.max.z/2;
-    const mx=m.position.x, mz=m.position.z;
-    // 玩家与 box 的 XZ 碰撞（抬高到身体高度范围）
-    if(ny< (m.position.y + bb.max.y) && ny+1.6 > (m.position.y - bb.max.y)){
-      const minX=mx-halfW-r, maxX=mx+halfW+r;
-      const minZ=mz-halfD-r, maxZ=mz+halfD+r;
-      if(px>minX&&px<maxX&&pz>minZ&&pz<maxZ){
-        // 从哪边撞入
-        const dx=px-mx, dz=pz-mz;
-        const ox=halfW+r-Math.abs(dx), oz=halfD+r-Math.abs(dz);
-        if(ox<oz){ px=mx+(dx>0?halfW+r:-(halfW+r)); }
-        else { pz=mz+(dz>0?halfD+r:-(halfD+r)); }
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
+    const mx=m.position.x, mz=m.position.z, my=m.position.y;
+    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+      if(tx>mx-halfW-r && tx<mx+halfW+r && pz>mz-halfD-r && pz<mz+halfD+r){
+        tx = (tx>mx) ? (mx+halfW+r) : (mx-halfW-r);
+        blockedX=true;
       }
     }
   }
-  P.pos.x=px; P.pos.z=pz; P.pos.y=ny;
+  if(blockedX) P.vel.x=0;
+
+  // ---- Z 轴 ----
+  let tz=nz, blockedZ=false;
+  for(const m of colliders){
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
+    const mx=m.position.x, mz=m.position.z, my=m.position.y;
+    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+      if(tx>mx-halfW-r && tx<mx+halfW+r && tz>mz-halfD-r && tz<mz+halfD+r){
+        tz = (tz>mz) ? (mz+halfD+r) : (mz-halfD-r);
+        blockedZ=true;
+      }
+    }
+  }
+  if(blockedZ) P.vel.z=0;
+
+  /* 兜底：万一出生点正好在某个碰撞盒内部（tx/tz 被来回夹住），
+     检测到这个情况就把玩家沿最近的可站立方向轻推出去，避免彻底卡死。 */
+  if(!isFinite(tx)||!isFinite(tz)){ tx=P.pos.x; tz=P.pos.z; }
+
+  P.pos.x=tx; P.pos.z=tz; P.pos.y=ny;
 }

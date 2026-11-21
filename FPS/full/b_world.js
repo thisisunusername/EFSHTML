@@ -39,6 +39,14 @@ function init(){
   renderer.setSize(innerWidth,innerHeight);
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  /* 色调映射：这是 saltline 「像照片」最核心的一步。
+     不做映射时，高光一律被硬裁到纯白，画面显平、发灰、像塑料；
+     ACES 会做胶片式的柔和肩部压缩，亮部保留层次。 */
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  if('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.autoUpdate = true;
+  renderer.shadowMap.needsUpdate = true;
 
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x8fb7d9);           // 天空淡蓝
@@ -52,15 +60,19 @@ function init(){
   clock=new THREE.Clock();
 
   /* 光照 */
-  scene.add(new THREE.HemisphereLight(0xbfd8ff,0x8a7a5a,.95));
-  const sun=new THREE.DirectionalLight(0xfff2df,1.7);
+  /* 光照：saltline 是强烈日光 + 明显阴影，不是均匀平光。
+     半球光压低（负责暗部补色），主光加强并产生硬阴影，对比就出来了。 */
+  scene.add(new THREE.HemisphereLight(0xcfe4ff,0x6b5f47,0.55));
+  scene.add(new THREE.AmbientLight(0xffffff,0.16));   // 极轻的环境底，避免暗部死黑
+  const sun=new THREE.DirectionalLight(0xfff4e0,2.6);
   sun.position.set(45,60,25);
   sun.castShadow=true;
   sun.shadow.mapSize.set(2048,2048);
   sun.shadow.camera.left=-90; sun.shadow.camera.right=90;
   sun.shadow.camera.top=90;  sun.shadow.camera.bottom=-90;
   sun.shadow.camera.far=260; sun.shadow.camera.near=1;
-  sun.shadow.bias=-0.0005;
+  sun.shadow.bias=-0.0004;
+  sun.shadow.normalBias=0.02;
   scene.add(sun);
 
   /* 大地：整个校园地面 */

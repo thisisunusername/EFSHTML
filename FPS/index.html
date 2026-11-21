@@ -8,7 +8,23 @@
   :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92); }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
   html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#e8e8f0; touch-action:none; }
-  #c{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #c{ position:fixed; inset:0; width:100%; height:100%; display:block;
+      /* saltline 观感：提对比 + 压高光 + 微降饱和 + 轻微色偏。
+         CSS filter 走 GPU 合成，几乎零开销，不需要 EffectComposer。 */
+      filter: contrast(1.18) saturate(0.92) brightness(1.04) hue-rotate(-4deg);
+    }
+  /* 后处理叠加层：暗角 + 色调 + 颗粒（对应 saltline 的最终合成 pass） */
+  #grade{ position:fixed; inset:0; z-index:4; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 45%, rgba(0,0,0,.28) 78%, rgba(0,0,0,.55) 100%),
+      linear-gradient(180deg, rgba(120,170,255,.06) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0) 70%, rgba(255,190,120,.05) 100%);
+    mix-blend-mode:normal;
+  }
+  /* 胶片颗粒：用 SVG 噪声做平铺，静态不闪，成本可忽略 */
+  #grain{ position:fixed; inset:0; z-index:5; pointer-events:none; opacity:.055;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
+    background-size:120px 120px;
+  }
   /* HUD */
   #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
   /* 视角触摸层：覆盖全屏，位于摇杆/按钮之下 */
@@ -41,7 +57,7 @@
   #loaderr{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ff7a6a; font-size:15px; font-weight:700; text-align:center; z-index:200; background:rgba(20,8,8,.92); padding:16px 22px; border-radius:12px; border:1px solid #c2382a; display:none; max-width:80%; line-height:1.6; }
   /* 摇杆（移动端） */
   #joyZone{ position:fixed; bottom:0; left:0; width:50%; height:100%; display:none; pointer-events:auto; z-index:30; touch-action:none; }
-  #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; }
+  #joyBase{ position:absolute; left:0; top:0; width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
   #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
@@ -110,6 +126,8 @@
   <div id="htip">📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下</div>
 </div>
 
+<div id="grade"></div>
+<div id="grain"></div>
 <!-- 触摸控制层：必须在 #hud 之外，因为 #hud 是 pointer-events:none -->
 <div id="viewLayer"></div>
 <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
@@ -229,6 +247,14 @@ function init(){
   renderer.setSize(innerWidth,innerHeight);
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  /* 色调映射：这是 saltline 「像照片」最核心的一步。
+     不做映射时，高光一律被硬裁到纯白，画面显平、发灰、像塑料；
+     ACES 会做胶片式的柔和肩部压缩，亮部保留层次。 */
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  if('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.autoUpdate = true;
+  renderer.shadowMap.needsUpdate = true;
 
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x8fb7d9);           // 天空淡蓝
@@ -242,15 +268,19 @@ function init(){
   clock=new THREE.Clock();
 
   /* 光照 */
-  scene.add(new THREE.HemisphereLight(0xbfd8ff,0x8a7a5a,.95));
-  const sun=new THREE.DirectionalLight(0xfff2df,1.7);
+  /* 光照：saltline 是强烈日光 + 明显阴影，不是均匀平光。
+     半球光压低（负责暗部补色），主光加强并产生硬阴影，对比就出来了。 */
+  scene.add(new THREE.HemisphereLight(0xcfe4ff,0x6b5f47,0.55));
+  scene.add(new THREE.AmbientLight(0xffffff,0.16));   // 极轻的环境底，避免暗部死黑
+  const sun=new THREE.DirectionalLight(0xfff4e0,2.6);
   sun.position.set(45,60,25);
   sun.castShadow=true;
   sun.shadow.mapSize.set(2048,2048);
   sun.shadow.camera.left=-90; sun.shadow.camera.right=90;
   sun.shadow.camera.top=90;  sun.shadow.camera.bottom=-90;
   sun.shadow.camera.far=260; sun.shadow.camera.near=1;
-  sun.shadow.bias=-0.0005;
+  sun.shadow.bias=-0.0004;
+  sun.shadow.normalBias=0.02;
   scene.add(sun);
 
   /* 大地：整个校园地面 */
@@ -514,6 +544,24 @@ function updP(dt){
   // 玩家朝向跟随视角
   camera.position.set(P.pos.x,P.pos.y,P.pos.z);
   lookAtYawPitch();
+
+  /* 调试：把摇杆活值和速度显示在 HUD 上，直接看数据而不是猜。
+     位置固定右下角，字体很小，不影响游戏。 */
+  if(!window.__dbgEl){
+    const d=document.createElement('div');
+    d.id='__dbg';
+    d.style.cssText='position:fixed;left:6px;bottom:6px;z-index:9999;color:#9fe6ff;font:10px monospace;background:rgba(0,0,0,.55);padding:3px 6px;border-radius:4px;pointer-events:none;line-height:1.35;white-space:pre';
+    document.body.appendChild(d);
+    window.__dbgEl=d;
+  }
+  if(window.__dbgEl){
+    const t=window.__joyTouch||{};
+    window.__dbgEl.textContent=
+      'joyX='+(P.joyX||0).toFixed(2)+' joyY='+(P.joyY||0).toFixed(2)+'\n'+
+      'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
+      'pos='+P.pos.x.toFixed(1)+','+P.pos.z.toFixed(1)+'\n'+
+      'touch='+(t.active?'Y':'N')+' id='+(t.active?(t.sx|0):'-');
+  }
 }
 
 /* 简单的地面碰撞：只检测与 colliders（BOX）的 XZ 平面重叠 */
@@ -527,31 +575,51 @@ function moveAndCollide(dt){
   P.onGround=false;              // 先假设离地，落地时再置 true
   if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
 
-  // 与建筑碰撞：简单按给定 XZ 判断
-  // 采用逐 collider 的 AABB 近似（colliders 里是 box/cyl 的 mesh）
-  let px=nx, pz=nz;
+  /* 分轴推进：先试 X，再试 Z。
+     整体一起判定的写法在角落里会把两轴一起弹回原位，
+     表现就是「贴着墙走不动」甚至「一出生就动不了」。
+     分轴的好处是被挡住时还能沿墙滑行，手感也顺。 */
+  let px=P.pos.x, pz=P.pos.z;
+
+  // ---- X 轴 ----
+  let tx=nx, blockedX=false;
   for(const m of colliders){
     if(!m.geometry) continue;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    const bb=m.geometry.boundingBox;
-    if(!bb) continue;
-    // 世界坐标 AABB（只处理未旋转的，旋转的（如篮板）跳过）
-    const halfW=bb.max.x/2, halfD=bb.max.z/2;
-    const mx=m.position.x, mz=m.position.z;
-    // 玩家与 box 的 XZ 碰撞（抬高到身体高度范围）
-    if(ny< (m.position.y + bb.max.y) && ny+1.6 > (m.position.y - bb.max.y)){
-      const minX=mx-halfW-r, maxX=mx+halfW+r;
-      const minZ=mz-halfD-r, maxZ=mz+halfD+r;
-      if(px>minX&&px<maxX&&pz>minZ&&pz<maxZ){
-        // 从哪边撞入
-        const dx=px-mx, dz=pz-mz;
-        const ox=halfW+r-Math.abs(dx), oz=halfD+r-Math.abs(dz);
-        if(ox<oz){ px=mx+(dx>0?halfW+r:-(halfW+r)); }
-        else { pz=mz+(dz>0?halfD+r:-(halfD+r)); }
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
+    const mx=m.position.x, mz=m.position.z, my=m.position.y;
+    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+      if(tx>mx-halfW-r && tx<mx+halfW+r && pz>mz-halfD-r && pz<mz+halfD+r){
+        tx = (tx>mx) ? (mx+halfW+r) : (mx-halfW-r);
+        blockedX=true;
       }
     }
   }
-  P.pos.x=px; P.pos.z=pz; P.pos.y=ny;
+  if(blockedX) P.vel.x=0;
+
+  // ---- Z 轴 ----
+  let tz=nz, blockedZ=false;
+  for(const m of colliders){
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const halfW=(bb.max.x-bb.min.x)/2, halfD=(bb.max.z-bb.min.z)/2, halfH=(bb.max.y-bb.min.y)/2;
+    const mx=m.position.x, mz=m.position.z, my=m.position.y;
+    if(ny < (my+halfH) && ny+1.6 > (my-halfH)){
+      if(tx>mx-halfW-r && tx<mx+halfW+r && tz>mz-halfD-r && tz<mz+halfD+r){
+        tz = (tz>mz) ? (mz+halfD+r) : (mz-halfD-r);
+        blockedZ=true;
+      }
+    }
+  }
+  if(blockedZ) P.vel.z=0;
+
+  /* 兜底：万一出生点正好在某个碰撞盒内部（tx/tz 被来回夹住），
+     检测到这个情况就把玩家沿最近的可站立方向轻推出去，避免彻底卡死。 */
+  if(!isFinite(tx)||!isFinite(tz)){ tx=P.pos.x; tz=P.pos.z; }
+
+  P.pos.x=tx; P.pos.z=tz; P.pos.y=ny;
 }
 
 /* ============ d_game.js：敌人 AI + 物资 + 撤离 + 射击 ============ */

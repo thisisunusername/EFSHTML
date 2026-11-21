@@ -38,7 +38,7 @@
   /* 加载/错误提示 */
   #loaderr{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ff7a6a; font-size:15px; font-weight:700; text-align:center; z-index:200; background:rgba(20,8,8,.92); padding:16px 22px; border-radius:12px; border:1px solid #c2382a; display:none; max-width:80%; line-height:1.6; }
   /* 摇杆（移动端） */
-  #joyZone{ position:fixed; bottom:0; left:0; width:50%; height:55%; display:none; pointer-events:auto; z-index:20; touch-action:none; }
+  #joyZone{ position:fixed; bottom:0; left:0; width:50%; height:100%; display:none; pointer-events:auto; z-index:30; touch-action:none; }
   #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
@@ -417,6 +417,15 @@ function lookDir(){
   return v;
 }
 
+/* ---- 跳跃（只能在落地时跳，防止二段跳） ---- */
+function doJump(){
+  if(!P.alive) return;
+  if(!P.onGround) return;   // 空中不能跳
+  P.vel.y=7;
+  P.onGround=false;
+  sfxStep();
+}
+
 /* ---- 玩家移动（重力 + 键盘/摇杆输入） ---- */
 function updP(dt){
   // 鼠标/触控视角在 e_io/e_ui 里通过 pointer 事件直接改 P.yaw/P.pitch
@@ -466,6 +475,7 @@ function moveAndCollide(dt){
   const r=0.4; // 玩家半径
 
   // 地面
+  P.onGround=false;              // 先假设离地，落地时再置 true
   if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
 
   // 与建筑碰撞：简单按给定 XZ 判断
@@ -774,6 +784,7 @@ function bindUI(){
     if(e.code==='KeyR') startReload();
     if(e.code==='KeyQ') toggleShop();
     if(e.code==='KeyE') interact();
+    if(e.code==='Space'&&!e.repeat) doJump();
     if(e.code==='Escape') $('shop').style.display='none';
   });
   addEventListener('keyup',e=>{ P.keys[e.code]=false; });
@@ -811,50 +822,51 @@ function bindUI(){
     const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
   });
 
-  // 触屏摇杆（整块 joyZone 都能拖，不必精确按小圆）
+  // 触屏摇杆（Pointer Events，整块左半屏可拖）
   const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   if(joyZone&&joyBase&&joyStick){
     let jId=null, jx=0, jy=0;
     const startJoy=(t)=>{
       const r=joyBase.getBoundingClientRect();
-      const cx=r.left+r.width/2, cy=r.top+r.height/2;
-      // 摇杆圆心跟着手指走（原位或手指位置），以手指按下点为基准
       jx=t.clientX; jy=t.clientY;
       joyBase.style.left=(t.clientX-r.width/2)+'px';
       joyBase.style.top=(t.clientY-r.height/2)+'px';
       joyBase.style.bottom='auto';
-      jId=t.identifier;
+      joyBase.style.display='block';
+      jId=t.pointerId;
       touchMoveX=0; touchMoveY=0;
     };
-    joyZone.addEventListener('touchstart',e=>{
+    joyZone.addEventListener('pointerdown',e=>{
       if(jId!==null) return;
-      startJoy(e.changedTouches[0]);
+      startJoy(e);
+      try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
+      const t=$('htip');
+      if(t){ t.classList.remove('hide'); t.textContent='🎮 摇杆已激活 · 拖动移动（松手停止）'; }
       e.preventDefault();
-    }, {passive:false});
-    joyZone.addEventListener('touchmove',e=>{
-      if(jId===null) return;
-      for(const t of e.changedTouches){
-        if(t.identifier!==jId) continue;
-        let dx=t.clientX-jx, dy=t.clientY-jy;
-        const max=48, d=Math.hypot(dx,dy);
-        if(d>max){ dx*=max/d; dy*=max/d; }
-        joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-        touchMoveX=dx/max; touchMoveY=dy/max;
-      }
+    });
+    joyZone.addEventListener('pointermove',e=>{
+      if(e.pointerId!==jId) return;
+      let dx=e.clientX-jx, dy=e.clientY-jy;
+      const max=48, d=Math.hypot(dx,dy);
+      if(d>max){ dx*=max/d; dy*=max/d; }
+      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      touchMoveX=dx/max; touchMoveY=dy/max;
       e.preventDefault();
-    }, {passive:false});
-    const endJoy=()=>{
+    });
+    const endJoy=(e)=>{
+      if(jId!==null && e && e.pointerId!==jId) return;
       jId=null; touchMoveX=0; touchMoveY=0;
       joyStick.style.transform='translate(-50%,-50%)';
       joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
     };
-    joyZone.addEventListener('touchend',endJoy);
-    joyZone.addEventListener('touchcancel',endJoy);
+    joyZone.addEventListener('pointerup',endJoy);
+    joyZone.addEventListener('pointercancel',endJoy);
+    joyZone.addEventListener('pointerleave',endJoy);
   }
 
   // 移动端操作按钮
   const fireBtn=$('btnFire'); if(fireBtn){ fireBtn.addEventListener('touchstart',e=>{ if(ready) fire(); e.preventDefault(); }); }
-  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ P.vel.y=7; e.preventDefault(); }); }
+  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ if(ready) doJump(); e.preventDefault(); }); }
   const reloadBtn=$('btnReload'); if(reloadBtn){ reloadBtn.addEventListener('touchstart',e=>{ startReload(); e.preventDefault(); }); }
   const sprintBtn=$('btnSprint'); if(sprintBtn){
     sprintBtn.addEventListener('touchstart',e=>{ P.sprinting=true; e.preventDefault(); });

@@ -30,6 +30,15 @@ function lookDir(){
   return v;
 }
 
+/* ---- 跳跃（只能在落地时跳，防止二段跳） ---- */
+function doJump(){
+  if(!P.alive) return;
+  if(!P.onGround) return;   // 空中不能跳
+  P.vel.y=7;
+  P.onGround=false;
+  sfxStep();
+}
+
 /* ---- 玩家移动（重力 + 键盘/摇杆输入） ---- */
 function updP(dt){
   // 鼠标/触控视角在 e_io/e_ui 里通过 pointer 事件直接改 P.yaw/P.pitch
@@ -79,6 +88,7 @@ function moveAndCollide(dt){
   const r=0.4; // 玩家半径
 
   // 地面
+  P.onGround=false;              // 先假设离地，落地时再置 true
   if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
 
   // 与建筑碰撞：简单按给定 XZ 判断

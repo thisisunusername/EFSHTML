@@ -53,6 +53,7 @@ function bindUI(){
     if(e.code==='KeyR') startReload();
     if(e.code==='KeyQ') toggleShop();
     if(e.code==='KeyE') interact();
+    if(e.code==='Space'&&!e.repeat) doJump();
     if(e.code==='Escape') $('shop').style.display='none';
   });
   addEventListener('keyup',e=>{ P.keys[e.code]=false; });
@@ -90,50 +91,51 @@ function bindUI(){
     const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
   });
 
-  // 触屏摇杆（整块 joyZone 都能拖，不必精确按小圆）
+  // 触屏摇杆（Pointer Events，整块左半屏可拖）
   const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   if(joyZone&&joyBase&&joyStick){
     let jId=null, jx=0, jy=0;
     const startJoy=(t)=>{
       const r=joyBase.getBoundingClientRect();
-      const cx=r.left+r.width/2, cy=r.top+r.height/2;
-      // 摇杆圆心跟着手指走（原位或手指位置），以手指按下点为基准
       jx=t.clientX; jy=t.clientY;
       joyBase.style.left=(t.clientX-r.width/2)+'px';
       joyBase.style.top=(t.clientY-r.height/2)+'px';
       joyBase.style.bottom='auto';
-      jId=t.identifier;
+      joyBase.style.display='block';
+      jId=t.pointerId;
       touchMoveX=0; touchMoveY=0;
     };
-    joyZone.addEventListener('touchstart',e=>{
+    joyZone.addEventListener('pointerdown',e=>{
       if(jId!==null) return;
-      startJoy(e.changedTouches[0]);
+      startJoy(e);
+      try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
+      const t=$('htip');
+      if(t){ t.classList.remove('hide'); t.textContent='🎮 摇杆已激活 · 拖动移动（松手停止）'; }
       e.preventDefault();
-    }, {passive:false});
-    joyZone.addEventListener('touchmove',e=>{
-      if(jId===null) return;
-      for(const t of e.changedTouches){
-        if(t.identifier!==jId) continue;
-        let dx=t.clientX-jx, dy=t.clientY-jy;
-        const max=48, d=Math.hypot(dx,dy);
-        if(d>max){ dx*=max/d; dy*=max/d; }
-        joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-        touchMoveX=dx/max; touchMoveY=dy/max;
-      }
+    });
+    joyZone.addEventListener('pointermove',e=>{
+      if(e.pointerId!==jId) return;
+      let dx=e.clientX-jx, dy=e.clientY-jy;
+      const max=48, d=Math.hypot(dx,dy);
+      if(d>max){ dx*=max/d; dy*=max/d; }
+      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      touchMoveX=dx/max; touchMoveY=dy/max;
       e.preventDefault();
-    }, {passive:false});
-    const endJoy=()=>{
+    });
+    const endJoy=(e)=>{
+      if(jId!==null && e && e.pointerId!==jId) return;
       jId=null; touchMoveX=0; touchMoveY=0;
       joyStick.style.transform='translate(-50%,-50%)';
       joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
     };
-    joyZone.addEventListener('touchend',endJoy);
-    joyZone.addEventListener('touchcancel',endJoy);
+    joyZone.addEventListener('pointerup',endJoy);
+    joyZone.addEventListener('pointercancel',endJoy);
+    joyZone.addEventListener('pointerleave',endJoy);
   }
 
   // 移动端操作按钮
   const fireBtn=$('btnFire'); if(fireBtn){ fireBtn.addEventListener('touchstart',e=>{ if(ready) fire(); e.preventDefault(); }); }
-  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ P.vel.y=7; e.preventDefault(); }); }
+  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ if(ready) doJump(); e.preventDefault(); }); }
   const reloadBtn=$('btnReload'); if(reloadBtn){ reloadBtn.addEventListener('touchstart',e=>{ startReload(); e.preventDefault(); }); }
   const sprintBtn=$('btnSprint'); if(sprintBtn){
     sprintBtn.addEventListener('touchstart',e=>{ P.sprinting=true; e.preventDefault(); });

@@ -1593,6 +1593,7 @@ function toggleGunsmith(){
        现在样式补上了，这里再把「先 visible 后填充」的保险也加上。 */
     s.style.display='flex';
     closeShop(); closeBag(); closeStash();
+    panelOpenHidesTouch();
     try{ window.__uiPhase='gunsmith:opening'; }catch(e){}
     try{
       const list=ownedWeapons();
@@ -1603,7 +1604,29 @@ function toggleGunsmith(){
       s.innerHTML='<div class="box"><h1>改枪台</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
   }else s.style.display='none';
 }
-function closeGunsmith(){ const s=$('gunsmith'); if(s) s.style.display='none'; }
+function closeGunsmith(){ const s=$('gunsmith'); if(s) s.style.display='none'; panelCloseRestoresTouch(); }
+/* 【面板打开时统一收掉触摸层】
+   #joyZone(210×210 左下) / #actZone(右下) / #viewLayer(右半屏)
+   都是 pointer-events:auto 的透明层，层级 35~60。
+   任何全屏面板一打开，这些层仍在原位吞事件：
+   手指按在面板左侧的格子上，事件先被 joyZone 吃掉。
+   这就是「背包/仓库/商店打开了，但格子点不动」的根因。
+   —— 打开面板时调它，关闭时再 showTouchUI() 还原（仅局内）。 */
+function panelOpenHidesTouch(){
+  try{ hideTouchUI(); }catch(e){}
+}
+/* 只有在「所有面板都关掉之后」才还原触摸层。
+   否则关背包时会顺手把摇杆亮出来，而商店还开着 —— 摇杆又压在商店上面。 */
+function panelCloseRestoresTouch(){
+  try{
+    const ids=['bag','shop','stash','gunsmith','settings','pause'];
+    for(const id of ids){
+      const el=document.getElementById(id);
+      if(el && el.style.display==='flex') return;
+    }
+    if(window.__inGame) showTouchUI();
+  }catch(e){}
+}
 
 function buildGunsmith(){
   const el=$('gunsmith'); if(!el) return;
@@ -1737,6 +1760,7 @@ function toggleShop(){
        不会再出现「按了没动静」这种完全无从下手的状态。 */
     s.style.display='flex';
     closeBag(); closeStash(); closeGunsmith();
+    panelOpenHidesTouch();
     try{ window.__uiPhase='shop:opening'; }catch(e){}
     try{ buildShop(); }
     catch(e){ console.error('buildShop failed', e);
@@ -1744,7 +1768,7 @@ function toggleShop(){
   }
   else s.style.display='none';
 }
-function closeShop(){ const s=$('shop'); if(s) s.style.display='none'; }
+function closeShop(){ const s=$('shop'); if(s) s.style.display='none'; panelCloseRestoresTouch(); }
 
 function buildShop(){
   const s=$('shop'); if(!s) return;
@@ -1920,6 +1944,7 @@ function toggleStash(){
   if(opening){
     el.style.display='flex';
     closeShop(); closeBag(); closeGunsmith();
+    panelOpenHidesTouch();
     /* 【诊断锚点】把当前阶段写到 window 上。
        自检试跑里如果 buildStashNew 抛了未命名异常，
        try/catch 己经接住并把错误画到面板里了；但如果是
@@ -1938,7 +1963,7 @@ function toggleStash(){
   }
   else el.style.display='none';
 }
-function closeStash(){ const el=$('stash'); if(el) el.style.display='none'; }
+function closeStash(){ const el=$('stash'); if(el) el.style.display='none'; panelCloseRestoresTouch(); }
 
 /* 仓库里的东西搬到出击背包 */
 function stashTake(id, n){
@@ -2435,14 +2460,26 @@ function toggleBag(){
   if(opening){
     b.style.display='flex';
     closeShop(); closeStash(); closeGunsmith();
+    /* 【必须收掉摇杆和操作区 —— 这是「背包点不动」的真正原因】
+       #joyZone 是一个 210×210 的透明方块，pointer-events:auto、
+       z-index:60，钉在屏幕左下角。背包左侧栏（装备槽 + 返回键）
+       正好落进这块区域：手指按在格子上，事件先被 joyZone 吃掉，
+       于是「背包能打开、但格子一个都点不动」。
+       同理 #actZone 会挡住右下角的格子，#viewLayer 会抢走右半屏的拖动。
+       所以打开面板时一律把它们收掉，关掉时再还原。 */
+    try{ panelOpenHidesTouch(); }catch(e){}
     try{ buildBagNew(); }
     catch(e){ console.error('buildBagNew failed', e);
       b.innerHTML='<div class="stk"><div class="stkleft"><div class="stktitle">背包</div>'
         +'<div class="d">加载失败：'+(e&&e.message||e)+'</div></div></div>'; }
   }
-  else b.style.display='none';
+  else{
+    b.style.display='none';
+    /* 只有在局内才还原摇杆；局外/主菜单时保持隐藏（hideTouchUI 的语义） */
+    try{ panelCloseRestoresTouch(); }catch(e){}
+  }
 }
-function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }
+function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; panelCloseRestoresTouch(); }
 
 /* ============ 底部中间：武器切换条 ============
    三个格子对应三个武器槽。点一下就切过去。

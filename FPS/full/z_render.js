@@ -85,6 +85,12 @@ function animate(){
        否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
     safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
     safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
+    /* 篮球：球体物理 + 穿筐判环 + 篮网摆动。
+       放在 checkExfil 之前，这样最后一帧的投篮也能正常结算。 */
+    safeCall(updBasketball,dt); safeCall(updBasketHint);
+    /* 光影：太阳缓动 + 天/雾冷暖 + 点光源傍晚提亮。
+       纯 uniform 更新，不掉帧，所以放在主循环每帧调用。 */
+    safeCall(updLighting,dt);
     safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
     /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
        这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */

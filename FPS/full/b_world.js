@@ -124,6 +124,74 @@ function init(){
   sun.shadow.normalBias=0.045;
   scene.add(sun);
 
+  /* ==================== 光影增强 ====================
+     需求：「然后加光影」。
+
+     【原来有什么】只有一盏方向光 + 半球光 + 环境光，
+     属于「基础照明」——能看清东西，但没有气氛：
+     整张图从早到晚一个样，室内室外一样亮，
+     灯不发光、球不留影、没有一处「暖」的地方。
+
+     【这次加四样，不加泛光（bloom）】
+     泛光要 EffectComposer + 多张离屏 RT，手机上一次多 2~3 遍全屏采样，
+     在 3D 版这种几何量下会明显掉帧，而且会糊掉贴在墙上的像素风贴图。
+     所以走「实打实的光」而不是「后期滤镜」：
+
+       1) 太阳缓动：位置随时间轻微摇摆，影子方向会变，
+          站在操场上能感觉到时间在走（360 秒一个循环，不影响玩法节奏）。
+       2) 天光/雾色联动：太阳低了天就偏暖橙，高时偏冷蓝，
+          同时改 fog 颜色，远景的楼跟着一起变色 —— 这是最省钱的「氛围」。
+       3) 分区域点光源：体育馆、篮球场、教学楼门口各一盏，
+          只影响近处（distance 限制），手机负担可控。
+       4) 篮球/关键道具投影：给会动的物体开 castShadow。
+
+     【为什么不给每盏灯都开 castShadow】点光源的阴影要各自渲染一遍场景，
+     N 盏就是 N 倍开销。这里所有点光源一律 castShadow=false，
+     靠方向光提供主阴影，点光源只负责「局部亮起来」。 */
+  window.__sunLight = sun;
+  window.__sunBase = { x:45, y:60, z:25 };
+
+  /* 点光源：每一盏都是「有理由的灯」，不是随便撒 */
+  const warmLamps = [
+    /* 篮球场：两侧灯柱，夜里投篮能看清篮板 */
+    { x:-26, y:6.2, z:15.2, color:0xfff0cc, intensity:1.5, dist:26 },
+    { x:-10, y:6.2, z:15.2, color:0xfff0cc, intensity:1.5, dist:26 },
+    /* 主教学楼门口：门洞两侧，进去之前先有一片暖光 */
+    { x:-6,  y:3.4, z:-13,  color:0xffe9c4, intensity:1.2, dist:16 },
+    { x:6,   y:3.4, z:-13,  color:0xffe9c4, intensity:1.2, dist:16 },
+    /* 体育馆大门 */
+    { x:52,  y:5.0, z:8,    color:0xd8e8ff, intensity:1.3, dist:22 },
+    /* 操场看台：冷白，跟场内暖光拉开对比 */
+    { x:0,   y:7.0, z:34,   color:0xe8f2ff, intensity:1.1, dist:28 },
+  ];
+  const lampMeshes=[];
+  for(const L of warmLamps){
+    const pl=new THREE.PointLight(L.color, L.intensity, L.dist, 2);
+    pl.position.set(L.x, L.y, L.z);
+    pl.castShadow=false;              // 见上方说明：点光源不渲阴影
+    scene.add(pl);
+    /* 灯体本身：一个自发光小球，让玩家知道光从哪来。
+       半径 0.18，不参与碰撞（noCol=true），走过去不会撞到空气。 */
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8),
+      new THREE.MeshBasicMaterial({color:L.color}));
+    bulb.position.set(L.x, L.y, L.z);
+    scene.add(bulb);
+    lampMeshes.push({light:pl, base:L.intensity, bulb});
+  }
+  window.__lampMeshes = lampMeshes;
+
+  /* 环境细节：地面上的「光池」贴花 —— 用半透明圆片模拟灯照在地面的亮斑。
+     比真开投影便宜得多，视觉上却让「这里有灯」变得确定。 */
+  for(const L of warmLamps){
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(2.6, 20),
+      new THREE.MeshBasicMaterial({ color:L.color, transparent:true, opacity:0.10,
+        depthWrite:false, blending:THREE.AdditiveBlending }));
+    pool.rotation.x=-Math.PI/2;
+    pool.position.set(L.x, 0.035, L.z);
+    pool.renderOrder=1;
+    scene.add(pool);
+  }
+
   /* 大地：整个校园地面
      【为什么单独处理】它是 300×300 的平面，如果走 matGetForSize 的
      3.5 米一次，会被 clamp 到 24 次上限，等于每 12.5 米才一个纹理周期，
@@ -142,6 +210,11 @@ function init(){
   carveWestDoor();
   carveAdminDoor();
   buildSportsZone();
+  /* 室内：楼体是实心 box，但内部铺了地板/桌椅/灯之后才算「能进去的地方」。
+     必须在 setupWorld() 之前调用 —— setupWorld 里会 buildContainers()，
+     而室内容器的点位写在 CONTAINER_SPOTS 里，不依赖调用顺序，
+     但楼内地面得先铺好，否则玩家在门内会「站」在 14 米高的楼顶上。 */
+  if(typeof buildInterior==='function') buildInterior();
   setupWorld();
   ready=true;
 }
@@ -257,10 +330,21 @@ function buildSchool(){
   /* 【围墙外扩】原来北墙在 z=52，操场一扩就会被压到墙外。
      现在北墙推到 z=68，东墙推到 x=78（体育馆在 x=58 附近，需要留出余量），
      南/西不动，校门位置保持不变。 */
-  box(120,2.6,.5,wallC,0,1.3,-46);                      // 南墙
-  box(.5,2.6,120,wallC,-60,1.3,10);                     // 西墙
-  box(.5,2.6,120,wallC,78,1.3,10);                      // 东墙
-  box(140,2.6,.5,wallC,9,1.3,68);                       // 北墙
+/* 【围墙加高 + 顶部压边】
+     原来只有 2.6 米，而跳跃能到 1.1 米、屋顶/看台/台阶都能站，
+     人是能翻出去的。现在主体加到 4.2 米，再压一条 0.35 米高的
+     深色压边 —— 既是视觉上的「翻不过去」暗示，也真的挡住。
+     c_player.js 里另有一道与几何无关的硬边界兜底。 */
+  const WALL_H = 4.2;
+  box(120,WALL_H,.5,wallC,0,WALL_H/2,-46);              // 南墙
+  box(.5,WALL_H,120,wallC,-60,WALL_H/2,10);             // 西墙
+  box(.5,WALL_H,120,wallC,78,WALL_H/2,10);              // 东墙
+  box(140,WALL_H,.5,wallC,9,WALL_H/2,68);               // 北墙
+  /* 压边：略宽于墙身，形成一条明显的深色收口 */
+  box(120,.35,.8,0x5b6773,0,WALL_H+.17,-46);
+  box(.8,.35,120,0x5b6773,-60,WALL_H+.17,10);
+  box(.8,.35,120,0x5b6773,78,WALL_H+.17,10);
+  box(140,.35,.8,0x5b6773,9,WALL_H+.17,68);
   // 校门（南墙中央开口 + 门柱 + 牌坊）
   box(1.4,3.6,1,0x555555,-5,1.8,-46);
   box(1.4,3.6,1,0x555555,5,1.8,-46);
@@ -365,6 +449,15 @@ function setupWorld(){
   /* 【局内容器】每次开局重新生成一遍，战利品随机 */
   if(typeof buildContainers==='function') buildContainers();
   if(typeof bindContainerUI==='function') bindContainerUI();
+  /* 【篮球：每局重置计数】投中上限、现金上限都按局算，
+     否则上一局刷满 1500 之后，这一局投进也不给钱了。 */
+  try{
+    if(typeof BBALL==='object'){
+      BBALL.ball=null; BBALL.held=true;
+      BBALL.shots=0; BBALL.hits={1:0,2:0,3:0}; BBALL.cash=0;
+      if(BBALL.ballMesh){ try{ scene.remove(BBALL.ballMesh); }catch(e){} }
+    }
+  }catch(e){}
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）
   initWeapon();       // 第一人称武器模型
   // 操作提示 8 秒后淡出

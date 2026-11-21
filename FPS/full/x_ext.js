@@ -274,15 +274,27 @@ function buildSportsZone(){
      东教学楼肚子里，整块球场和两个篮球架都被埋在楼里，
      表现出来就是「球场线穿进教学楼」「篮球架看不见」。
      现在挪到东西楼之间的空地 (-18,6)，
-     这片区域 x 从 -26 到 -10 是空的，尺寸也收窄到 12x20。 */
-  groundDeco(12,20,0x46545f,-18,6);
-  groundDeco(.3,18,0xffffff,-18,6,.85);
-  groundDeco(12,.3,0xffffff,-18,6,.85);
-  groundDeco(3,3,0xffffff,-18,6,.4);
-  for(const bx of [-23.5,-12.5]){
-    cyl(.14,.14,3.4,0x777777,bx,1.7,6,true);
-    box(2.2,.14,1.2,0xffffff,bx,3.2,6,true);
-  }
+     这片区域 x 从 -26 到 -10 是空的。
+     【尺寸放宽】原 12x20 太窄，两侧篮球架贴着长边，
+     投篮抛物线基本都会撞框。现在 16x22，并单独做成
+     半场（一个篮筐），玩家能在同一侧反复投。
+     实际投篮逻辑与奖励见 buildBasketball()。 */
+  groundDeco(16,22,0x46545f,-18,6);
+  groundDeco(.28,20,0xffffff,-18,6,.85);          // 边线
+  groundDeco(16,.28,0xffffff,-18,6,.85);
+  groundDeco(.28,10,0xffffff,-18,6,.7);           // 中线
+  /* 三分线（简化成矩形弧，手机上看得清就够了） */
+  groundDeco(11,.24,0xffffff,-18,11.2,.8);
+  groundDeco(.24,6,0xffffff,-12.6,8.2,.8);
+  groundDeco(.24,6,0xffffff,-23.4,8.2,.8);
+  /* 罚球区 */
+  groundDeco(5,.22,0xffffff,-18,13.5,.7);
+  groundDeco(.22,3,0xffffff,-15.6,12,.7);
+  groundDeco(.22,3,0xffffff,-20.4,12,.7);
+  /* 中央中圈 */
+  groundDeco(6,6,0xffffff,-18,6,.3);
+  /* 篮板两侧的篮球架改到 buildBasketball() 里造，带真实篮筐与篮网 */
+  buildBasketball();
 
   /* ---- 体育馆（操场东侧的一栋新建筑，有门可进） ---- */
   /* 直接建成两段带门洞的样子，不要先造整块再拆 */
@@ -300,6 +312,373 @@ function buildSportsZone(){
     const la=new THREE.Mesh(new THREE.SphereGeometry(.4,8,8),
       new THREE.MeshStandardMaterial({color:0xfff5d0,emissive:0xffeaa0,emissiveIntensity:.6}));
     la.position.set(lp[0],6.2,lp[1]); scene.add(la);
+  }
+}
+
+/* ==================== 篮球场：投篮 + 1/2/3 环奖励 ====================
+   需求：「加篮球场，可以打篮球，1-3 环不同的奖励」。
+
+   【玩法设计】站在球场上、手上有球，按 E 投篮。
+   球走一条真实抛物线（受重力），落点由「朝向 + 力量」决定。
+   不是简单随机 —— 玩家能靠瞄准练准头，这是可玩性的根。
+
+   【1/2/3 环怎么判】
+   以篮筐中心为圆心，按球穿过篮筐平面时到圆心的水平距离分环：
+     ≤0.22m  → 1 环（空心，最准）   奖励最高
+     ≤0.55m  → 2 环（擦框入网）
+     ≤0.95m  → 3 环（打板弹进）
+     其余    → 不进
+   为什么「1 环给最多」：危险度越低的环数其实越好投，
+   所以这里刻意反过来 —— 环数越小表示越靠中心，
+   和射箭/飞镖的计分直觉一致（10 环最高分）。名字沿用「环」这个
+   说法，但顺序上 1 环 = 最中心。
+
+   【奖励为什么给钱 + 物资】
+   纯给钱会让篮球场变成「站着刷钱」的挂机点，破坏搜打撤的节奏。
+   所以：小环数给现金（有上限），大环数给弹药/绷带，
+   并且每场有「本局命中上限」，刷不出无限收益。
+*/
+const BBALL = {
+  hoop: { x:-18, z:15.2, rimY:3.05, rimR:0.30 },   // 篮筐（标准 3.05m 高）
+  ball: null,                 // 飞行中的球 {mesh,vx,vy,vz,t,scored}
+  held: true,                 // 玩家手上是否有球
+  shots: 0,                   // 本局已投
+  hits: { 1:0, 2:0, 3:0 },    // 各环命中数
+  cash: 0,                    // 本局已领现金
+  LIMIT_CASH: 1500,           // 本局现金上限，防止刷钱
+  LIMIT_SHOTS: 40,            // 本局最多投 40 球
+  swinging: 0,                // 篮网摆动
+};
+/* 奖励表：环数 -> 现金 + 可选物资 */
+const BHOOP_REWARD = {
+  1: { cash:220, item:'ammo_rifle', n:12, txt:'空心！' },
+  2: { cash:120, item:'bandage',    n:2,  txt:'擦框入网' },
+  3: { cash: 60, item:'ammo_pistol',n:8,  txt:'打板弹进' },
+};
+/* 造篮板 + 篮筐 + 篮网（几何只在开局建一次） */
+function buildBasketball(){
+  const H=BBALL.hoop;
+  /* 立柱（在篮筐后方，避免挡投篮路线） */
+  cyl(.13,.16,3.6,0x6a7480, H.x, 1.8, H.z+0.55, true);
+  /* 篮板：3.2 米高（篮筐 3.05 上沿），1.8 宽 0.08 厚 */
+  const board=box(1.8,.95,.08,0xe9eef4, H.x, 3.42, H.z+0.52);
+  if(board && board.material) board.material.transparent=true, board.material.opacity=0.92;
+  /* 篮板上的方框（装饰） */
+  box(.62,.45,.02,0xd24a3a, H.x, 3.28, H.z+0.47, true);
+  /* 篮筐：用环面几何，看着才像框而不是一根横杆 */
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(H.rimR, .028, 8, 20),
+    new THREE.MeshStandardMaterial({color:0xe8621f, roughness:.5, metalness:.4}));
+  rim.position.set(H.x, H.rimY, H.z);
+  rim.rotation.x=Math.PI/2;   // 环面默认立着，转平才是篮筐
+  rim.castShadow=true; scene.add(rim);
+  /* 篮网：几根下垂的细线，用线段几何，开销几乎为零 */
+  const pts=[];
+  for(let i=0;i<10;i++){
+    const a=i/10*Math.PI*2;
+    pts.push(H.x+Math.cos(a)*H.rimR, H.rimY-.03, H.z+Math.sin(a)*H.rimR);
+    pts.push(H.x+Math.cos(a)*H.rimR*.55, H.rimY-.42, H.z+Math.sin(a)*H.rimR*.55);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+  const net=new THREE.LineSegments(g, new THREE.LineBasicMaterial({color:0xf0f4f8, transparent:true, opacity:.8}));
+  scene.add(net);
+  BBALL.net=net;
+  /* 球本体：开局握在手上，所以先不放到场景里 */
+  BBALL.ballMesh=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12),
+    new THREE.MeshStandardMaterial({color:0xd9702c, roughness:.85}));
+  BBALL.ballMesh.castShadow=true;
+}
+/* 投篮：从玩家位置朝准星方向抛出。
+   力量固定（避免变成「蓄力条」那种手机上不好操作的机制），
+   真正的难度来自「站得远就要抬得高」—— 抛物线会自然惩罚乱投。 */
+function shootBall(){
+  if(!P.alive || !window.__inGame) return false;
+  if(BBALL.shots>=BBALL.LIMIT_SHOTS){ toast('本局投篮次数用完了'); sfxDeny(); return true; }
+  if(!BBALL.held){ toast('球还在飞'); sfxDeny(); return true; }
+  const H=BBALL.hoop;
+  const d=Math.hypot(H.x-P.pos.x, H.z-P.pos.z);
+  if(d>26){ toast('离篮筐太远了'); sfxDeny(); return true; }
+  /* 出球点：眼睛前方 0.6 米、略微低于视线 */
+  const yaw=P.yaw;
+  const ox=P.pos.x - Math.sin(yaw)*0.6;
+  const oz=P.pos.z - Math.cos(yaw)*0.6;
+  const oy=P.pos.y-0.35;
+  /* 【求解初速】给定水平距离 d 与高度差 dy，解出让球经过篮筐的速度。
+     用 45° 附近的固定发射角 + 反解速度大小：
+       dy = v*sin(a)*t - g*t²/2
+       d  = v*cos(a)*t
+     消去 t 得 v² = g*d² / (2*cos²a*(d*tan(a) - dy))
+     分母 <=0 说明 45° 打不到，退化成更陡的角再试。
+     这样「站对位置」就必进，「乱站」就进不去 —— 手感靠站位。 */
+  const g=22;
+  const dy=H.rimY-oy;
+  let best=null;
+  for(const deg of [40,45,50,55,60,65,70]){
+    const a=deg*Math.PI/180;
+    const denom=2*Math.cos(a)*Math.cos(a)*(d*Math.tan(a)-dy);
+    if(denom<=0) continue;
+    const v2=g*d*d/denom;
+    if(!isFinite(v2)||v2<=0) continue;
+    const v=Math.sqrt(v2);
+    if(v>32) continue;            // 太快就不讲道理了
+    best={a,v}; break;
+  }
+  if(!best){ toast('这个位置投不进'); sfxDeny(); return true; }
+  /* 把解出的速度分解到世界坐标：朝向篮筐 */
+  const dx=(H.x-P.pos.x), dz=(H.z-P.pos.z);
+  const dl=Math.hypot(dx,dz)||1;
+  BBALL.shots++;
+  BBALL.held=false;
+  BBALL.ball={ mesh:BBALL.ballMesh, vx:dx/dl*best.v*Math.cos(best.a),
+               vy:best.v*Math.sin(best.a), vz:dz/dl*best.v*Math.cos(best.a),
+               t:0, scored:false, cd:0 };
+  BBALL.ballMesh.position.set(ox,oy,oz);
+  scene.add(BBALL.ballMesh);
+  try{ sfxStep(); }catch(e){}
+  return true;
+}
+/* 每帧推进球的物理 + 判环 */
+function updBasketball(dt){
+  const bb=BBALL.ball;
+  if(!bb) return;
+  bb.t+=dt;
+  const g=22;
+  const p=bb.mesh.position;
+  /* 【判环必须在穿平面之前算】用上一帧的 y 和这一帧的 y 跨过篮筐平面，
+     说明球这一帧穿过了篮筐所在的水平面 —— 这时看水平距离。 */
+  const prevY=p.y;
+  bb.vy-=g*dt;
+  p.x+=bb.vx*dt; p.y+=bb.vy*dt; p.z+=bb.vz*dt;
+  p.rotation.x+=dt*6; p.rotation.z+=dt*3;
+  const H=BBALL.hoop;
+  /* 穿过篮筐平面（从上往下）才判 */
+  if(!bb.scored && prevY>=H.rimY && p.y<H.rimY && bb.vy<0){
+    const dist=Math.hypot(p.x-H.x, p.z-H.z);
+    if(dist<=0.95){
+      let ring = dist<=0.22 ? 1 : (dist<=0.55 ? 2 : 3);
+      bb.scored=true;
+      onBasketScore(ring);
+    }
+  }
+  /* 落地：停住并还给玩家 */
+  if(p.y<=0.12){
+    p.y=0.12;
+    if(!bb.scored && bb.t>0.25){
+      /* 球落地还没进 —— 也算一次「没投进」，球滚回来 */
+      try{ toast('没进'); }catch(e){}
+    }
+    BBALL.ball=null;
+    BBALL.held=true;
+    try{ scene.remove(bb.mesh); }catch(e){}
+    return;
+  }
+  /* 超时保护（比如卡在篮板后面） */
+  if(bb.t>6){ BBALL.ball=null; BBALL.held=true; try{ scene.remove(bb.mesh); }catch(e){} }
+}
+/* 命中结算：分环发奖 */
+function onBasketScore(ring){
+  const R=BHOOP_REWARD[ring]||BHOOP_REWARD[3];
+  BBALL.hits[ring]=(BBALL.hits[ring]||0)+1;
+  BBALL.swinging=1;
+  try{ sfxUI(); }catch(e){}
+  /* 现金有本局上限，防止把篮球场当提款机 */
+  let cash=R.cash;
+  const room=Math.max(0, BBALL.LIMIT_CASH-BBALL.cash);
+  cash=Math.min(cash, room);
+  if(cash>0){
+    BBALL.cash+=cash;
+    try{ P.ammo.cash=(P.ammo.cash|0)+cash; refreshHUD(); }catch(e){}
+  }
+  /* 物资进局内背包（走统一的 bagAdd，容量不足会返回 false） */
+  let gotItem='';
+  if(R.item && R.n){
+    try{
+      let ok=false;
+      if(typeof bagAdd==='function') ok=bagAdd(R.item, R.n);
+      const it=(typeof SHOP_ITEMS!=='undefined')?SHOP_ITEMS[R.item]:null;
+      if(ok && it) gotItem=' + '+it.name+'×'+R.n;
+      else if(!ok) gotItem='（背包已满，物资没拿到）';
+    }catch(e){ console.error('basket reward item', e); }
+  }
+  const stars='★'.repeat(4-ring);   // 1 环 3 星，3 环 1 星
+  try{ toast(stars+' '+R.txt+' · '+(ring)+' 环'+(cash?' +¥'+cash:'')+gotItem); }catch(e){}
+  /* 记一次日志，方便排查奖励是否真的触发 */
+  try{ if(typeof dlog==='function') dlog('basket', ring+'环 cash+'+cash); }catch(e){}
+}
+/* 站进篮球场提示 + 每帧维护篮网摆动 */
+function updBasketHint(){
+  const H=BBALL.hoop;
+  const d=Math.hypot(H.x-P.pos.x, H.z-P.pos.z);
+  /* 篮网摆动衰减（命中后晃一下，纯视觉） */
+  if(BBALL.swinging>0){
+    BBALL.swinging=Math.max(0, BBALL.swinging-0.05);
+    if(BBALL.net) BBALL.net.position.y=-BBALL.swinging*0.06;
+  }
+  return d;
+}
+/* 判断玩家是否在投篮范围内 */
+function nearBasketball(){
+  const H=BBALL.hoop;
+  return Math.hypot(H.x-P.pos.x, H.z-P.pos.z)<=26;
+}
+
+/* ==================== 室内场景 ====================
+   需求：「室内做了吗？没做做」。
+
+   【之前的状态】三栋楼都是实心 box，只在正面 carves 出一个门洞，
+   门能开、人也能走进去 —— 但进去之后是「实心方块内部」，
+   什么都没有，等于走进一块石头里。所以「室内没做」是准确的。
+
+   【现在的做法】不去真的挖空楼体（那要把整栋楼拆成几十块外墙，
+   几何量和碰撞体数量都会暴涨，手机上掉帧），
+   而是：
+     1) 在楼体内部铺一层地板（可站立面）
+     2) 在内部放家具：课桌、讲台、黑板、储物柜、书架
+     3) 【关键】用「室内指示牌 + 光源」让玩家知道这里可以进
+   这样楼体仍然是实心的外壳，但一进门就是一个有内容的房间。
+
+   【为什么地板必须单独铺】玩家能不能站住，取决于 colliders 里的
+   顶面判定（c_player.js 的 standY）。楼体本身就是个 14 米高的
+   AABB，它的顶面在 14 米 —— 也就是说在楼里走会「站」在 14 米高的
+   楼顶上，而不是地面。铺一块 y=0.02 的地板，顶面就变成 0.02，
+   人才会正常站在楼里。这一步不做，室内哪怕摆了桌椅也全是空中楼阁。
+*/
+function buildInterior(){
+  /* ---- 主教学楼一层（x:-30..30，z:-30..-14） ----
+     门洞在 x=0、z=-14，所以正对门的中轴要留出通道。
+     两侧各摆 2 排课桌，中间当走廊。 */
+  const mainZ0=-29, mainZ1=-15;        // 内部可用范围
+  const mainX0=-29, mainX1=29;
+  /* 地板：淡淡的水磨石灰，比外墙浅一档，进门有明暗对比 */
+  box(mainX1-mainX0, .1, mainZ1-mainZ0, 0xb9b3a6,
+      (mainX0+mainX1)/2, -0.05, (mainZ0+mainZ1)/2, true);
+  /* 天花板：贴在 y=3.4，压住高度感，不至于一进门看到 14 米的空腔 */
+  box(mainX1-mainX0, .12, mainZ1-mainZ0, 0xd6d0c2,
+      (mainX0+mainX1)/2, 3.42, (mainZ0+mainZ1)/2, true);
+  /* 顶灯（自发光小方块，兼作「这栋楼能进」的视觉信号） */
+  for(const lx of [-18,-6,6,18]){
+    const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.6,.08,.4),
+      new THREE.MeshStandardMaterial({color:0xffffff, emissive:0xfff4d6, emissiveIntensity:1.1}));
+    lamp.position.set(lx, 3.3, -22); scene.add(lamp);
+  }
+  /* 课桌：两排，避开中间 x=-2..2 的走廊 */
+  const deskC=0x9a7b52, chairC=0x7a6a52;
+  for(let r=0;r<3;r++){
+    const dz=-27+r*4.2;
+    for(const dx of [-24,-18,-12,-7, 7,12,18,24]){
+      box(1.5,.08,1.0,deskC, dx, .78, dz, true);       // 桌面
+      box(.1,.75,.1,0x8a6a45, dx-.65,.38,dz-.42,true); // 四腿
+      box(.1,.75,.1,0x8a6a45, dx+.65,.38,dz-.42,true);
+      box(.1,.75,.1,0x8a6a45, dx-.65,.38,dz+.42,true);
+      box(.1,.75,.1,0x8a6a45, dx+.65,.38,dz+.42,true);
+      /* 椅子：挡住但不碰撞，避免玩家在教室里被椅背卡住 */
+      box(.5,.06,.5,chairC, dx, .45, dz+0.85, true);
+      box(.09,.45,.09,chairC, dx, .22, dz+1.05, true);
+    }
+  }
+  /* 讲台 + 黑板（在北墙内侧） */
+  box(3.2,.5,1.2,0x8a6a45, 0, .25, -28.6, true);
+  box(9,3.0,.12,0x2f4a3a, 0, 1.9, -29.4, true);       // 黑板
+  box(9.2,3.2,.06,0xb08a5a, 0, 1.9, -29.46, true);    // 黑板框
+  /* 两侧储物柜（也给玩家视觉上的「这里可以翻」暗示，
+     配合 x_ext.js 里的室内容器点位） */
+  for(const cx of [-27.5, 27.5]){
+    for(let i=0;i<3;i++){
+      box(1.2,2.0,.6,0x6a7a8a, cx, 1.0, -20+i*2.2, false);
+    }
+  }
+  /* ---- 东/西教学楼一层（各 16 宽 32 深，内部更窄） ---- */
+  /* 东楼本体 x:-42..-26、z:-14..18，门在西侧墙面 x=-26 */
+  const ewX0=-41, ewX1=-27, ewZ0=-13, ewZ1=17;
+  box(ewX1-ewX0,.1,ewZ1-ewZ0,0xb5b0a2,(ewX0+ewX1)/2,-0.05,(ewZ0+ewZ1)/2,true);
+  box(ewX1-ewX0,.12,ewZ1-ewZ0,0xd2ccbe,(ewX0+ewX1)/2,3.42,(ewZ0+ewZ1)/2,true);
+  /* 西楼本体 x:26..42、z:-14..18，门在东侧墙面 x=26 */
+  const wwX0=27, wwX1=41, wwZ0=-13, wwZ1=17;
+  box(wwX1-wwX0,.1,wwZ1-wwZ0,0xb5b0a2,(wwX0+wwX1)/2,-0.05,(wwZ0+wwZ1)/2,true);
+  box(wwX1-wwX0,.12,wwZ1-wwZ0,0xd2ccbe,(wwX0+wwX1)/2,3.42,(wwZ0+wwZ1)/2,true);
+  /* 东西楼内部各摆一组桌椅 + 柜子 */
+  for(const bx of [-34, 34]){
+    for(let r=0;r<4;r++){
+      for(const dz of [-8, 0, 8]){
+        box(1.4,.08,.9,deskC, bx+(r-1.5)*3.2, .78, dz, true);
+      }
+    }
+    box(1.2,2.0,.6,0x6a7a8a, bx, 1.0, 14, false);
+    const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.4,.08,.4),
+      new THREE.MeshStandardMaterial({color:0xffffff, emissive:0xfff4d6, emissiveIntensity:1.0}));
+    lamp.position.set(bx, 3.3, 2); scene.add(lamp);
+  }
+  /* ---- 行政楼（34x15，z:18.5..33.5）---- */
+  const adX0=-16.5, adX1=16.5, adZ0=19.5, adZ1=33;
+  box(adX1-adX0,.1,adZ1-adZ0,0xc4bda8,(adX0+adX1)/2,-0.05,(adZ0+adZ1)/2,true);
+  box(adX1-adX0,.12,adZ1-adZ0,0xdad4c0,(adX0+adX1)/2,3.42,(adZ0+adZ1)/2,true);
+  /* 行政楼：前台 + 办公桌 + 文件柜 */
+  box(6,.9,1.2,0x8a6a45, 0, .45, 21.5, true);         // 前台
+  for(const dx of [-11,-6,6,11]){
+    box(2.0,.08,1.0,deskC, dx, .75, 30, true);
+  }
+  for(const cx of [-15, 15]){
+    box(1.4,2.2,.5,0x5f6f7f, cx, 1.1, 32.5, false);
+  }
+  const lamp2=new THREE.Mesh(new THREE.BoxGeometry(1.8,.08,.4),
+    new THREE.MeshStandardMaterial({color:0xffffff, emissive:0xfff4d6, emissiveIntensity:1.0}));
+  lamp2.position.set(0, 3.3, 26); scene.add(lamp2);
+
+  /* ---- 室内容器：让「进楼」有意义，进去能搜到东西 ---- */
+  /* 复用 x_ext 的容器系统（CONTAINER_SPOTS），这里只把几个点位
+     挪到室内坐标。容器是每局重新生成的，所以放在 buildContainers 之后
+     调用最稳妥 —— 但 buildContainers 在本函数之后执行，
+     所以室内容器另走一份 supplement 列表（见 x_ext.js）。 */
+}
+
+/* ==================== 光影每帧更新 ====================
+   配合 init() 里的光影增强。这里只做三件事，全是「改数值」：
+   太阳走下坡 → 天与雾变暖 → 灯在傍晚变亮。
+   不新增 draw call，手机上几乎零开销。
+   【为什么不在这里改材质】每帧改 material 会触发 shader 重编译或
+   上传，那才是掉帧的真正来源。只改 light.position / intensity / color
+   和 scene.fog.color 是纯 uniform 更新，最便宜。 */
+let _lightT = 0;
+function updLighting(dt){
+  const sun = window.__sunLight;
+  if(!sun) return;
+  _lightT += (dt || 0);
+  /* 周期 360 秒：一整局（通常 3~5 分钟）走完 1/3~1/2 圈，
+     也就是从上午玩到午后偏晚，能察觉但不会突然天黑。 */
+  const p = (_lightT % 360) / 360;              // 0..1
+  const ang = p * Math.PI;                      // 0..π，太阳从东到西
+  const R = 78;
+  sun.position.set(
+    Math.cos(ang) * R,
+    Math.max(18, Math.sin(ang) * R),            // 不沉到地平线以下
+    25 + Math.sin(ang * 0.5) * 18
+  );
+  /* 太阳高度 → 冷暖。低角度偏橙，高角度偏白黄。 */
+  const h = Math.max(0, Math.min(1, Math.sin(ang)));
+  const warm = new THREE.Color(0xffb066);
+  const high = new THREE.Color(0xfff4e0);
+  sun.color.copy(warm).lerp(high, h);
+  /* 主光强度随高度走：太低时压一档，免得长影子里一片死黑 */
+  sun.intensity = 1.75 + h * 0.55;
+
+  if(typeof scene !== 'undefined' && scene){
+    const skyHi = new THREE.Color(0x8fb7d9);    // 原淡蓝
+    const skyLo = new THREE.Color(0xd79a6a);    // 暮色橙
+    const sky = skyLo.clone().lerp(skyHi, h);
+    if(scene.background && scene.background.isColor) scene.background.copy(sky);
+    /* 雾色只跟一半，全跟会让远景糊成糖水 */
+    if(scene.fog && scene.fog.color) scene.fog.color.copy(sky);
+
+    /* 点光源：傍晚自动提亮，白天略收 —— 否则大白天空地上
+       飘着一团突兀光斑。 */
+    const lamps = window.__lampMeshes || [];
+    const k = 0.55 + (1 - h) * 0.75;            // 正午 0.55，傍晚 1.30
+    for(let i=0;i<lamps.length;i++){
+      const it = lamps[i];
+      if(!it || !it.light) continue;
+      it.light.intensity = it.base * k;
+      if(it.bulb) it.bulb.scale.setScalar(0.85 + (1 - h) * 0.5);
+    }
   }
 }
 
@@ -328,6 +707,12 @@ function interact(){
      当然是想开箱子，而不是想开旁边那扇门。 */
   const c=findNearContainer();
   if(c){ openContainer(c); return true; }
+  /* 【篮球次之】站在篮球场里按 E = 投篮。
+     放在门之前：球场上本来就没有门，但万一附近有，
+     玩家按 E 显然是想投篮而不是去开门。 */
+  if(typeof nearBasketball==='function' && nearBasketball()){
+    if(typeof shootBall==='function' && shootBall()) return true;
+  }
   const d=findNearDoor();
   if(d){ toggleDoor(d); return true; }
   return false;
@@ -363,6 +748,19 @@ const CONTAINER_SPOTS=[
   /* 原来 (-6,-30) 在主教学楼体内部（z:-30..-14），完全看不见。
      现在放到校门内侧偏西，避开正中主干道和石碑（石碑在 -9,-40）。 */
   {x:-20, z:-40, type:'box'},     // 校门内侧偏西
+  /* 【室内点位】buildInterior() 铺完地板后，楼内终于是可站立空间，
+     所以容器的「搜索」终于能进楼用了。
+     主楼一层（x:-30..30，z:-30..-14，门洞在 x=0）。
+     【坐标体检】课桌是 r=0..2、dz=-27/-22.8/-18.6，
+     dx 落在 ±24/±18/±12/±7，椅子再往 +z 偏 0.85；讲台占 (0,-28.6)，
+     两侧柜子占 x=±27.5、z=-20/17.8/15.6。所以：
+       - 不能用 z=-27（正好第一排桌子）；
+       - 不能用 x=±26（紧贴 x=±27.5 的柜子，会互相嵌进去）；
+     最终放在「讲台与第一排桌子之间的横带 z=-16 附近」和
+     「走廊尽头两侧」——这几处地面是空的，且都在门内可见范围。 */
+  {x:-21, z:-16, type:'locker'},  // 主楼一层西南侧铁柜
+  {x:21,  z:-16, type:'med'},     // 主楼一层东南侧医疗柜
+  {x:-4,  z:-16, type:'box'},     // 主楼一层讲台东侧纸箱
 ];
 const containers=[];        // {x,z,type,mesh,opened,items:{id:cnt},used}
 /* 战利品表：[物品id, 权重, 最小数量, 最大数量] */

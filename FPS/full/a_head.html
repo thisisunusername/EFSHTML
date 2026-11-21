@@ -472,7 +472,13 @@ html[data-lang="en"] #bagBtn span{
      没有给子元素确定高度 -> height:100% 解析成 auto -> 整块塌成 0 高。
      表现就是「背包能打开，但格子一个都点不动」（其实根本没渲染出尺寸）。
      这里给 .stk 一个明确的高度来源。 */
-  #bag .stk{ height:min(88vh, 620px); max-height:88vh; }
+  #bag .stk{ height:min(88vh, 620px); max-height:88vh;
+    /* 【视觉壳】#bag 的样式规则只覆盖了 .box，而背包实际用的是 .stk，
+       于是背包打开后是一片没有底色、没有边框的透明内容浮在遮罩上。
+       补上和 #stash .stk 一致的壳，局内局外观感统一。 */
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; box-shadow:0 18px 50px rgba(0,0,0,.6);
+    padding:12px; overflow-y:auto; }
   /* 【仓库同病】#stash 也是 flex 居中的全屏遮罩，.stk 里的 height:100%
      同样没有确定的父高度可解析。局外仓库格子更多（左装备栏 + 右 8 列格），
      高度给得比局内背包大一点。不加这条，#stash .stk 会按内容高度收缩，

@@ -414,6 +414,55 @@ function buildBasketball(){
   BBALL.ballMesh=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12),
     new THREE.MeshStandardMaterial({color:0xd9702c, roughness:.85}));
   BBALL.ballMesh.castShadow=true;
+
+  /* ================= 场边常驻篮球 =================
+     【之前的问题】玩家走到篮球场，看到的是一个空场地：
+     地上没球、场边没球，根本不知道这里能打球。
+     原因：BBALL.ballMesh 是个「飞行用」的球，
+     只有调用 shootBall() 那一刻才 scene.add()，落地就又 remove()，
+     平时它根本不在场景里（而 held 默认就是 true，等于凭空握着球）。
+     【本次】在篮柱旁边摆几颗**装饰性实心球**（不参与物理，
+     只是告诉玩家「这里是篮球场」），再加一个球筐。
+     球用和飞行球一样的橙色 + 黑线纹，风格统一。 */
+  BBALL.decoBalls=[];
+  const ballMat=new THREE.MeshStandardMaterial({color:0xd9702c, roughness:.85});
+  /* 一颗球在篮柱脚边，两颗散在中线附近 */
+  const decoPos=[
+    [H.x+0.85, 0.12, H.z+0.55],
+    [H.x-3.2, 0.12, H.z-2.4],
+    [H.x+2.6, 0.12, H.z-5.0]
+  ];
+  for(const dp of decoPos){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12), ballMat);
+    b.position.set(dp[0], dp[1], dp[2]);
+    b.castShadow=true; b.receiveShadow=true;
+    /* 黑线：两条细环，看不出的话至少球的轮廓很饱满 */
+    const ring1=new THREE.Mesh(new THREE.TorusGeometry(.121,.006,6,18),
+      new THREE.MeshStandardMaterial({color:0x2a1a10, roughness:.9}));
+    ring1.rotation.x=Math.PI/2; ring1.position.copy(b.position);
+    const ring2=ring1.clone(); ring2.rotation.set(0,0,Math.PI/2);
+    scene.add(b); scene.add(ring1); scene.add(ring2);
+    BBALL.decoBalls.push(b, ring1, ring2);
+  }
+  /* 球筐：一个开口的金属框，里面再放两颗球，看着像体育馆器材区 */
+  const bcX=H.x+4.2, bcZ=H.z+1.2;
+  const bcMat=new THREE.MeshStandardMaterial({color:0x59636e, roughness:.6, metalness:.5});
+  /* 四面网壁：用 4 块薄板围一个框（圆筒看不到里面，板框更像球筐） */
+  for(let i=0;i<4;i++){
+    const a=i*Math.PI/2;
+    const w=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.62,0.03), bcMat);
+    w.position.set(bcX+Math.cos(a)*0.45, 0.31, bcZ+Math.sin(a)*0.45);
+    w.rotation.y=-a;
+    scene.add(w);
+    BBALL.decoBalls.push(w);
+  }
+  for(const off of [[-0.2,0.2],[0.22,-0.18]]){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(.12,14,12), ballMat);
+    b.position.set(bcX+off[0], 0.42, bcZ+off[1]);
+    b.castShadow=true;
+    scene.add(b);
+    BBALL.decoBalls.push(b);
+  }
 }
 /* 投篮：从玩家位置朝准星方向抛出。
    力量固定（避免变成「蓄力条」那种手机上不好操作的机制），

@@ -118,7 +118,6 @@ function animate(){
 
   refreshHUD();
   /* 常驻诊断角标：把真实坐标画在屏幕上，不需要点击 */
-  try{ if(window.__dgTick) window.__dgTick(); }catch(e){}
   /* 渲染放在 try 里：万一某帧的子步骤抛错，
      用纯场景渲染兜底，绝不让画面停在全黑上等下一帧。 */
   try{
@@ -248,42 +247,11 @@ try{ if(typeof fontWarmup==='function') fontWarmup(); }catch(e){}
   }
 })();
 
-/* ================= 常驻诊断角标（不用点击，直接显示） =================
-   【为什么要加】长按顶栏的诊断条可能根本按不到（顶栏就是点不动的那个），
-   所以这次直接把数据画在屏幕左下角，自己滚动，不依赖任何交互。
-   显示的是「每帧执行完 updP 之后」的真实值，
-   也就是相机实际使用的那个坐标。 */
-(function(){
-  let box=null;
-  function ensure(){
-    if(box && box.parentNode) return box;
-    box=document.createElement('div');
-    box.id='__dgbadge';
-    box.style.cssText='position:fixed;left:6px;bottom:6px;z-index:99999;'+
-      'background:rgba(0,0,0,.82);color:#5f5;font:11px/1.35 monospace;'+
-      'padding:5px 7px;border-radius:6px;border:1px solid #0f0;'+
-      'pointer-events:none;white-space:pre;max-width:46vw;';
-    (document.body||document.documentElement).appendChild(box);
-    return box;
-  }
-  window.__dgTick=function(){
-    try{
-      const b=ensure();
-      const py=(P&&P.pos)?P.pos.y:NaN;
-      const cam=(typeof camera!=='undefined'&&camera)?camera.position.y:NaN;
-      const inB=(typeof inBuilding!=='undefined')?inBuilding:'?';
-      const cf=(typeof curFloor!=='undefined')?curFloor:'?';
-      let vis='';
-      try{
-        if(typeof floorGroups!=='undefined'&&floorGroups.length){
-          for(let i=0;i<floorGroups.length;i++) vis+=floorGroups[i].visible?'1':'0';
-        }
-      }catch(e){ vis='err'; }
-      b.textContent='y='+py.toFixed(2)+' cam='+cam.toFixed(2)+' vy='+(P&&P.vel?P.vel.y.toFixed(1):'?')+String.fromCharCode(10)
-        +'inB='+inB+' fl='+cf+' vis='+vis+String.fromCharCode(10)
-        +'ground='+(P&&P.onGround)+' eye='+(P&&P.eyeH);
-    }catch(e){}
-  };
-})();
+/* 【已移除】常驻诊断角标
+   左下角那个绿框（y= / cam= / inB= / fl= / vis=）是之前排查
+   「人物站在天上、楼层显隐不对」时加的临时调试显示，
+   那个问题已经解决，它就不该再出现在玩家画面上了。
+   原始实现保留在 git 历史里（提交 d9dd821 及之前），需要时能找回。 */
+
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

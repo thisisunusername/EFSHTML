@@ -15,6 +15,7 @@ OUT=index.html
   cat full/d_game.js;    printf '\n'
   cat full/e_io.js;      printf '\n'
   cat full/f_ui.js;      printf '\n'
+  cat full/w_weapon.js;  printf '\n'
   cat full/y_audio.js;   printf '\n'
   cat full/z_render.js
   printf '\n</script>\n'

@@ -9,7 +9,7 @@ const P={
   speed:6, sprint:10,
   onGround:true,
   shooting:false, reload:false, reloadT:0,
-  shootCd:0, sprinting:false,
+  shootCd:0, sprinting:false, joyX:0, joyY:0, alive:true,
   keys:{},
 };
 const LOCK_TURN=false; // 手机端陀螺仪可后续接入
@@ -48,9 +48,9 @@ function updP(dt){
 
   let mx=0,mz=0;
   if(f)mz-=1; if(b)mz+=1; if(l)mx-=1; if(r)mx+=1;
-  // 虚拟摇杆输入（移动端）
-  if(typeof touchMoveX!=='undefined'&&(touchMoveX||touchMoveY)){
-    mx=touchMoveX; mz=touchMoveY;
+  // 虚拟摇杆输入（移动端，挂在 P 上避免跨模块变量问题）
+  if(P.joyX||P.joyY){
+    mx=P.joyX; mz=P.joyY;
   }
 
   // 相对 yaw 的方向
@@ -95,9 +95,10 @@ function moveAndCollide(dt){
   // 采用逐 collider 的 AABB 近似（colliders 里是 box/cyl 的 mesh）
   let px=nx, pz=nz;
   for(const m of colliders){
-    if(!m.geometry||!m.geometry.boundingBox) continue;
+    if(!m.geometry) continue;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
     const bb=m.geometry.boundingBox;
+    if(!bb) continue;
     // 世界坐标 AABB（只处理未旋转的，旋转的（如篮板）跳过）
     const halfW=bb.max.x/2, halfD=bb.max.z/2;
     const mx=m.position.x, mz=m.position.z;

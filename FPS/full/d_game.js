@@ -12,6 +12,7 @@ function fire(){
   P.shooting=true;
   sfxShoot();
   addShake(P.inv.gun?0.55:0.9);
+  weaponKick();
 
   // 射线检测
   const dir=lookDir();

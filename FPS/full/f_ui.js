@@ -119,12 +119,12 @@ function bindUI(){
       const max=48, d=Math.hypot(dx,dy);
       if(d>max){ dx*=max/d; dy*=max/d; }
       joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      touchMoveX=dx/max; touchMoveY=dy/max;
+      P.joyX=dx/max; P.joyY=dy/max;
       e.preventDefault();
     });
     const endJoy=(e)=>{
       if(jId!==null && e && e.pointerId!==jId) return;
-      jId=null; touchMoveX=0; touchMoveY=0;
+      jId=null; P.joyX=0; P.joyY=0;
       joyStick.style.transform='translate(-50%,-50%)';
       joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
     };

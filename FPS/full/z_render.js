@@ -38,6 +38,7 @@ function animate(){
   updLoot(dt);
   checkExfil();
   updAudio(dt);
+  updWeapon(dt);
 
   // 相机抖动叠加（基准位置由 updP 写入）
   const sh=updShake(dt);

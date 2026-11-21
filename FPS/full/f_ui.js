@@ -30,7 +30,15 @@ function showTouchUI(){
   const az=$('actZone'); if(az) az.style.display='block';
   const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
 }
+/* 主菜单/死亡界面时把摇杆和操作按钮收起来。
+   之前 #joyZone 是常驻 display:block，层级还压在菜单之上，
+   于是主界面也能看到一个摇杆，很碍事。 */
+function hideTouchUI(){
+  const jz=$('joyZone'); if(jz) jz.style.display='none';
+  const az=$('actZone'); if(az) az.style.display='none';
+}
 function bindUI(){
+  hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
   const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
@@ -107,11 +115,23 @@ function bindUI(){
   if(joyZone&&joyBase&&joyStick){
     let activeId=null, sx=0, sy=0;
 
+    /* 【真凶就在这里】原来 startJoy 每次都无条件执行 sx=cx;sy=cy;
+       浏览器只要多发一次 touchstart（手指轻微抖动、WebView 重新派发、
+       或者 #joyZone 被反复 touchstart），起点就被刷新成「当前点」，
+       于是接下来的 touchmove 里 dx=cx-sx 恒等于 0，
+       moveJoy 被调用了 134 次、joyX 却永远是 0.00，pos 永远 0.0,5.0。
+       修法：只有「当前没有活动触点」时才记录起点，
+       已经在拖时再收到 touchstart 一律忽略。 */
     const startJoy=(cx,cy)=>{
+      if(activeId!==null){          // 已经在拖了，绝不重置起点
+        window.__evtStart=(window.__evtStart||0)+1;
+        return;
+      }
       sx=cx; sy=cy;
       activeId=1;
       window.__evtStart=(window.__evtStart||0)+1;
-      /* 摇杆固定出现在按下位置，用 translate(-50%,-50%) 精确居中 */
+      window.__lastStart=[cx|0,cy|0];
+      /* 摇杆放在按下位置，用 translate(-50%,-50%) 精确居中 */
       joyBase.style.left=cx+'px';
       joyBase.style.top=cy+'px';
       joyBase.style.display='block';
@@ -122,12 +142,16 @@ function bindUI(){
 
     const moveJoy=(cx,cy)=>{
       window.__evtMove=(window.__evtMove||0)+1;
+      window.__lastMove=[cx|0,cy|0];
       let dx=cx-sx, dy=cy-sy;
       const max=48, d=Math.hypot(dx,dy);
       if(d>max){ dx*=max/d; dy*=max/d; }
       joyStick.style.transform='translate(calc(-50% + '+dx+'px), calc(-50% + '+dy+'px))';
-      P.joyX=dx/max; P.joyY=dy/max;
-      if(window.__joyTouch){ window.__joyTouch.cx=cx; window.__joyTouch.cy=cy; }
+      /* 死区 2px：手指轻微抖动不算推杆，但门限不能太大，
+         否则手感会发黏。超过门限按比例输出 -1~1。 */
+      if(d>2){ P.joyX=dx/max; P.joyY=dy/max; }
+      else { P.joyX=0; P.joyY=0; }
+      if(window.__joyTouch){ window.__joyTouch.cx=cx; window.__joyTouch.cy=cy; window.__joyTouch.active=true; }
     };
 
     const endJoy=()=>{
@@ -141,22 +165,38 @@ function bindUI(){
     };
 
     joyZone.addEventListener('touchstart',e=>{
-      if(activeId!==null) return;
+      /* 已经在拖时不再重置起点（见上面 startJoy 的说明） */
       const t=e.changedTouches[0]; if(!t) return;
       startJoy(t.clientX,t.clientY);
       const tip=$('htip');
       if(tip){ tip.classList.remove('hide'); tip.textContent='🎮 摇杆已激活 · 拖动移动'; }
       e.preventDefault();
     }, {passive:false});
-
     joyZone.addEventListener('touchmove',e=>{
       if(activeId===null) return;
       const t=e.changedTouches[0]; if(!t) return;
       moveJoy(t.clientX,t.clientY);
       e.preventDefault();
     }, {passive:false});
-
-    joyZone.addEventListener('touchend',e=>{ endJoy(); },{passive:true});
+    /* 【按住期间被系统吞掉 touchend 的兜底】
+       如果 WebView 在手指仍按着时发了 touchend、却没有后续 touchstart，
+       会出现「手指仍在动、却收不到 move」的僵死状态。
+       用一个定时器在 touchend 后 250ms 检查：期间没有任何 move，
+       才真正结束摇杆，否则把它当作误报忽略。 */
+    let endTimer=null;
+    const softEnd=()=>{
+      if(endTimer) clearTimeout(endTimer);
+      const t0=window.__joyTouch?window.__joyTouch.t0:0;
+      const mv=window.__evtMove||0;
+      endTimer=setTimeout(()=>{
+        if((window.__evtMove||0)!==mv && Date.now()-(window.__joyTouch.t0||0)<2000){
+          // 期间还有 move，说明是误报的 touchend，保持按住状态
+          return;
+        }
+        endJoy();
+      }, 250);
+    };
+    joyZone.addEventListener('touchend',e=>{ softEnd(); },{passive:true});
     joyZone.addEventListener('touchcancel',e=>{ endJoy(); },{passive:true});
 
     /* 桌面调试用：鼠标拖左半屏也能触发摇杆，方便在电脑上验证移动逻辑 */

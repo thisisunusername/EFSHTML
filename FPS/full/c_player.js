@@ -63,10 +63,9 @@ function updP(dt){
     const t=window.__joyTouch;
     let dx=t.cx-t.sx, dy=t.cy-t.sy;
     const max=48, d=Math.hypot(dx,dy);
-    if(d>6){
+    if(d>2){
       if(d>max){ dx*=max/d; dy*=max/d; }
       mx=dx/max; mz=dy/max;
-      P.joyX=mx; P.joyY=mz;
     }
   }
 
@@ -122,6 +121,7 @@ function updP(dt){
       'joy='+(P.joyX||0).toFixed(2)+','+(P.joyY||0).toFixed(2)+'\n'+
       'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
       'pos='+P.pos.x.toFixed(1)+','+P.pos.z.toFixed(1)+'\n'+
+      'MS '+JSON.stringify(window.__lastStart||0)+'→'+JSON.stringify(window.__lastMove||0)+'\n'+
       'touch='+(t.active?'Y':'N');
   }
 }

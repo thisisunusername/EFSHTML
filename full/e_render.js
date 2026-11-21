@@ -92,12 +92,13 @@ function computeView(){
   padBot = (CH>620) ? 190 : 172;
   viewH = Math.max(140, CH-padTop-padBot);
 
-  /* 视口大约显示 18 格：回合制下要能看清敌人的走位 */
-  var tiles = 18;
+  /* 视口大约显示多少格：回合制下要能看清敌人的走位
+     回合制把视野放宽到 24 格，地图看起来更大、能提前看到远处的巡逻路线 */
+  var tiles = 24;
   /* 经典模式：格子保持看得清（13 格视野），相机跟随玩家 */
   if(S.mode2==='classic'){ tiles = 13; }
   scale = Math.min(CW/tiles, viewH/tiles);
-  scale = Math.max(12, Math.min(scale, 34));
+  scale = Math.max(10, Math.min(scale, 34));
   S._scale = scale;
   return f;
 }

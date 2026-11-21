@@ -723,10 +723,11 @@ function runEnemyTurn(){
   if(S.mode!=='play') return;
   S.needEnemyTurn=false;
 
-  /* 1) 记下每个敌人回合开始的位置与楼层 */
+  /* 1) 记下每个敌人回合开始的位置与楼层，并重置本回合的移动预算 */
   var froms=[];
   for(var i=0;i<S.npcs.length;i++){
     var n0=S.npcs[i];
+    n0.budget=0;                 /* 每回合重新分配格数预算 */
     froms.push({n:n0, x:n0.x, y:n0.y, floor:n0.floor});
   }
 
@@ -813,16 +814,41 @@ function setPath(n,f,tx,ty){
 function moveNpc(n,dt){
   var f=W[n.floor];
   if(!f || !n.path || n.path.length===0) return;
-  var t=n.path[0];
-  var gx=t.x+0.5, gy=t.y+0.5;
-  var dx=gx-n.x, dy=gy-n.y;
-  var d=Math.sqrt(dx*dx+dy*dy);
-  if(d<0.07){ n.path.shift(); return; }
-  var sp=n.speed*dt;
-  if(sp>d) sp=d;
-  n.x+=dx/d*sp;
-  n.y+=dy/d*sp;
-  n.dir=Math.atan2(dy,dx);
+
+  /* 回合制：玩家一回合走 1 格，NPC 也必须按「格」推进，而不是按秒。
+     dt 是这一回合的等效秒数（ENEMY_TURN）。换算成可推进的格数：
+     速度 1.95 格/秒 × 0.5 秒 ≈ 0.98 格 → 四舍五入到 1 格。
+     用 n.budget 保存本回合剩余的可推进格数，跨格连续消耗，
+     不足 1 格的部分累积到下一回合，避免「每回合只挪一点点」。 */
+  if(n.budget===undefined || n.budget<=0){
+    n.budget = Math.max(1, Math.round(n.speed * dt));
+  }
+
+  var guard=0;
+  while(n.budget>0 && n.path && n.path.length>0 && guard<16){
+    guard++;
+    var t=n.path[0];
+    var gx=t.x+0.5, gy=t.y+0.5;
+    var dx=gx-n.x, dy=gy-n.y;
+    var d=Math.sqrt(dx*dx+dy*dy);
+    if(d<0.001){ n.path.shift(); continue; }   /* 已在格心，吃掉这个点 */
+
+    if(n.budget>=d){
+      /* 本回合还有足够预算走到格心 → 直接落到格心并消耗一个路径点 */
+      n.x=gx; n.y=gy;
+      n.dir=Math.atan2(dy,dx);
+      n.budget-=d;
+      n.path.shift();
+    } else {
+      /* 预算不够走完这一格 → 按预算推进一段（通常是刚好一格的情况） */
+      var sp=n.budget;
+      n.x+=dx/d*sp;
+      n.y+=dy/d*sp;
+      n.dir=Math.atan2(dy,dx);
+      n.budget=0;
+    }
+  }
+  if(n.budget<0.05) n.budget=0;
 }
 
 function updateNpcs(dt){

@@ -436,8 +436,45 @@ var CUSTOM_FIELDS = [
   { k:'btn',     n:'按钮底',   d:'#1e2c42' },
   { k:'btnText', n:'按钮字',   d:'#dceaff' }
 ];
+/* ================= 自定义字体 =================
+   font: { family:'system|mono|serif|round|hand|zw|ms|zk|lc', title:28, body:13, btn:14 }
+   跟颜色一起存在同一个 CUSTOM_THEME.v1 配置里。
+*/
+var FONT_FAMILY = {
+  system: { name:'系统默认', css:'-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif' },
+  mono:   { name:'等宽',     css:'"JetBrains Mono","Cascadia Mono",Consolas,"Noto Sans Mono",monospace' },
+  serif:  { name:'衬线',     css:'Georgia,"Songti SC","SimSun","Noto Serif SC",serif' },
+  round:  { name:'圆体',     css:'"Yuanti SC","Hiragino Sans GB","Microsoft YaHei",sans-serif' },
+  hand:   { name:'手写',     css:'"Kaiti SC","STKaiti",KaiTi,"Noto Serif SC",cursive' },
+  zw:     { name:'站酷小薇', css:'"ZCOOLXiaoWei","PingFang SC",sans-serif' },
+  ms:     { name:'马善政楷', css:'"MaShanZheng","PingFang SC",cursive' },
+  zk:     { name:'站酷快乐', css:'"ZCOOLKuaiLe","PingFang SC",sans-serif' },
+  lc:     { name:'龙藏体',   css:'"LongCang","PingFang SC",cursive' }
+};
+var FONT_ORDER = ['system','mono','serif','round','hand','zw','ms','zk','lc'];
+var FONT_LIMITS = {
+  title: { min:14, max:48, step:1, def:28, n:'标题字号' },
+  body:  { min:9,  max:24, step:1, def:13, n:'正文字号' },
+  btn:   { min:10, max:26, step:1, def:14, n:'按钮字号' }
+};
+function fontDefaults(){
+  return { family:'system', title:28, body:13, btn:14 };
+}
+function fontClampSize(k,v){
+  var lim=FONT_LIMITS[k];
+  if(!lim) return null;
+  var n=parseInt(v,10);
+  if(isNaN(n)) return lim.def;
+  if(n<lim.min) n=lim.min;
+  if(n>lim.max) n=lim.max;
+  return n;
+}
+function fontNormFamily(v){
+  var s=String(v||'').toLowerCase();
+  return FONT_FAMILY[s] ? s : 'system';
+}
 function customDefaults(){
-  var o={ v:1, name:'我的主题', ui:{} };
+  var o={ v:1, name:'我的主题', ui:{}, font:fontDefaults() };
   for(var i=0;i<CUSTOM_FIELDS.length;i++) o.ui[CUSTOM_FIELDS[i].k]=CUSTOM_FIELDS[i].d;
   return o;
 }
@@ -472,12 +509,18 @@ function customParse(raw){
   try{ o=(typeof raw==='string')? JSON.parse(raw) : raw; }catch(e){ return null; }
   if(!o || typeof o!=='object') return null;
   var base=customDefaults();
-  var out={ v:1, name:String(o.name||base.name).slice(0,32), ui:{} };
+  var out={ v:1, name:String(o.name||base.name).slice(0,32), ui:{}, font:fontDefaults() };
   var src=o.ui||o;
   for(var i=0;i<CUSTOM_FIELDS.length;i++){
     var f=CUSTOM_FIELDS[i];
     var v=customNormHex(src[f.k]);
     out.ui[f.k]= v||base.ui[f.k];
+  }
+  if(o.font && typeof o.font==='object'){
+    out.font.family = fontNormFamily(o.font.family);
+    out.font.title  = fontClampSize('title', o.font.title);
+    out.font.body   = fontClampSize('body',  o.font.body);
+    out.font.btn    = fontClampSize('btn',   o.font.btn);
   }
   return out;
 }
@@ -515,6 +558,12 @@ function customApply(){
     root.style.setProperty('--cf-line', ui.line);
     root.style.setProperty('--cf-btn', ui.btn);
     root.style.setProperty('--cf-btnText', ui.btnText);
+    var fo=customGet().font;
+    root.style.setProperty('--cf-font', FONT_FAMILY[fo.family].css);
+    root.style.setProperty('--cf-fontName', FONT_FAMILY[fo.family].name);
+    root.style.setProperty('--cf-titleSize', fo.title+'px');
+    root.style.setProperty('--cf-bodySize',  fo.body+'px');
+    root.style.setProperty('--cf-btnSize',   fo.btn+'px');
   }
   var body=document.body;
   if(body && body.classList){
@@ -536,6 +585,92 @@ function customReset(){
   customRenderUI();
   toast('已恢复自定义主题默认值');
 }
+/* ================= 导入导出与字体 ================= */
+function customSetFont(k,v){
+  if(k==='family'){
+    customGet().font.family=fontNormFamily(v);
+  } else {
+    var s=fontClampSize(k,v);
+    if(s===null) return false;
+    customGet().font[k]=s;
+  }
+  customSave();
+  customApply();
+  /* 只同步按钮高亮，不重建 DOM —— 重建会让拖动中的滑块失焦、断掉 */
+  var box=document.getElementById('custBox');
+  if(box){
+    var fbs=box.querySelectorAll('.custFonts button');
+    for(var i=0;i<fbs.length;i++){
+      var fk=fbs[i].getAttribute('data-cft');
+      if(fk===customGet().font.family) fbs[i].classList.add('on');
+      else fbs[i].classList.remove('on');
+    }
+  }
+  return true;
+}
+function customCopyConfig(){
+  var txt=customSerialize(true);
+  var ta=document.getElementById('custIOText');
+  if(ta) ta.value=txt;
+  /* 优先 Clipboard API，失败回退到选中 textarea */
+  var done=false;
+  try{
+    if(navigator && navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt);
+      done=true;
+      toast('配置已复制到剪贴板');
+    }
+  }catch(e){ done=false; }
+  if(!done && ta){
+    try{ ta.focus(); ta.select(); document.execCommand('copy'); toast('配置已复制'); done=true; }catch(e){}
+  }
+  if(!done) toast('已生成配置，请手动长按文本框全选复制');
+  return txt;
+}
+function customExportFile(){
+  var txt=customSerialize(true);
+  try{
+    var blob=new Blob([txt],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download='efs-theme-'+Date.now()+'.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); if(a.parentNode) a.parentNode.removeChild(a); },1500);
+    toast('配置文件已导出');
+  }catch(e){
+    /* 不支持 Blob 下载时退化为复制 */
+    customCopyConfig();
+    toast('此浏览器不支持下载，已复制到文本框');
+  }
+}
+function customImportText(raw){
+  var ta=document.getElementById('custIOText');
+  var txt=(raw===undefined)? (ta? ta.value : '') : String(raw);
+  txt=String(txt||'').trim();
+  if(!txt){ toast('请先粘贴配置 JSON'); return false; }
+  var o=customParse(txt);
+  if(!o){ toast('配置解析失败：不是合法 JSON'); return false; }
+  CUSTOM_THEME=o;
+  THEME.custom=true;
+  customSave();
+  themeSave();
+  themeApply();
+  customRenderUI();
+  toast('配置已导入并启用');
+  return true;
+}
+function customImportFile(file){
+  if(!file) return false;
+  try{
+    var fr=new FileReader();
+    fr.onload=function(){ customImportText(fr.result); };
+    fr.readAsText(file);
+    return true;
+  }catch(e){ toast('读取文件失败'); return false; }
+}
+/* ================= 自定义字体配置 ================= */
 
 function customRenderUI(){
   var box=document.getElementById('custBox');
@@ -551,6 +686,20 @@ function customRenderUI(){
       '<input type="color" class="custPick" id="cust_'+f.k+'" value="'+o.ui[f.k]+'">'+
       '<input type="text" class="custHex" id="custHex_'+f.k+'" value="'+o.ui[f.k]+'" maxlength="7" spellcheck="false">'+
       '</div>';
+  }
+  html+='<div class="custLabel">字体</div>';
+  html+='<div class="custRow"><span class="custName">字体族</span><div class="custFonts">';
+  for(var fi=0;fi<FONT_ORDER.length;fi++){
+    var fk=FONT_ORDER[fi];
+    html+='<button type="button" data-cft='+fk+' class='+(o.font.family===fk?'on':'')+'>'+FONT_FAMILY[fk].name+'</button>';
+  }
+  html+='</div></div>';
+  var sizeKeys=['title','body','btn'];
+  for(var si=0;si<sizeKeys.length;si++){
+    var sk=sizeKeys[si]; var lim=FONT_LIMITS[sk];
+    html+='<div class="custRow"><span class="custName">'+lim.n+'</span>'
+      +'<input type="range" class="custRange" id="custFs_'+sk+'" min='+lim.min+' max='+lim.max+' step='+lim.step+' value='+o.font[sk]+'>'
+      +'<span class="custVal" id="custFv_'+sk+'">'+o.font[sk]+'</span></div>';
   }
   html+='<div class="custRow"><span class="custName">预设</span><div class="custPresets">';
   html+='<button data-cp="dark">深色</button>';
@@ -611,7 +760,8 @@ function customBindUI(){
     })(CUSTOM_FIELDS[i]);
   }
   /* 字体族 */
-  var fbs=document.querySelectorAll('#custBox .custFonts button');
+  var box=document.getElementById('custBox');
+  var fbs=box.querySelectorAll('.custFonts button');
   for(var fi=0;fi<fbs.length;fi++){
     (function(b){ b.onclick=function(){ customSetFont('family', b.getAttribute('data-cft')); }; })(fbs[fi]);
   }

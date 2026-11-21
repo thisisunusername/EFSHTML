@@ -149,7 +149,7 @@ function syncWeapon(){
   wsk.rifle.visible=hasGun;
 }
 
-/* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 */
+/* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 */
 function updWeapon(dt){
   if(!weaponRoot||!wsk) return;
 
@@ -157,13 +157,21 @@ function updWeapon(dt){
   const wantRifle=!!(P&&P.inv&&P.inv.gun);
   if(wsk.rifle.visible!==wantRifle) syncWeapon();
 
-  // 走路晃动（速度越快幅度越大）
   const spd=Math.hypot(P.vel.x,P.vel.z);
   const moving=spd>0.5&&P.onGround;
-  wBobT+=dt*(moving?spd*1.6:0);
+  const sprinting=P.sprinting&&moving;
+
+  // 平滑过渡系数（避免姿态突变）
+  const k=Math.min(1,dt*10);
+  wSprint = wSprint===undefined?0:wSprint+( (sprinting?1:0) - wSprint )*k;
+  wAds = wAds===undefined?0:wAds;
+
+  // 走路晃动：冲刺时频率和幅度都加大
+  wBobT+=dt*(moving?spd*(sprinting?2.1:1.6):0);
   const bobAmt=moving?Math.min(spd/10,1):0;
-  const bobX=Math.sin(wBobT)*0.012*bobAmt;
-  const bobY=Math.abs(Math.cos(wBobT))*0.010*bobAmt;
+  const bobScale=sprinting?1.85:1;
+  const bobX=Math.sin(wBobT)*0.012*bobAmt*bobScale;
+  const bobY=Math.abs(Math.cos(wBobT))*0.010*bobAmt*bobScale;
 
   // 开火后坐力衰减
   if(wRecoil>0) wRecoil=Math.max(0,wRecoil-dt*6);
@@ -171,13 +179,19 @@ function updWeapon(dt){
   const reloadDip=P.reload?0.09:0;
   const reloadRot=P.reload?0.5:0;
 
-  weaponRoot.position.x=0.19+bobX;
-  weaponRoot.position.y=-0.17-bobY-wRecoil*0.03-reloadDip;
-  weaponRoot.position.z=-0.38+wRecoil*0.06;
+  // ===== 奔跑姿态：枪身放低、向内倾斜、上下颠 =====
+  // 右手枪判断（冲刺时把枪压低并向左收）
+  const s=wSprint;
+  const bobRun=Math.sin(wBobT*1.0)*0.028*s;
 
-  weaponRoot.rotation.x=wRecoil*0.16+reloadRot*0.35;
-  weaponRoot.rotation.z=Math.sin(wBobT*0.5)*0.02*bobAmt+reloadRot*0.25;
-  weaponRoot.rotation.y=(P.reload?0.3:0);
+  weaponRoot.position.x=(0.19+bobX) - 0.055*s;
+  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun;
+  weaponRoot.position.z=(-0.38+wRecoil*0.06) + 0.055*s;
+
+  // 奔跑时枪口朝左下压，形成「抱着枪跑」的观感
+  weaponRoot.rotation.x=wRecoil*0.16 + reloadRot*0.35 + 0.42*s;
+  weaponRoot.rotation.z=Math.sin(wBobT*0.5)*0.02*bobAmt + reloadRot*0.25 + 0.30*s;
+  weaponRoot.rotation.y=(P.reload?0.3:0) + 0.22*s;
 }
 
 /* 开火时调用：给模型加后坐 */

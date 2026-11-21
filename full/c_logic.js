@@ -821,7 +821,12 @@ function moveNpc(n,dt){
      用 n.budget 保存本回合剩余的可推进格数，跨格连续消耗，
      不足 1 格的部分累积到下一回合，避免「每回合只挪一点点」。 */
   if(n.budget===undefined || n.budget<=0){
-    n.budget = Math.max(1, Math.round(n.speed * dt));
+    /* 按速度换算可推进格数。
+       原写法 Math.max(1, Math.round(speed*dt)) 会让速度参数完全失效：
+       speed=1.95、dt=0.5 → round(0.975)=1，speed=0.85 算出来也是 1，
+       所以所有难度下老师都变成「每回合固定一格」，感官上就是飞快且无差别。
+       改为严格按 speed*dt 累积余量，慢速才真的慢。 */
+    n.budget = (n.budget||0) + n.speed * dt;
   }
 
   var guard=0;

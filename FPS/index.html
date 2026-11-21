@@ -828,43 +828,60 @@ function bindUI(){
   // 触屏摇杆（Pointer Events，整块左半屏可拖）
   const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   if(joyZone&&joyBase&&joyStick){
-    let jId=null, jx=0, jy=0;
+    let jId=null, jx=0, jy=0, r0=null;
+
     const startJoy=(t)=>{
-      const r=joyBase.getBoundingClientRect();
+      r0=joyBase.getBoundingClientRect();
       jx=t.clientX; jy=t.clientY;
-      joyBase.style.left=(t.clientX-r.width/2)+'px';
-      joyBase.style.top=(t.clientY-r.height/2)+'px';
+      // 摇杆跟着手指出现在按下处
+      joyBase.style.left=(t.clientX-r0.width/2)+'px';
+      joyBase.style.top=(t.clientY-r0.height/2)+'px';
       joyBase.style.bottom='auto';
       joyBase.style.display='block';
+      joyStick.style.transform='translate(-50%,-50%)';
       jId=t.pointerId;
-      touchMoveX=0; touchMoveY=0;
+      P.joyX=0; P.joyY=0;
     };
+
+    const moveJoy=(t)=>{
+      let dx=t.clientX-jx, dy=t.clientY-jy;
+      const max=48, d=Math.hypot(dx,dy);
+      if(d>max){ dx*=max/d; dy*=max/d; }
+      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      P.joyX=dx/max; P.joyY=dy/max;
+    };
+
+    const endJoy=()=>{
+      jId=null; P.joyX=0; P.joyY=0;
+      joyStick.style.transform='translate(-50%,-50%)';
+      joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
+    };
+
     joyZone.addEventListener('pointerdown',e=>{
       if(jId!==null) return;
       startJoy(e);
       try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
       const t=$('htip');
-      if(t){ t.classList.remove('hide'); t.textContent='🎮 摇杆已激活 · 拖动移动（松手停止）'; }
+      if(t){ t.classList.remove('hide'); t.textContent='🎮 摇杆已激活 · 拖动移动'; }
       e.preventDefault();
-    });
+    }, {passive:false});
+
     joyZone.addEventListener('pointermove',e=>{
       if(e.pointerId!==jId) return;
-      let dx=e.clientX-jx, dy=e.clientY-jy;
-      const max=48, d=Math.hypot(dx,dy);
-      if(d>max){ dx*=max/d; dy*=max/d; }
-      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      P.joyX=dx/max; P.joyY=dy/max;
+      moveJoy(e);
       e.preventDefault();
+    }, {passive:false});
+
+    // 只在真正抬起/取消时结束；不要用 pointerleave（会被 capture 干扰）
+    joyZone.addEventListener('pointerup',e=>{
+      if(e.pointerId===jId) endJoy();
     });
-    const endJoy=(e)=>{
-      if(jId!==null && e && e.pointerId!==jId) return;
-      jId=null; P.joyX=0; P.joyY=0;
-      joyStick.style.transform='translate(-50%,-50%)';
-      joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
-    };
-    joyZone.addEventListener('pointerup',endJoy);
-    joyZone.addEventListener('pointercancel',endJoy);
-    joyZone.addEventListener('pointerleave',endJoy);
+    joyZone.addEventListener('pointercancel',e=>{
+      if(e.pointerId===jId) endJoy();
+    });
+    // 兜底：所有指针抬起都清理
+    addEventListener('pointerup',e=>{ if(e.pointerId===jId) endJoy(); });
+    addEventListener('pointercancel',e=>{ if(e.pointerId===jId) endJoy(); });
   }
 
   // 移动端操作按钮
@@ -1093,7 +1110,7 @@ function syncWeapon(){
   wsk.rifle.visible=hasGun;
 }
 
-/* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 */
+/* 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 */
 function updWeapon(dt){
   if(!weaponRoot||!wsk) return;
 
@@ -1101,13 +1118,21 @@ function updWeapon(dt){
   const wantRifle=!!(P&&P.inv&&P.inv.gun);
   if(wsk.rifle.visible!==wantRifle) syncWeapon();
 
-  // 走路晃动（速度越快幅度越大）
   const spd=Math.hypot(P.vel.x,P.vel.z);
   const moving=spd>0.5&&P.onGround;
-  wBobT+=dt*(moving?spd*1.6:0);
+  const sprinting=P.sprinting&&moving;
+
+  // 平滑过渡系数（避免姿态突变）
+  const k=Math.min(1,dt*10);
+  wSprint = wSprint===undefined?0:wSprint+( (sprinting?1:0) - wSprint )*k;
+  wAds = wAds===undefined?0:wAds;
+
+  // 走路晃动：冲刺时频率和幅度都加大
+  wBobT+=dt*(moving?spd*(sprinting?2.1:1.6):0);
   const bobAmt=moving?Math.min(spd/10,1):0;
-  const bobX=Math.sin(wBobT)*0.012*bobAmt;
-  const bobY=Math.abs(Math.cos(wBobT))*0.010*bobAmt;
+  const bobScale=sprinting?1.85:1;
+  const bobX=Math.sin(wBobT)*0.012*bobAmt*bobScale;
+  const bobY=Math.abs(Math.cos(wBobT))*0.010*bobAmt*bobScale;
 
   // 开火后坐力衰减
   if(wRecoil>0) wRecoil=Math.max(0,wRecoil-dt*6);
@@ -1115,13 +1140,19 @@ function updWeapon(dt){
   const reloadDip=P.reload?0.09:0;
   const reloadRot=P.reload?0.5:0;
 
-  weaponRoot.position.x=0.19+bobX;
-  weaponRoot.position.y=-0.17-bobY-wRecoil*0.03-reloadDip;
-  weaponRoot.position.z=-0.38+wRecoil*0.06;
+  // ===== 奔跑姿态：枪身放低、向内倾斜、上下颠 =====
+  // 右手枪判断（冲刺时把枪压低并向左收）
+  const s=wSprint;
+  const bobRun=Math.sin(wBobT*1.0)*0.028*s;
 
-  weaponRoot.rotation.x=wRecoil*0.16+reloadRot*0.35;
-  weaponRoot.rotation.z=Math.sin(wBobT*0.5)*0.02*bobAmt+reloadRot*0.25;
-  weaponRoot.rotation.y=(P.reload?0.3:0);
+  weaponRoot.position.x=(0.19+bobX) - 0.055*s;
+  weaponRoot.position.y=(-0.17-bobY-wRecoil*0.03-reloadDip) - 0.075*s + bobRun;
+  weaponRoot.position.z=(-0.38+wRecoil*0.06) + 0.055*s;
+
+  // 奔跑时枪口朝左下压，形成「抱着枪跑」的观感
+  weaponRoot.rotation.x=wRecoil*0.16 + reloadRot*0.35 + 0.42*s;
+  weaponRoot.rotation.z=Math.sin(wBobT*0.5)*0.02*bobAmt + reloadRot*0.25 + 0.30*s;
+  weaponRoot.rotation.y=(P.reload?0.3:0) + 0.22*s;
 }
 
 /* 开火时调用：给模型加后坐 */

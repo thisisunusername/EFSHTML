@@ -8,10 +8,10 @@ var SIGHT_STEP = 3;          /* 视线采样密度 */
 /* 坐标约定：格子(ix,iy)的中心 = (ix+0.5, iy+0.5) */
 
 var DIFF = {
-  easy:   {name:'简单',   guards:0, tspeed:1.7, gspeed:1.5, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
-  normal: {name:'普通',   guards:1, tspeed:1.95, gspeed:1.7, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
-  hard:   {name:'困难',   guards:2, tspeed:2.25, gspeed:1.95, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
-  hell:   {name:'地狱',   guards:3, tspeed:2.55, gspeed:2.2, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
+  easy:   {name:'简单',   guards:0, tspeed:0.70, gspeed:0.62, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
+  normal: {name:'普通',   guards:1, tspeed:0.85, gspeed:0.75, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
+  hard:   {name:'困难',   guards:2, tspeed:1.05, gspeed:0.92, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
+  hell:   {name:'地狱',   guards:3, tspeed:1.25, gspeed:1.08, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
 };
 
 var ITEM = {

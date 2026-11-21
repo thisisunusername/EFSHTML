@@ -383,6 +383,28 @@ html[data-lang="en"] #bagBtn span{
     align-items:center; justify-content:center; padding:16px;
     background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px); }
+  /* 【改枪台缺样式】
+     #gunsmith 从加入改枪系统那天起就没有任何 CSS —— 它和早期的 #shop 一样，
+     只是文档流里的一个普通 <div>。toggleGunsmith() 把 display 设成 flex 后，
+     内容被画在页面末尾、被 #menu(100) / #hud(10) / #death(90) 这些层完整盖住，
+     功能其实执行了，但屏幕上什么也看不见 —— 表现就是「改枪台点了没反应」。
+     这里给它和商店、仓库完全一致的全屏遮罩 + 高 z-index。 */
+  #gunsmith{ position:fixed; inset:0; z-index:210; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    touch-action:auto; pointer-events:auto; }
+  #gunsmith .box{ width:100%; max-width:640px; max-height:88vh;
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
+  #gunsmith .box::-webkit-scrollbar{ width:8px; }
+  #gunsmith .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  #gunsmith h1{ font-size:19px; margin-bottom:4px; }
+  /* 改枪台的关闭按钮在筛选栏里也要能点 */
+  #gunsmith .tab, #gunsmith .btn{ pointer-events:auto; }
   #shop .box, #bag .box{ width:100%; max-width:560px; max-height:88vh;
     overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
     background:var(--panel); border:1px solid rgba(255,255,255,.12);
@@ -395,6 +417,22 @@ html[data-lang="en"] #bagBtn span{
      表现就是「背包能打开，但格子一个都点不动」（其实根本没渲染出尺寸）。
      这里给 .stk 一个明确的高度来源。 */
   #bag .stk{ height:min(88vh, 620px); max-height:88vh; }
+  /* 【仓库同病】#stash 也是 flex 居中的全屏遮罩，.stk 里的 height:100%
+     同样没有确定的父高度可解析。局外仓库格子更多（左装备栏 + 右 8 列格），
+     高度给得比局内背包大一点。不加这条，#stash .stk 会按内容高度收缩，
+     右侧 .stkgrid 的 flex:1 拿不到剩余空间，格子区会被压得很矮甚至几乎不可见。 */
+  #stash .stk{ height:min(92vh, 760px); max-height:92vh;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; box-shadow:0 18px 50px rgba(0,0,0,.6); overflow-y:auto; }
+  /* 仓库 / 改枪台 / 商店的滚动区也要显式放开触摸滚动：
+     页面根节点为了防下拉刷新把 touch-action 收得很紧，
+     面板里如果继承到 none，手指划不动、看不到下面的东西，看起来就像「空的」。 */
+  #shop .box, #bag .stk, #stash .stk, #gunsmith .box{
+    touch-action:pan-y; -webkit-overflow-scrolling:touch; }
+  @media (max-height:520px){
+    #gunsmith .box, #shop .box, #bag .box{ max-height:94vh; padding:12px 14px; }
+    #stash .stk, #bag .stk{ height:94vh; max-height:94vh; }
+  }
   /* 面板必须自己吃掉触摸/鼠标事件，否则底下的视角拖拽层（#viewLayer, z-index:25）
      和摇杆会抢走手势，表现为「点在格子上没反应」或「点一下视角还转了」。
      touch-action 也要显式放开，不然滚动和点击会被浏览器当成手势丢掉。 */

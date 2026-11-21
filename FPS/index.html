@@ -383,6 +383,28 @@ html[data-lang="en"] #bagBtn span{
     align-items:center; justify-content:center; padding:16px;
     background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px); }
+  /* 【改枪台缺样式】
+     #gunsmith 从加入改枪系统那天起就没有任何 CSS —— 它和早期的 #shop 一样，
+     只是文档流里的一个普通 <div>。toggleGunsmith() 把 display 设成 flex 后，
+     内容被画在页面末尾、被 #menu(100) / #hud(10) / #death(90) 这些层完整盖住，
+     功能其实执行了，但屏幕上什么也看不见 —— 表现就是「改枪台点了没反应」。
+     这里给它和商店、仓库完全一致的全屏遮罩 + 高 z-index。 */
+  #gunsmith{ position:fixed; inset:0; z-index:210; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    touch-action:auto; pointer-events:auto; }
+  #gunsmith .box{ width:100%; max-width:640px; max-height:88vh;
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
+  #gunsmith .box::-webkit-scrollbar{ width:8px; }
+  #gunsmith .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  #gunsmith h1{ font-size:19px; margin-bottom:4px; }
+  /* 改枪台的关闭按钮在筛选栏里也要能点 */
+  #gunsmith .tab, #gunsmith .btn{ pointer-events:auto; }
   #shop .box, #bag .box{ width:100%; max-width:560px; max-height:88vh;
     overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
     background:var(--panel); border:1px solid rgba(255,255,255,.12);
@@ -395,6 +417,22 @@ html[data-lang="en"] #bagBtn span{
      表现就是「背包能打开，但格子一个都点不动」（其实根本没渲染出尺寸）。
      这里给 .stk 一个明确的高度来源。 */
   #bag .stk{ height:min(88vh, 620px); max-height:88vh; }
+  /* 【仓库同病】#stash 也是 flex 居中的全屏遮罩，.stk 里的 height:100%
+     同样没有确定的父高度可解析。局外仓库格子更多（左装备栏 + 右 8 列格），
+     高度给得比局内背包大一点。不加这条，#stash .stk 会按内容高度收缩，
+     右侧 .stkgrid 的 flex:1 拿不到剩余空间，格子区会被压得很矮甚至几乎不可见。 */
+  #stash .stk{ height:min(92vh, 760px); max-height:92vh;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; box-shadow:0 18px 50px rgba(0,0,0,.6); overflow-y:auto; }
+  /* 仓库 / 改枪台 / 商店的滚动区也要显式放开触摸滚动：
+     页面根节点为了防下拉刷新把 touch-action 收得很紧，
+     面板里如果继承到 none，手指划不动、看不到下面的东西，看起来就像「空的」。 */
+  #shop .box, #bag .stk, #stash .stk, #gunsmith .box{
+    touch-action:pan-y; -webkit-overflow-scrolling:touch; }
+  @media (max-height:520px){
+    #gunsmith .box, #shop .box, #bag .box{ max-height:94vh; padding:12px 14px; }
+    #stash .stk, #bag .stk{ height:94vh; max-height:94vh; }
+  }
   /* 面板必须自己吃掉触摸/鼠标事件，否则底下的视角拖拽层（#viewLayer, z-index:25）
      和摇杆会抢走手势，表现为「点在格子上没反应」或「点一下视角还转了」。
      touch-action 也要显式放开，不然滚动和点击会被浏览器当成手势丢掉。 */
@@ -4323,7 +4361,12 @@ function bindUI(){
     if(e.code==='KeyD'&&!e.repeat){ if(typeof gmHitD==='function') gmHitD(); }
     /* X = 循环切枪，懒得记槽位时用 */
     if(e.code==='KeyX'&&!e.repeat) cycleSlot();
-    if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
+    if(e.code==='Escape'){
+      /* 以前这里只关商店和背包，仓库/改枪台按 Esc 关不掉，
+         只能去找那个小小的关闭按钮。四个一起关。 */
+      const closeAll=['shop','bag','stash','gunsmith'];
+      for(const _id of closeAll){ const _el=$(_id); if(_el) _el.style.display='none'; }
+    }
   });
   addEventListener('keyup',e=>{
     P.keys[e.code]=false;
@@ -5165,9 +5208,18 @@ function toggleGunsmith(){
   const s=$('gunsmith'); if(!s) return;
   const opening = s.style.display!=='flex';
   if(opening){
-    const list=ownedWeapons();
-    if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
-    buildGunsmith(); s.style.display='flex';
+    /* 同上：先开面板再 build。改枪台以前连 CSS 都没有，
+       就算 build 成功内容也是画在页面末尾被 #menu 盖住，
+       现在样式补上了，这里再把「先 visible 后填充」的保险也加上。 */
+    s.style.display='flex';
+    closeShop(); closeBag(); closeStash();
+    try{
+      const list=ownedWeapons();
+      if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
+      buildGunsmith();
+    }
+    catch(e){ console.error('buildGunsmith failed', e);
+      s.innerHTML='<div class="box"><h1>改枪台</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
   }else s.style.display='none';
 }
 function closeGunsmith(){ const s=$('gunsmith'); if(s) s.style.display='none'; }
@@ -5292,7 +5344,19 @@ function bindGunsmith(){
 function toggleShop(){
   const s=$('shop'); if(!s) return;
   const opening = s.style.display!=='flex';
-  if(opening){ buildShop(); s.style.display='flex'; }
+  if(opening){
+    /* 【先开面板，再填内容】
+       以前的顺序是 buildShop() 然后才 display='flex'。
+       buildShop 里只要有任何一句抛错（数据缺字段、某个 id 没定义……），
+       display 那一行就永远执行不到 —— 表现就是「点商店毫无反应」。
+       现在先让面板可见，build 失败也只是空面板 + 控制台报错，
+       不会再出现「按了没动静」这种完全无从下手的状态。 */
+    s.style.display='flex';
+    closeBag(); closeStash(); closeGunsmith();
+    try{ buildShop(); }
+    catch(e){ console.error('buildShop failed', e);
+      s.innerHTML='<div class="box"><h1>商店</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
+  }
   else s.style.display='none';
 }
 function closeShop(){ const s=$('shop'); if(s) s.style.display='none'; }
@@ -5460,13 +5524,23 @@ function buyItem(id){
 function toggleStash(){
   const el=$('stash'); if(!el) return;
   const opening = el.style.display!=='flex';
+  /* 【先开面板，再填内容】
+     和 toggleShop 同一个坑：buildStashNew 抛错 -> display 不执行 -> 点了没反应。
+     buildStashNew 有两百多行、要碰 P.stash/P.pouch/SHOP_ITEMS/GUN_MODS，
+     任何一个数据异常都会让整个仓库打不开。现在面板先亮起来，
+     build 出错时把错误直接显示在面板里，玩家能看到、我们也能定位。 */
   if(opening){
+    el.style.display='flex';
+    closeShop(); closeBag(); closeGunsmith();
     /* 每次打开仓库顺手修一次 looted 账本（见 clampLooted 注释），
        并重置卖出模式 —— 否则上次点开卖出没确认就退出，
        下次进来还是选择模式，点格子不装备，玩家会以为仓库坏了。 */
     if(typeof clampLooted==='function') clampLooted();
     sellMode=false; sellSel={};
-    buildStashNew(); el.style.display='flex';
+    try{ buildStashNew(); }
+    catch(e){ console.error('buildStashNew failed', e);
+      el.innerHTML='<div class="stk"><div class="stkleft"><div class="stktitle">仓库</div>'
+        +'<div class="d">加载失败：'+(e&&e.message||e)+'</div></div></div>'; }
   }
   else el.style.display='none';
 }
@@ -5914,7 +5988,14 @@ function bindStashDrag(root){
 function toggleBag(){
   const b=$('bag'); if(!b) return;
   const opening = b.style.display!=='flex';
-  if(opening){ buildBagNew(); b.style.display='flex'; }
+  if(opening){
+    b.style.display='flex';
+    closeShop(); closeStash(); closeGunsmith();
+    try{ buildBagNew(); }
+    catch(e){ console.error('buildBagNew failed', e);
+      b.innerHTML='<div class="stk"><div class="stkleft"><div class="stktitle">背包</div>'
+        +'<div class="d">加载失败：'+(e&&e.message||e)+'</div></div></div>'; }
+  }
   else b.style.display='none';
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }

@@ -379,7 +379,12 @@ function bindUI(){
     if(e.code==='KeyD'&&!e.repeat){ if(typeof gmHitD==='function') gmHitD(); }
     /* X = 循环切枪，懒得记槽位时用 */
     if(e.code==='KeyX'&&!e.repeat) cycleSlot();
-    if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
+    if(e.code==='Escape'){
+      /* 以前这里只关商店和背包，仓库/改枪台按 Esc 关不掉，
+         只能去找那个小小的关闭按钮。四个一起关。 */
+      const closeAll=['shop','bag','stash','gunsmith'];
+      for(const _id of closeAll){ const _el=$(_id); if(_el) _el.style.display='none'; }
+    }
   });
   addEventListener('keyup',e=>{
     P.keys[e.code]=false;
@@ -1221,9 +1226,18 @@ function toggleGunsmith(){
   const s=$('gunsmith'); if(!s) return;
   const opening = s.style.display!=='flex';
   if(opening){
-    const list=ownedWeapons();
-    if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
-    buildGunsmith(); s.style.display='flex';
+    /* 同上：先开面板再 build。改枪台以前连 CSS 都没有，
+       就算 build 成功内容也是画在页面末尾被 #menu 盖住，
+       现在样式补上了，这里再把「先 visible 后填充」的保险也加上。 */
+    s.style.display='flex';
+    closeShop(); closeBag(); closeStash();
+    try{
+      const list=ownedWeapons();
+      if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
+      buildGunsmith();
+    }
+    catch(e){ console.error('buildGunsmith failed', e);
+      s.innerHTML='<div class="box"><h1>改枪台</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
   }else s.style.display='none';
 }
 function closeGunsmith(){ const s=$('gunsmith'); if(s) s.style.display='none'; }
@@ -1348,7 +1362,19 @@ function bindGunsmith(){
 function toggleShop(){
   const s=$('shop'); if(!s) return;
   const opening = s.style.display!=='flex';
-  if(opening){ buildShop(); s.style.display='flex'; }
+  if(opening){
+    /* 【先开面板，再填内容】
+       以前的顺序是 buildShop() 然后才 display='flex'。
+       buildShop 里只要有任何一句抛错（数据缺字段、某个 id 没定义……），
+       display 那一行就永远执行不到 —— 表现就是「点商店毫无反应」。
+       现在先让面板可见，build 失败也只是空面板 + 控制台报错，
+       不会再出现「按了没动静」这种完全无从下手的状态。 */
+    s.style.display='flex';
+    closeBag(); closeStash(); closeGunsmith();
+    try{ buildShop(); }
+    catch(e){ console.error('buildShop failed', e);
+      s.innerHTML='<div class="box"><h1>商店</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
+  }
   else s.style.display='none';
 }
 function closeShop(){ const s=$('shop'); if(s) s.style.display='none'; }
@@ -1516,13 +1542,23 @@ function buyItem(id){
 function toggleStash(){
   const el=$('stash'); if(!el) return;
   const opening = el.style.display!=='flex';
+  /* 【先开面板，再填内容】
+     和 toggleShop 同一个坑：buildStashNew 抛错 -> display 不执行 -> 点了没反应。
+     buildStashNew 有两百多行、要碰 P.stash/P.pouch/SHOP_ITEMS/GUN_MODS，
+     任何一个数据异常都会让整个仓库打不开。现在面板先亮起来，
+     build 出错时把错误直接显示在面板里，玩家能看到、我们也能定位。 */
   if(opening){
+    el.style.display='flex';
+    closeShop(); closeBag(); closeGunsmith();
     /* 每次打开仓库顺手修一次 looted 账本（见 clampLooted 注释），
        并重置卖出模式 —— 否则上次点开卖出没确认就退出，
        下次进来还是选择模式，点格子不装备，玩家会以为仓库坏了。 */
     if(typeof clampLooted==='function') clampLooted();
     sellMode=false; sellSel={};
-    buildStashNew(); el.style.display='flex';
+    try{ buildStashNew(); }
+    catch(e){ console.error('buildStashNew failed', e);
+      el.innerHTML='<div class="stk"><div class="stkleft"><div class="stktitle">仓库</div>'
+        +'<div class="d">加载失败：'+(e&&e.message||e)+'</div></div></div>'; }
   }
   else el.style.display='none';
 }
@@ -1970,7 +2006,14 @@ function bindStashDrag(root){
 function toggleBag(){
   const b=$('bag'); if(!b) return;
   const opening = b.style.display!=='flex';
-  if(opening){ buildBagNew(); b.style.display='flex'; }
+  if(opening){
+    b.style.display='flex';
+    closeShop(); closeStash(); closeGunsmith();
+    try{ buildBagNew(); }
+    catch(e){ console.error('buildBagNew failed', e);
+      b.innerHTML='<div class="stk"><div class="stkleft"><div class="stktitle">背包</div>'
+        +'<div class="d">加载失败：'+(e&&e.message||e)+'</div></div></div>'; }
+  }
   else b.style.display='none';
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }

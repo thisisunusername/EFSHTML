@@ -204,6 +204,11 @@ if(window.__uiBound) return; window.__uiBound=true;
   window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
   relayout();
   const start=$('btnPlay'); if(start) start.onclick=()=>{
+    /* 【开局前同步落盘一次】主菜单时期的所有改动（买东西、仓库整理、
+       改枪、换皮肤）到这一刻必须已经写进 localStorage 了。
+       进局之后 P 会被 init() 大改，再想存「出击前的配置」就晚了 ——
+       而且玩家进局后直接被杀进程，主菜单的改动会全部丢失。 */
+    try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(e){}
     $('menu').style.display='none';
     audioInit(); audioResume(); sfxUI();
     /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
@@ -246,7 +251,29 @@ if(window.__uiBound) return; window.__uiBound=true;
     if(sfxOn) sfxUI();
   };
   const exportBtn=$('btnExport'); if(exportBtn) exportBtn.onclick=exportSave;
-  const importBtn=$('btnImport'); if(importBtn) importBtn.onclick=importSave;
+  /* 【导入按钮】点击流程改成：
+       先亮出「📂 选择存档文件」那一行 —— 手机上从下载目录挑 json
+       比复制粘贴一大段省事得多；
+       如果设备根本弹不出文件选择器（老 WebView），再退回文本框粘贴。
+     exportSave/importSave 全程不问密码：加密导出用内置密钥，
+     导入先拿内置密钥试，解不开才问。 */
+  const importBtn=$('btnImport');
+  if(importBtn) importBtn.onclick=()=>{
+    const row=$('saveRow'), f=$('saveFile');
+    if(row) row.style.display='flex';
+    if(f){
+      f.value='';                 // 清掉上次选的文件，否则重新选同一个文件不会触发 change
+      /* 直接调 click()：靠 onchange 触发导入。不弹文件选择器时
+         什么也不会发生，下面的文本框兜底依然是可用的。 */
+      try{ f.click(); }catch(e){}
+    }
+    importSave();
+  };
+  /* 手动挑文件的入口（有些 WebView 会拦截程序化 click，必须靠用户真点一下按钮） */
+  const pickBtn=$('btnPickSave');
+  if(pickBtn) pickBtn.onclick=()=>{ const f=$('saveFile'); if(f) f.click(); };
+  const saveFileEl=$('saveFile');
+  if(saveFileEl) saveFileEl.onchange=()=>{ importSave(); };
   /* 【重置数据】以前只做 location.reload() —— 现在有了本地自动存档，
      重载后 autoSaveLoad() 会把旧档读回来，等于「重置完了还是原来的数据」。
      所以必须先清档再重载。 */
@@ -1732,6 +1759,10 @@ function buildStashNew(){
       /* 容量：物品本身占 1 格，一次放 1 个 */
       if(stashTake(id,1)){
         bagAdd(id,1);
+        /* 【以前这里没有 saveTick()】玩家把药、子弹、手雷从仓库点进
+           出击背包后直接关页面，这一格就丢了 —— 表现就是「没保存」。
+           放包和装备都是局外资产变动，一律立刻落盘。 */
+        saveTick();
         buildStashNew(); refreshHUD();
       }
     };

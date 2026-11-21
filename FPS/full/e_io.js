@@ -44,30 +44,163 @@ async function decryptSave(str,pw){
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
-function exportSave(){
-  const obj={hp:P.hp,armor:P.armor,ammo:P.ammo,inv:P.inv,cash:P.ammo.cash,pos:[P.pos.x,P.pos.z]};
-  const pw=prompt('设置存档密码：');
-  if(!pw) return;
-  encryptSave(obj,pw).then(s=>{
-    const t=$('savebox'); if(!t) return;
-    t.value=s; t.style.display='block';
-    t.select(); document.execCommand('copy');
-    alert('已加密并复制到剪贴板');
-  });
+/* ============================================================
+   【内置存档密钥】
+   用户要求：导出时不要让人设置密码 —— 否则玩家自己设的密码
+   写在同一份代码里，等于「加密/解密随便改明文」，一点保护都没有。
+   改成所有玩家共用一把内置密钥，藏在文件很靠前的位置，
+   导出时自动加密、导入时自动解密，玩家全程不需要知道密码。
+   这仍然是明文写在源码里（浏览器必须能看到密钥才能解密），
+   所以它防的是「随手改存档」，不是防会读源码的人 —— 这点必须说清楚。
+   ============================================================ */
+const SAVE_KEY_STR='AESeNcRypTeDNOtMyINsSTalL!*{}';
+/* 用密钥派生出一个稳定盐值：同一条存档在哪台机器都能解开，
+   所以盐不能随机（随机盐也必须一起存进存档串里，那样等于把
+   盐和密文放在一起，还不如直接用固定盐简单可靠）。
+   GCM 的 IV 仍然是随机的 —— 那是加密安全所必需的。 */
+const SAVE_FIXED_SALT=(()=>{
+  const s=new Uint8Array(16);
+  for(let i=0;i<16;i++) s[i]=(SAVE_KEY_STR.charCodeAt(i%SAVE_KEY_STR.length)*31+i*7)&0xff;
+  return s;
+})();
+
+/* ---- 文件下载（参考 2D 版 c_logic.js 的写法）----
+   2D 版导出的做法：Blob → URL.createObjectURL → <a download> → click。
+   我们照抄这一套，并补两件 2D 版没做的事：
+     1. 老 WebView 不支持 <a download> 时，退化成把内容塞进文本框让人手动复制；
+     2. 清理用 setTimeout，且在 revoke 之前先移除节点，避免某些
+        WebView 里「点了没反应」。
+   【为什么以前导出没用】
+     旧实现是把加密串塞进页面上的 #savebox 然后 execCommand('copy')。
+     在手机 WebView 里 execCommand 经常直接返回 false，
+     于是玩家看到「已复制」但其实剪贴板是空的；
+     而且它只存了 hp/ammo/inv 几个字段，仓库、皮肤、配件全丢了 ——
+     就算复制成功，导入回来也是个残档。这次连内容一起修。 */
+function saveDownload(filename, text){
+  try{
+    const blob=new Blob([text],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=filename; a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{
+      try{ document.body.removeChild(a); }catch(e){}
+      try{ URL.revokeObjectURL(url); }catch(e){}
+    }, 400);
+    return true;
+  }catch(e){
+    return false;
+  }
 }
+/* 导出的内容 = 本地自动存档的完整快照。
+   用 autoSaveSnapshot() 而不是手写字段：本地存档已经把所有
+   「局外资产」维护好了（仓库/胸挂/搜来账本/皮肤/配件/护甲耐久/
+   背包容量…），导出再手写一遍字段只会两边不同步 ——
+   这正是旧版「导出没用」的根因。 */
+function exportSave(){
+  let snap;
+  try{ snap=autoSaveSnapshot(); }catch(e){ toast('导出失败：'+e.message); return; }
+  snap.kind='efs-fps-save';
+  snap.exportedAt=new Date().toISOString();
+  const plain=JSON.stringify(snap,null,2);
+
+  /* 先用内置密钥加密。crypto.subtle 在 http:// 或某些老 WebView 里
+     不存在（安全上下文限制），那就退回存明文 JSON ——
+     文件仍然能用，只是没了加密，总比导不出来强。 */
+  const done=(text,enc)=>{
+    const fn='efs-save-'+(enc?'enc':'plain')+'-'+Date.now()+'.json';
+    if(saveDownload(fn,text)){
+      toast((enc?'已加密导出 ':'已导出 ')+fn);
+    }else{
+      /* 下载通道不可用：显示文本框兜底，让玩家自己复制 */
+      const t=$('savebox');
+      if(t){
+        t.value=text; t.style.display='block'; t.select();
+        toast('无法直接下载，已放到下面的文本框，请手动复制');
+      }else{
+        toast('导出失败：这个浏览器不支持文件下载');
+      }
+    }
+  };
+
+  (async()=>{
+    try{
+      if(crypto && crypto.subtle){
+        const enc=await encryptSave(snap,SAVE_KEY_STR);
+        done(enc,true);
+      }else{
+        done(plain,false);
+      }
+    }catch(e){
+      /* 加密失败（极少见）也照样导出明文，不让玩家白点一次 */
+      done(plain,false);
+    }
+  })().catch(()=>{ done(plain,false); });
+}
+
+/* 导入：自动识别「加密串」和「明文 JSON」两种格式，
+   全程不问密码。这样玩家六年前的旧存档（如果当时是加密的）
+   也能靠内置密钥打开。 */
 function importSave(){
-  const s=prompt('粘贴存档串：');
-  if(!s) return;
-  const pw=prompt('输入存档密码：');
-  if(!pw) return;
-  decryptSave(s,pw).then(o=>{
-    P.hp=o.hp; P.armor=o.armor; P.ammo=o.ammo; P.inv=o.inv;
-    P.pos.set(o.pos[0],1.6,o.pos[1]);
-    refreshHUD();
-    alert('存档已恢复');
-  }).catch(e=>{
-    alert('解密失败：'+e.message);
-  });
+  const box=$('savebox');
+  const file=$('saveFile');
+  const finishSafe=(text)=>{
+    if(!text || !text.trim()){ toast('没有内容可导入'); return; }
+    const raw=text.trim();
+    const parseAndApply=(obj)=>{
+      if(!obj || typeof obj!=='object'){ toast('存档格式不对'); return; }
+      try{
+        /* autoSaveApply 内部对每个字段都做了合法性校验，
+           坏字段会被忽略而不是把游戏搞崩。 */
+        autoSaveApply(obj);
+        /* 导入完立刻落盘，避免「导进来了但一刷新又没了」 */
+        if(typeof autoSaveTouch==='function') autoSaveTouch();
+        refreshHUD();
+        try{ if(typeof buildMenuStats==='function') buildMenuStats(); }catch(e){}
+        toast('存档已导入');
+      }catch(e){
+        toast('导入失败：'+e.message);
+      }
+    };
+    if(raw.indexOf(MAGIC+'.')===0){
+      /* 加密串：直接拿内置密钥解，不询问密码 */
+      decryptSave(raw, SAVE_KEY_STR)
+        .then(parseAndApply)
+        .catch(()=>{
+          /* 万一不是内置密钥加密的（比如玩家自己设过密码的老档），
+             才退回问一次密码 —— 只在真的解不开时才打扰玩家。 */
+          const pw=(typeof prompt==='function')?prompt('这份存档不是内置密钥加密的，请输入它原来的密码：'):null;
+          if(!pw) return;
+          decryptSave(raw,pw).then(parseAndApply).catch(e=>toast('解密失败：'+e.message));
+        });
+      return;
+    }
+    let obj=null;
+    try{ obj=JSON.parse(raw); }catch(e){}
+    if(obj) parseAndApply(obj);
+    else toast('无法识别这段内容');
+  };
+
+  /* 优先读文件：手机上从下载目录挑一个 .json 比「复制粘贴一大段」
+      intuitiveness 高太多。 */
+  if(file && file.files && file.files.length){
+    const f=file.files[0];
+    const fr=new FileReader();
+    fr.onload=()=>finishSafe(String(fr.result||''));
+    fr.onerror=()=>toast('读取文件失败');
+    fr.readAsText(f);
+    return;
+  }
+  if(box && box.value && box.value.trim()){ finishSafe(box.value); return; }
+  /* 都没有：让玩家先把内容贴进文本框，再点一次导入 */
+  if(box){
+    box.style.display='block';
+    toast('把存档内容贴到下面的文本框，再点一次「导入」');
+    try{ box.focus(); }catch(e){}
+  }else{
+    toast('这台设备上没法选文件，请用文本框粘贴');
+  }
 }
 /* ============================================================
    本地自动存档（localStorage + cookie 双写）
@@ -322,6 +455,22 @@ function autoSaveTouch(){
   else if(typeof setTimeout==='function') setTimeout(flush, 0);
   else flush();
 }
+/* 【立即写盘】和 autoSaveTouch 的区别：这个是同步的，调用返回时
+   数据已经在 localStorage 里了。
+   【为什么后来必须加这个】用户反馈「本地 cookie 没保存」，
+   查下来不是写盘代码坏了，而是两处漏了「触发」：
+     1. 仓库里点物品「放进出击背包」那条分支压根没调 saveTick()，
+        只有装备槽那条调了。玩家把药、子弹塞进背包，然后关页面 ——
+        这些改动从来没被写过。
+     2. 手机 WebView 从最近任务里划掉时，pagehide/visibilitychange
+        不一定来得及触发（进程直接被 kill）。队里只挂了一个
+        queueMicrotask 的话，一帧都跑不完就没了。
+   所以凡是「离开某个界面 / 结算」这类关键时刻，一律用 autoSaveFlush()
+   同步写一次，不再赌微任务能不能跑完。 */
+function autoSaveFlush(){
+  _autoSavePending = false;
+  return autoSaveWrite();
+}
 
 /* 清档（「重置数据」按钮要用） */
 function autoSaveClear(){
@@ -332,10 +481,24 @@ function autoSaveClear(){
 }
 
 /* 页面生命周期挂钩：切到后台、关掉前各写一次。
-   pagehide 比 beforeunload 可靠（移动端 WebView 经常不触发 beforeunload）。 */
+   pagehide 比 beforeunload 可靠（移动端 WebView 经常不触发 beforeunload）。
+   再用 autoSaveFlush 同步写，不要队列 —— 进程快被 kill 的时候，
+   排队中的微任务根本没机会执行。 */
 if(typeof window!=='undefined'){
-  window.addEventListener('pagehide', ()=>{ try{ autoSaveWrite(); }catch(e){} });
+  window.addEventListener('pagehide', ()=>{ try{ autoSaveFlush(); }catch(e){} });
+  /* 某些 iPad/WebView 连 pagehide 都不发，只有 beforeunload 有反应，
+     两个都挂上，重复写同一份数据没有副作用。 */
+  window.addEventListener('beforeunload', ()=>{ try{ autoSaveFlush(); }catch(e){} });
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState==='hidden'){ try{ autoSaveWrite(); }catch(e){} }
+    if(document.visibilityState==='hidden'){ try{ autoSaveFlush(); }catch(e){} }
   });
+  /* 【兜底定时写盘】最后一道保险：每隔 20 秒，如果期间发生过改动
+     就同步写一次。手机的 WebView 被系统回收时可能一个事件都不给，
+     有了这个，最多丢 20 秒内的操作，而不是整个会话。
+     没有改动就不写，所以不会有额外 IO。 */
+  try{
+    setInterval(()=>{
+      if(_autoSavePending) autoSaveFlush();
+    }, 20000);
+  }catch(e){}
 }

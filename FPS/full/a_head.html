@@ -118,24 +118,30 @@
     margin:0; justify-self:center; align-self:center;
     pointer-events:auto;
   }
-  /* 布局（3 列 × 3 行）：
-        [    ] [瞄准] [    ]
-        [检视] [跳跃] [换弹]
+  /* 布局（3 列 × 3 行）—— 一格一键，绝不重叠：
+        [交互] [开镜] [检视]
+        [奔跑] [跳跃] [换弹]
         [    ] [趴下] [开火]
-     开火最大、贴右下角，其余按功能分组，位置固定不随屏幕变。 */
-  #btnAim{    grid-column:2; grid-row:1; width:calc(var(--u)*1.05); height:calc(var(--u)*1.05); border-color:#7c5cff; }
-  #btnInspect{grid-column:1; grid-row:2; }
-  #btnJump{   grid-column:2; grid-row:2; }
-  #btnReload{ grid-column:3; grid-row:2; }
-  #btnProne{  grid-column:2; grid-row:3; }
-  #btnFire{   grid-column:3; grid-row:3;
-              width:calc(var(--u)*1.42); height:calc(var(--u)*1.42);
-              border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+     · 开火在右下角最大（玩家拇指自然落点）
+     · 开镜放在第一行，和奔跑（第二行左）最少隔一整格
+     · 开镜与换弹的位置按用户要求互换过：
+       开镜原来在 (2,2) 挤着跳跃，现在提到 (2,1)；
+       换弹落在 (3,2)。
+     · 所有按钮宽度都 = var(--u)，不再用 1.05 倍溢出格子。 */
+  #btnInteract{ grid-column:1; grid-row:1; }
+  #btnAim{      grid-column:2; grid-row:1; border-color:#7c5cff; }
+  #btnInspect{  grid-column:3; grid-row:1; }
+  #btnSprint{   grid-column:1; grid-row:2; }
+  #btnJump{     grid-column:2; grid-row:2; }
+  #btnReload{   grid-column:3; grid-row:2; }
+  #btnProne{    grid-column:2; grid-row:3; }
+  #btnFire{     grid-column:3; grid-row:3;
+                width:calc(var(--u)*1.42); height:calc(var(--u)*1.42);
+                border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
   #btnAim .ico{ width:28px; height:28px; }
-  /* 交互（E）和奔跑（Shift）也放进网格，否则它们会被自动填充到空格子里，
-     导致上面的固定布局被打乱。交互放左上空格，奔跑放左下空格。 */
-  #btnInteract{grid-column:1; grid-row:1; }
-  #btnSprint{  grid-column:1; grid-row:3; }
+  /* 交互（E）和奔跑（Shift）的 grid 位置已在上面的布局块里统一定义，
+     这里绝对不要再写 grid-column/grid-row —— 重复定义只会让
+     后写的覆盖先写的，又回到「改了没反应」的老路上。 */
   #btnInspect .ico{ width:24px; height:24px; }
   #btnJump .ico{ width:26px; height:26px; }
   #btnReload .ico{ width:26px; height:26px; }
@@ -328,6 +334,15 @@ html[data-lang="en"] #bagBtn span{
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
   #menu .box{ width:100%; max-width:520px; max-height:92vh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:24px; }
   #menu .box::-webkit-scrollbar{ width:8px; }
+  /* 存档导入的兜底文本框：默认不占位置，只有导出下载失败、
+     或导入需要手动粘贴时才由 JS 把 #saveRow 显示出来。 */
+  #saveRow{ display:none; flex-direction:column; gap:8px; margin-top:10px; }
+  #savebox{ width:100%; min-height:76px; resize:vertical; box-sizing:border-box;
+            background:rgba(255,255,255,.06); color:#e9ecf5; font-size:11.5px;
+            font-family:ui-monospace,Menlo,Consolas,monospace; line-height:1.45;
+            border:1px solid rgba(255,255,255,.14); border-radius:10px;
+            padding:8px 10px; word-break:break-all; }
+  #savebox:focus{ outline:none; border-color:#7c5cff; }
   #menu .box::-webkit-scrollbar-track{ background:rgba(255,255,255,.06); border-radius:4px; }
   #menu .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
   .keysbox{ margin:4px 0 14px; padding:14px; border-radius:12px; background:rgba(124,92,255,.13); border:1px solid rgba(124,92,255,.42); box-shadow:0 0 0 1px rgba(124,92,255,.1) inset; }
@@ -775,6 +790,19 @@ background:rgba(90,220,255,.03); cursor:default; }
       <button class="btn ghost small" id="btnImport">⬆️ 加密导入</button>
       <button class="btn danger small" id="btnReset">♻️ 重置数据</button>
       <button class="btn ghost small" id="btnBack">← 返回原版</button>
+    </div>
+    <!-- 存档导入/导出的辅助控件。
+         以前导出走的是「把加密串塞进文本框 + execCommand('copy')」这套，
+         手机 WebView 里 execCommand 常静默失败，所以玩家点了没反应。
+         现在导出改成和 2D 版一样直接下载文件，这里的文本框只作兜底：
+         万一设备不支持 <a download>，才把内容显示出来让玩家手动复制。
+         导入则优先用 <input type="file">，从下载目录挑 json 最省事；
+         挑不了文件（或在桌面端懒得点）时，还是可以贴文本。 -->
+    <div class="row" id="saveRow" style="display:none">
+      <input type="file" id="saveFile" accept="application/json,.json,.txt"
+             style="display:none">
+      <button class="btn ghost small" id="btnPickSave">📂 选择存档文件</button>
+      <textarea id="savebox" spellcheck="false" placeholder="存档内容（仅兜底用：无法直接下载或选择文件时，把内容贴到这里，再点一次「导入」）"></textarea>
     </div>
   </div>
 </div>

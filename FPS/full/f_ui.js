@@ -89,7 +89,13 @@ function refreshHUD(){
   }
   if(ar){
     if(rk===null) ar.textContent='近战';
-    else ar.textContent=((P.ammo[rk]|0)||(P.ammo.ammo|0));
+    /* 【备弹取值修正】原来写的是 `(P.ammo[rk]|0)||(P.ammo.ammo|0)`，
+       用 `||` 做兜底 —— 但 0 是 falsy，于是「这类备弹真的为 0」时
+       会跳去读通用池 P.ammo.ammo（新手初始 90），
+       表现就是手枪弹匣才 20，备弹却顶着 90 甚至 100 多，
+       看着像「子弹数量没改」。
+       这里改成「字段存在就用字段值，哪怕是 0」。 */
+    else ar.textContent = (typeof P.ammo[rk]==='number') ? (P.ammo[rk]|0) : (P.ammo.ammo|0);
   }
   const money=$('money'); if(money) money.textContent=P.ammo.cash;
   const mm=$('mMoney'); if(mm) mm.textContent=P.ammo.cash;
@@ -140,6 +146,8 @@ function toggleSound(){
     /* sfxOn 是 y_audio.js 里用 let 声明的模块级变量，
        这里直接赋值即可（同一个 module 作用域）。 */
     sfxOn = on;
+    /* 【落盘】否则刷新就复位，看着像开关没生效 */
+    if(typeof sfxOnSave==='function') sfxOnSave();
   }catch(e){}
   /* 【走统一入口】不能直接写 VOL.master，否则会把设置里的音量倍率抹掉 ——
      玩家把音量拉到 30%，点一下静音再取消，音量就回到 100%。 */
@@ -2046,6 +2054,8 @@ function clampLooted(){
     if(n>have) delete P.looted[id];
   }
 }
+/* 【固定装备】出生就有的小刀，不可出售、不可丢弃。 */
+const FIXED_MELEE_ID='melee_knife';
 function sellPriceOf(id){
   const it=SHOP_ITEMS[id];
   if(!it) return 0;
@@ -2061,7 +2071,12 @@ function sellPriceOf(id){
 function doSellSelected(){
   clampLooted();   // 卖之前夹一次账本，防止用掉的搜来物品被重复溢价
   let total=0, cnt=0;
+  /* 【固定小刀不可卖】melee_knife 是出生装备，不是商品。
+     允许卖掉它会让玩家变成「手无寸铁」且再也拿不回来
+     （商店买要钱，而新手开局没钱）。这里直接跳过并计数提示。 */
+  let lockedSkipped=0;
   for(const id in sellSel){
+    if(id===FIXED_MELEE_ID){ lockedSkipped++; continue; }
     const n=Math.min(sellSel[id]|0, P.stash[id]|0);
     if(n<=0) continue;
     const it=SHOP_ITEMS[id]; if(!it) continue;
@@ -2076,7 +2091,11 @@ function doSellSelected(){
     if(P.stash[id]<=0) delete P.stash[id];
     cnt+=n;
   }
-  if(!cnt){ toast('没有选中物品'); sfxDeny(); return; }
+  if(!cnt){
+    if(lockedSkipped>0) toast('战术小刀是固定装备，不能出售');
+    else toast('没有选中物品');
+    sfxDeny(); return;
+  }
   P.ammo.cash=(P.ammo.cash|0)+total;
   sellSel={}; sellMode=false;
   sfxBuy();
@@ -2463,11 +2482,27 @@ function bindStashDrag(root){
 
 /* ---- 局内背包 ---- */
 function toggleBag(){
-  const b=$('bag'); if(!b) return;
+  const b=$('bag');
+  if(!b){
+    /* 【诊断】以前这里是静默 return —— 如果 DOM 里真没有 #bag，
+       玩家点背包就是「毫无反应」，完全没法判断原因。
+       现在给个明确提示，至少知道是容器丢了。 */
+    console.error('toggleBag: #bag 容器不存在');
+    try{ toast('背包面板缺失（#bag 未找到）'); }catch(e){}
+    return;
+  }
   const opening = b.style.display!=='flex';
   if(opening){
     b.style.display='flex';
+    /* 【层级保险】#bag 的 CSS 已经是 z-index:210，但运行时如果
+       有别的浮层（调试面板 9000、拖拽幽灵 99999）还开着，
+       背包会被压到下面 —— 表现就是「点了没反应」。
+       打开时统一把已知浮层收掉。 */
+    try{
+      const gm=document.getElementById('gmPanel'); if(gm) gm.style.display='none';
+    }catch(e){}
     closeShop(); closeStash(); closeGunsmith();
+    try{ hidePauseOverlay(false); }catch(e){}
     /* 【必须收掉摇杆和操作区 —— 这是「背包点不动」的真正原因】
        #joyZone 是一个 210×210 的透明方块，pointer-events:auto、
        z-index:60，钉在屏幕左下角。背包左侧栏（装备槽 + 返回键）

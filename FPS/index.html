@@ -3572,7 +3572,11 @@ const P={
   /* ammo=手枪弹匣 / gun=长枪弹匣 / rifle|pistol|sniper|shot=各类后备弹。
      sniper 和 shot 以前没初始化，撒弹枪和狙击买了弹也只能靠
      「完全没弹时白给满匣」的兜底苟着，换弹时后备一直是 undefined。 */
-  ammo:{ammo:90,med:0,cash:0,gun:120,rifle:0,pistol:0,sniper:0,shot:0},
+  /* 【弹药初始值】以前 ammo:90 / gun:120 是白送的备弹，
+     加上 HUD 那个 `||` 兜底 bug，手枪开局就显示 90+ 发，
+     看着像「子弹数量没改」。现在全部清零：
+     枪要买，子弹也要买（或从搜刮里拿）。 */
+  ammo:{ammo:0,med:0,cash:0,gun:0,rifle:0,pistol:0,sniper:0,shot:0},
   inv:{gun:true,med:0},
   /* 【搜打撤基础装备】撤离类游戏的核心是「带什么进去、能带回什么」。
      bag 是按 id 聚合的物品表：{ itemId: 数量 }。
@@ -3583,7 +3587,9 @@ const P={
      pouch —— 局内背包，装什么带什么，容量由背包装备决定，阵亡全丢
      原来的 P.bag 把两者混成一个，导致「蹲局里还能买到所有东西」，
      完全不像搜打撤。现在彻底拆开。 */
-  stash:{ med:2, ammo_pistol:2, bandage:3, melee_knife:1, pis_default:1 },  // 局外仓库（新手初始物资）
+  /* 【新手初始物资】只给一把小刀 + 一点药品，不给枪。
+     melee_knife 是固定装备：卖出函数里会拦它，永远丢不掉。 */
+  stash:{ med:2, bandage:3, melee_knife:1 },  // 局外仓库（新手初始物资）
   pouch:{},                // 局内背包 { itemId: 数量 }
   chestPouch:{},           // 胸挂格子 { itemId: 数量 }（独立容量，只收小件）
   /* 【物品来源追踪】卖出系统要区分「搜来的」和「自己买的」：
@@ -3603,8 +3609,13 @@ const P={
        chest     胸挂（决定额外弹匣位）
        backpack  背包（决定 bagCap）
        helmet / armorVest 头盔护甲（减伤） */
+  /* 【初始武器：只有一把小刀】
+     之前 secondary 默认就是 'pis_default'（制式手枪），等于白送一把枪，
+     和「仓库里没配武器就该只有小刀」的设定冲突。
+     现在 secondary 默认 null —— 手枪必须去商店买（600 块）。
+     小刀是固定的出生装备，永远有、不可卖（见 stash 的 melee_knife）。 */
   equip:{ helmet:null, armorVest:null, backpack:'bp_small',
-          primary:null, secondary:'pis_default', melee:'melee_knife', chest:null },
+          primary:null, secondary:null, melee:'melee_knife', chest:null },
   helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
   /* 【当前手持武器槽】三个可用槽：primary / secondary / melee
      P.slot 决定现在拿哪把：
@@ -3613,7 +3624,7 @@ const P={
        'melee'     副武器小刀/警棍 —— 永不耗弹
      切换逻辑见 switchSlot()。原来的实现只有 P.inv.gun 一个布尔，
      只能表达「有枪/没枪」，做不了多武器切换。 */
-  slot:'secondary',        // 初始拿手枪（新手只有手枪+小刀）
+  slot:'melee',            // 初始拿小刀（新手只有一把小刀，没有枪）
   slotT:0,                 // 切换动画计时（抬枪放下再抬起）
   speed:6, sprint:10,
   onGround:true,
@@ -4201,7 +4212,16 @@ function updReload(dt){
       P.ammo[t]=(P.ammo[t]|0)+take;
       P.ammo[rk]=have-take;
     }else if(!(P.ammo[t]|0)){
-      P.ammo[t]=mag;    // 兜底：完全没弹了给满一梭子，不然新手卡死
+      /* 【取消免费弹兜底】原注释是「完全没弹了给满一梭子，不然新手卡死」，
+         实际效果是「备弹 0 也能无限白射」—— 子弹完全不用买，
+         搜打撤的资源压力全没了。
+         现在：备弹 0 就不装填，弹匣还是空，必须去买/搜刮子弹。
+         新手不会卡死，因为出生就有一把小刀（永不耗弹）。 */
+      P.reload=false;
+      try{ sfxEmpty(); }catch(e){}
+      try{ toast('没有备弹了 — 去买或搜刮子弹'); }catch(e){}
+      refreshHUD();
+      return;
     }
     refreshHUD();
   }
@@ -5144,7 +5164,13 @@ function refreshHUD(){
   }
   if(ar){
     if(rk===null) ar.textContent='近战';
-    else ar.textContent=((P.ammo[rk]|0)||(P.ammo.ammo|0));
+    /* 【备弹取值修正】原来写的是 `(P.ammo[rk]|0)||(P.ammo.ammo|0)`，
+       用 `||` 做兜底 —— 但 0 是 falsy，于是「这类备弹真的为 0」时
+       会跳去读通用池 P.ammo.ammo（新手初始 90），
+       表现就是手枪弹匣才 20，备弹却顶着 90 甚至 100 多，
+       看着像「子弹数量没改」。
+       这里改成「字段存在就用字段值，哪怕是 0」。 */
+    else ar.textContent = (typeof P.ammo[rk]==='number') ? (P.ammo[rk]|0) : (P.ammo.ammo|0);
   }
   const money=$('money'); if(money) money.textContent=P.ammo.cash;
   const mm=$('mMoney'); if(mm) mm.textContent=P.ammo.cash;
@@ -5195,6 +5221,8 @@ function toggleSound(){
     /* sfxOn 是 y_audio.js 里用 let 声明的模块级变量，
        这里直接赋值即可（同一个 module 作用域）。 */
     sfxOn = on;
+    /* 【落盘】否则刷新就复位，看着像开关没生效 */
+    if(typeof sfxOnSave==='function') sfxOnSave();
   }catch(e){}
   /* 【走统一入口】不能直接写 VOL.master，否则会把设置里的音量倍率抹掉 ——
      玩家把音量拉到 30%，点一下静音再取消，音量就回到 100%。 */
@@ -7101,6 +7129,8 @@ function clampLooted(){
     if(n>have) delete P.looted[id];
   }
 }
+/* 【固定装备】出生就有的小刀，不可出售、不可丢弃。 */
+const FIXED_MELEE_ID='melee_knife';
 function sellPriceOf(id){
   const it=SHOP_ITEMS[id];
   if(!it) return 0;
@@ -7116,7 +7146,12 @@ function sellPriceOf(id){
 function doSellSelected(){
   clampLooted();   // 卖之前夹一次账本，防止用掉的搜来物品被重复溢价
   let total=0, cnt=0;
+  /* 【固定小刀不可卖】melee_knife 是出生装备，不是商品。
+     允许卖掉它会让玩家变成「手无寸铁」且再也拿不回来
+     （商店买要钱，而新手开局没钱）。这里直接跳过并计数提示。 */
+  let lockedSkipped=0;
   for(const id in sellSel){
+    if(id===FIXED_MELEE_ID){ lockedSkipped++; continue; }
     const n=Math.min(sellSel[id]|0, P.stash[id]|0);
     if(n<=0) continue;
     const it=SHOP_ITEMS[id]; if(!it) continue;
@@ -7131,7 +7166,11 @@ function doSellSelected(){
     if(P.stash[id]<=0) delete P.stash[id];
     cnt+=n;
   }
-  if(!cnt){ toast('没有选中物品'); sfxDeny(); return; }
+  if(!cnt){
+    if(lockedSkipped>0) toast('战术小刀是固定装备，不能出售');
+    else toast('没有选中物品');
+    sfxDeny(); return;
+  }
   P.ammo.cash=(P.ammo.cash|0)+total;
   sellSel={}; sellMode=false;
   sfxBuy();
@@ -7518,11 +7557,27 @@ function bindStashDrag(root){
 
 /* ---- 局内背包 ---- */
 function toggleBag(){
-  const b=$('bag'); if(!b) return;
+  const b=$('bag');
+  if(!b){
+    /* 【诊断】以前这里是静默 return —— 如果 DOM 里真没有 #bag，
+       玩家点背包就是「毫无反应」，完全没法判断原因。
+       现在给个明确提示，至少知道是容器丢了。 */
+    console.error('toggleBag: #bag 容器不存在');
+    try{ toast('背包面板缺失（#bag 未找到）'); }catch(e){}
+    return;
+  }
   const opening = b.style.display!=='flex';
   if(opening){
     b.style.display='flex';
+    /* 【层级保险】#bag 的 CSS 已经是 z-index:210，但运行时如果
+       有别的浮层（调试面板 9000、拖拽幽灵 99999）还开着，
+       背包会被压到下面 —— 表现就是「点了没反应」。
+       打开时统一把已知浮层收掉。 */
+    try{
+      const gm=document.getElementById('gmPanel'); if(gm) gm.style.display='none';
+    }catch(e){}
     closeShop(); closeStash(); closeGunsmith();
+    try{ hidePauseOverlay(false); }catch(e){}
     /* 【必须收掉摇杆和操作区 —— 这是「背包点不动」的真正原因】
        #joyZone 是一个 210×210 的透明方块，pointer-events:auto、
        z-index:60，钉在屏幕左下角。背包左侧栏（装备槽 + 返回键）
@@ -11068,6 +11123,21 @@ function weaponKick(){ wRecoil=Math.min(1.2,wRecoil+0.85); }
 
 /* ============ y_audio.js：Web Audio 合成音效（零素材、零依赖） ============ */
 let AC=null, masterGain=null, sfxOn=true, noiseBuf=null;
+/* 【音效开关持久化】sfxOn 以前只是内存变量，刷新一次就回到 true。
+   玩家点了「声音：关」，下次进游戏又响了 —— 看着像「音效开关没用」。
+   这里加一个 localStorage 键，启动时读回。 */
+const SFX_ON_KEY='efs_sfx_on_v1';
+function sfxOnLoad(){
+  try{
+    const raw=localStorage.getItem(SFX_ON_KEY);
+    if(raw==='0') sfxOn=false;
+    else if(raw==='1') sfxOn=true;
+  }catch(e){}
+  return sfxOn;
+}
+function sfxOnSave(){
+  try{ localStorage.setItem(SFX_ON_KEY, sfxOn?'1':'0'); }catch(e){}
+}
 const VOL={ master:0.55, shot:0.42, reload:0.3, hit:0.35, hurt:0.4, pickup:0.35, step:0.12, ui:0.25, ambient:0.16 };
 /* ============================================================
    全局音量（设置面板里的滑块）
@@ -11111,6 +11181,7 @@ function audioInit(){
     AC=new (window.AudioContext||window.webkitAudioContext)();
     masterGain=AC.createGain();
     masterVolLoad();
+    sfxOnLoad();
     masterGain.gain.value=sfxOn?(VOL.master*masterVol):0;
     masterGain.connect(AC.destination);
     // 预生成 1 秒白噪声缓冲（枪声/脚步/爆炸复用）
@@ -11123,7 +11194,19 @@ function audioInit(){
   return AC;
 }
 // 移动端需要用户手势才能解锁音频
-function audioResume(){ if(AC&&AC.state==='suspended') AC.resume(); }
+/* 【音频解锁】移动端/文件协议下 AudioContext 常常停在 suspended，
+   必须在「用户手势」的调用栈里 resume，否则整局都没声音。
+   这里同时兜一次 AC.state 为 'interrupted'（部分 WebView）的情况。 */
+function audioResume(){
+  try{
+    if(!AC) return;
+    if(AC.state!=='running'){
+      const p=AC.resume();
+      if(p&&p.catch) p.catch(()=>{});
+    }
+  }catch(e){}
+  return AC ? AC.state : 'none';
+}
 
 /* ---- 基础合成器 ---- */
 function tone(freq,dur,type,vol,slideTo,delay){
@@ -11155,7 +11238,11 @@ function noise(dur,vol,delay){
 /* ---- 具体音效 ---- */
 function sfxShoot(){
   if(!AC) return;
-  const g=!!(P&&P.inv&&P.inv.gun);
+  /* 【枪声判断】原来读 P.inv.gun，而这个布尔默认 true、
+     而且装上小刀也会被置 true —— 拿刀砍人却放枪声。
+     改成接当前手持槽：只有拿到真枪（primary/secondary）才是枪声。 */
+  const g=!!(P && P.slot && P.slot!=='melee' && P.equip
+             && (P.equip[P.slot]));
   noise(g?0.09:0.16, VOL.shot*(g?0.75:1));
   tone(g?180:95, g?0.07:0.13, 'square', VOL.shot*0.55, g?60:35);
   tone(g?900:520, 0.03, 'sawtooth', VOL.shot*0.2, 200);

@@ -255,7 +255,16 @@ function updReload(dt){
       P.ammo[t]=(P.ammo[t]|0)+take;
       P.ammo[rk]=have-take;
     }else if(!(P.ammo[t]|0)){
-      P.ammo[t]=mag;    // 兜底：完全没弹了给满一梭子，不然新手卡死
+      /* 【取消免费弹兜底】原注释是「完全没弹了给满一梭子，不然新手卡死」，
+         实际效果是「备弹 0 也能无限白射」—— 子弹完全不用买，
+         搜打撤的资源压力全没了。
+         现在：备弹 0 就不装填，弹匣还是空，必须去买/搜刮子弹。
+         新手不会卡死，因为出生就有一把小刀（永不耗弹）。 */
+      P.reload=false;
+      try{ sfxEmpty(); }catch(e){}
+      try{ toast('没有备弹了 — 去买或搜刮子弹'); }catch(e){}
+      refreshHUD();
+      return;
     }
     refreshHUD();
   }

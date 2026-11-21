@@ -1,5 +1,20 @@
 /* ============ y_audio.js：Web Audio 合成音效（零素材、零依赖） ============ */
 let AC=null, masterGain=null, sfxOn=true, noiseBuf=null;
+/* 【音效开关持久化】sfxOn 以前只是内存变量，刷新一次就回到 true。
+   玩家点了「声音：关」，下次进游戏又响了 —— 看着像「音效开关没用」。
+   这里加一个 localStorage 键，启动时读回。 */
+const SFX_ON_KEY='efs_sfx_on_v1';
+function sfxOnLoad(){
+  try{
+    const raw=localStorage.getItem(SFX_ON_KEY);
+    if(raw==='0') sfxOn=false;
+    else if(raw==='1') sfxOn=true;
+  }catch(e){}
+  return sfxOn;
+}
+function sfxOnSave(){
+  try{ localStorage.setItem(SFX_ON_KEY, sfxOn?'1':'0'); }catch(e){}
+}
 const VOL={ master:0.55, shot:0.42, reload:0.3, hit:0.35, hurt:0.4, pickup:0.35, step:0.12, ui:0.25, ambient:0.16 };
 /* ============================================================
    全局音量（设置面板里的滑块）
@@ -43,6 +58,7 @@ function audioInit(){
     AC=new (window.AudioContext||window.webkitAudioContext)();
     masterGain=AC.createGain();
     masterVolLoad();
+    sfxOnLoad();
     masterGain.gain.value=sfxOn?(VOL.master*masterVol):0;
     masterGain.connect(AC.destination);
     // 预生成 1 秒白噪声缓冲（枪声/脚步/爆炸复用）
@@ -55,7 +71,19 @@ function audioInit(){
   return AC;
 }
 // 移动端需要用户手势才能解锁音频
-function audioResume(){ if(AC&&AC.state==='suspended') AC.resume(); }
+/* 【音频解锁】移动端/文件协议下 AudioContext 常常停在 suspended，
+   必须在「用户手势」的调用栈里 resume，否则整局都没声音。
+   这里同时兜一次 AC.state 为 'interrupted'（部分 WebView）的情况。 */
+function audioResume(){
+  try{
+    if(!AC) return;
+    if(AC.state!=='running'){
+      const p=AC.resume();
+      if(p&&p.catch) p.catch(()=>{});
+    }
+  }catch(e){}
+  return AC ? AC.state : 'none';
+}
 
 /* ---- 基础合成器 ---- */
 function tone(freq,dur,type,vol,slideTo,delay){
@@ -87,7 +115,11 @@ function noise(dur,vol,delay){
 /* ---- 具体音效 ---- */
 function sfxShoot(){
   if(!AC) return;
-  const g=!!(P&&P.inv&&P.inv.gun);
+  /* 【枪声判断】原来读 P.inv.gun，而这个布尔默认 true、
+     而且装上小刀也会被置 true —— 拿刀砍人却放枪声。
+     改成接当前手持槽：只有拿到真枪（primary/secondary）才是枪声。 */
+  const g=!!(P && P.slot && P.slot!=='melee' && P.equip
+             && (P.equip[P.slot]));
   noise(g?0.09:0.16, VOL.shot*(g?0.75:1));
   tone(g?180:95, g?0.07:0.13, 'square', VOL.shot*0.55, g?60:35);
   tone(g?900:520, 0.03, 'sawtooth', VOL.shot*0.2, 200);

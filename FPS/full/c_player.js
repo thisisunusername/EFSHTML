@@ -17,7 +17,11 @@ const P={
   /* ammo=手枪弹匣 / gun=长枪弹匣 / rifle|pistol|sniper|shot=各类后备弹。
      sniper 和 shot 以前没初始化，撒弹枪和狙击买了弹也只能靠
      「完全没弹时白给满匣」的兜底苟着，换弹时后备一直是 undefined。 */
-  ammo:{ammo:90,med:0,cash:0,gun:120,rifle:0,pistol:0,sniper:0,shot:0},
+  /* 【弹药初始值】以前 ammo:90 / gun:120 是白送的备弹，
+     加上 HUD 那个 `||` 兜底 bug，手枪开局就显示 90+ 发，
+     看着像「子弹数量没改」。现在全部清零：
+     枪要买，子弹也要买（或从搜刮里拿）。 */
+  ammo:{ammo:0,med:0,cash:0,gun:0,rifle:0,pistol:0,sniper:0,shot:0},
   inv:{gun:true,med:0},
   /* 【搜打撤基础装备】撤离类游戏的核心是「带什么进去、能带回什么」。
      bag 是按 id 聚合的物品表：{ itemId: 数量 }。
@@ -28,7 +32,9 @@ const P={
      pouch —— 局内背包，装什么带什么，容量由背包装备决定，阵亡全丢
      原来的 P.bag 把两者混成一个，导致「蹲局里还能买到所有东西」，
      完全不像搜打撤。现在彻底拆开。 */
-  stash:{ med:2, ammo_pistol:2, bandage:3, melee_knife:1, pis_default:1 },  // 局外仓库（新手初始物资）
+  /* 【新手初始物资】只给一把小刀 + 一点药品，不给枪。
+     melee_knife 是固定装备：卖出函数里会拦它，永远丢不掉。 */
+  stash:{ med:2, bandage:3, melee_knife:1 },  // 局外仓库（新手初始物资）
   pouch:{},                // 局内背包 { itemId: 数量 }
   chestPouch:{},           // 胸挂格子 { itemId: 数量 }（独立容量，只收小件）
   /* 【物品来源追踪】卖出系统要区分「搜来的」和「自己买的」：
@@ -48,8 +54,13 @@ const P={
        chest     胸挂（决定额外弹匣位）
        backpack  背包（决定 bagCap）
        helmet / armorVest 头盔护甲（减伤） */
+  /* 【初始武器：只有一把小刀】
+     之前 secondary 默认就是 'pis_default'（制式手枪），等于白送一把枪，
+     和「仓库里没配武器就该只有小刀」的设定冲突。
+     现在 secondary 默认 null —— 手枪必须去商店买（600 块）。
+     小刀是固定的出生装备，永远有、不可卖（见 stash 的 melee_knife）。 */
   equip:{ helmet:null, armorVest:null, backpack:'bp_small',
-          primary:null, secondary:'pis_default', melee:'melee_knife', chest:null },
+          primary:null, secondary:null, melee:'melee_knife', chest:null },
   helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
   /* 【当前手持武器槽】三个可用槽：primary / secondary / melee
      P.slot 决定现在拿哪把：
@@ -58,7 +69,7 @@ const P={
        'melee'     副武器小刀/警棍 —— 永不耗弹
      切换逻辑见 switchSlot()。原来的实现只有 P.inv.gun 一个布尔，
      只能表达「有枪/没枪」，做不了多武器切换。 */
-  slot:'secondary',        // 初始拿手枪（新手只有手枪+小刀）
+  slot:'melee',            // 初始拿小刀（新手只有一把小刀，没有枪）
   slotT:0,                 // 切换动画计时（抬枪放下再抬起）
   speed:6, sprint:10,
   onGround:true,

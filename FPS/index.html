@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>FPS 搜打撤 · 学校逃离 3D</title>
+<style>
+  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92); }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#000; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#e8e8f0; touch-action:none; }
+  #c{ position:fixed; inset:0; display:block; }
+
+  /* HUD */
+  #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px; }
+  .pill{ background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; backdrop-filter:blur(6px); }
+  .pill b{ color:var(--accent2); }
+  #hpwrap{ flex:1; }
+  #hpbar{ height:8px; background:rgba(255,255,255,.12); border-radius:6px; overflow:hidden; margin-top:5px; }
+  #hpfill{ height:100%; width:100%; background:linear-gradient(90deg,#48c774,#8ce6a0); border-radius:6px; transition:width .2s; }
+  #hpfill.low{ background:linear-gradient(90deg,#e6533c,#ff8a70); }
+  #crosshair{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:22px; height:22px; }
+  #crosshair::before,#crosshair::after{ content:""; position:absolute; background:rgba(255,255,255,.85); }
+  #crosshair::before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
+  #crosshair::after{ top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
+  #hitmark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:32px; height:32px; opacity:0; transition:opacity .1s; }
+  #hitmark span{ position:absolute; width:12px; height:3px; background:#fff; border-radius:2px; }
+  #hitmark .h1{ top:-1px; left:-1px; transform:rotate(45deg); } #hitmark .h2{ top:-1px; right:-1px; transform:rotate(-45deg); }
+  #hitmark .h3{ bottom:-1px; left:-1px; transform:rotate(-45deg); } #hitmark .h4{ bottom:-1px; right:-1px; transform:rotate(45deg); }
+
+  /* 消息 / 拾取提示 */
+  #msg{ position:absolute; top:70px; left:50%; transform:translateX(-50%); text-align:center; font-size:15px; font-weight:600; text-shadow:0 1px 4px #000; pointer-events:none; opacity:0; transition:opacity .2s; }
+  #prompt{ position:absolute; bottom:130px; left:50%; transform:translateX(-50%); background:var(--panel); padding:8px 16px; border-radius:10px; font-size:14px; border:1px solid var(--accent); opacity:0; transition:opacity .15s; }
+  #toast{ position:absolute; bottom:130px; left:50%; transform:translateX(-50%); color:#7ee8a0; font-size:14px; font-weight:600; opacity:0; text-shadow:0 1px 3px #000; }
+
+  /* 摇杆（移动端） */
+  #joyZone{ position:absolute; bottom:0; left:0; width:50%; height:55%; display:none; pointer-events:auto; }
+  #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.18); }
+  #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
+  /* 右侧操作区（移动端） */
+  #actZone{ position:absolute; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:auto; }
+  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  .actbtn:active{ background:var(--accent); }
+  #btnFire{ right:30px; bottom:28px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+  #btnJump{ right:130px; bottom:28px; }
+  #btnReload{ right:130px; bottom:116px; }
+  #btnInteract{ right:30px; bottom:130px; border-color:var(--accent2); }
+  #btnSprint{ right:130px; bottom:204px; }
+
+  /* 菜单 */
+  #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
+  #menu .box{ width:100%; max-width:520px; max-height:92vh; overflow-y:auto; background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:24px; }
+  h1{ font-size:22px; margin-bottom:4px; } h1 span{ color:var(--accent2); }
+  .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
+  .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn:active{ filter:brightness(1.2); }
+  .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
+  .btn.danger{ background:#c2382a; }
+  .btn.small{ padding:8px 12px; font-size:13px; }
+  .stat{ background:rgba(255,255,255,.05); border-radius:10px; padding:10px 14px; flex:1; min-width:120px; }
+  .stat .k{ font-size:11px; color:#98a0b0; } .stat .v{ font-size:18px; font-weight:800; color:var(--accent2); }
+  .shoprow{ display:flex; align-items:center; gap:10px; padding:10px; border:1px solid rgba(255,255,255,.1); border-radius:10px; margin-top:8px; background:rgba(255,255,255,.03); }
+  .shoprow .info{ flex:1; } .shoprow .n{ font-weight:700; font-size:14px; } .shoprow .d{ font-size:12px; color:#98a0b0; }
+  .shoprow .price{ font-weight:800; color:#ffd54a; white-space:nowrap; }
+  #death{ position:fixed; inset:0; z-index:90; background:rgba(120,10,10,.6); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
+  #loaderr{ color:#ff7a6a; font-size:14px; margin-top:10px; display:none; }
+  #fpscount{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:11px; color:#556; }
+  @media (max-width:768px){ .actbtn,.actZone,.joyZone{ } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="topbar">
+    <div class="pill">🪙 <b id="money">0</b></div>
+    <div class="pill" id="weaponPill">🔫 <span id="wpnName">手枪</span></div>
+    <div class="pill" id="ammoPill"><span id="ammo">12</span> / <span id="ammoReserve">36</span></div>
+    <div class="pill" id="hpwrap">❤️ <span id="hpNum">100</span><div id="hpbar"><div id="hpfill"></div></div></div>
+    <div class="pill">⏱ <span id="timer">00:00</span></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>
+  <div id="msg"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+
+  <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
+  <div id="actZone">
+    <div class="actbtn" id="btnFire">开火</div>
+    <div class="actbtn" id="btnJump">跳</div>
+    <div class="actbtn" id="btnReload">换弹</div>
+    <div class="actbtn" id="btnInteract">拾取</div>
+    <div class="actbtn" id="btnSprint">奔跑</div>
+  </div>
+</div>
+
+<div id="loaderr"></div>
+<div id="fpscount"></div>
+
+<!-- 主菜单 -->
+<div id="menu">
+  <div class="box">
+    <h1>🔫 FPS <span>搜打撤</span> · 学校 3D</h1>
+    <p class="sub">搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。</p>
+    <div class="row">
+      <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
+      <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
+      <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
+      <button class="btn ghost" id="btnShop">🛒 商店</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
+      <button class="btn ghost small" id="btnImport">⬆️ 加密导入</button>
+      <button class="btn danger small" id="btnReset">♻️ 重置数据</button>
+      <button class="btn ghost small" id="btnBack">← 返回原版</button>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <div class="stat" style="min-width:100%">
+        <div class="k">操作说明（桌面）</div>
+        <div class="v" style="font-size:12px;color:#c8d0e0;line-height:1.7;font-weight:400">
+          WASD 移动 · 鼠标 转视角 · 左键 射击 · R 换弹 · Shift 奔跑 · 空格 跳 · E 拾取/互动 · Q 进入商店 · Esc 菜单/释放鼠标
+        </div>
+      </div>
+    </div>
+    <div id="loaderr_shop"></div>
+  </div>
+</div>
+
+<!-- 商店 -->
+<div id="shop" style="display:none"></div>
+
+<!-- 死亡界面 -->
+<div id="death">
+  <h2>💀 你阵亡了</h2>
+  <p id="deathInfo"></p>
+  <button class="btn" id="btnRespawn">重新部署</button>
+  <button class="btn ghost" id="btnDeathMenu">回主菜单</button>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+const $=id=>document.getElementById(id);
+const SAVE_KEY='efs_fps_v1';
+let SAVE=(()=>{try{const r=JSON.parse(localStorage.getItem(SAVE_KEY));if(r&&r.money!=null)return r}catch(e){}return{money:500,exfil:0,kills:0,hp:100,med:2,ammo:60}})();
+const persist=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE))}catch(e){}};
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const b64d=s=>{const a=atob(s),u=new Uint8Array(a.length);for(let i=0;i<a.length;i++)u[i]=a.charCodeAt(i);return u};
+async function dk(pwd,salt){const e=new TextEncoder(),b=await crypto.subtle.importKey('raw',e.encode(pwd),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},b,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+function hash(d){const s=JSON.stringify(d);let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0}return('0000000'+h.toString(16)).slice(-8)}
+async function encryptSave(pwd){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),k=await dk(pwd,salt);const p=JSON.stringify({m:'EFSFPS',h:hash(SAVE),d:SAVE});const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(p));return'EFSFPS1.'+b64(salt)+'.'+b64(iv)+'.'+b64(ct)}
+async function decryptSave(str,pwd){const p=str.split('.');if(p.length!==4||p[0]!=='EFSFPS1')throw Error('格式错误');const k=await dk(pwd,b64d(p[1]));let pt;try{pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(p[2])},k,b64d(p[3]))}catch(e){throw Error('密码错误或数据被篡改')}const o=JSON.parse(new TextDecoder().decode(pt));if(o.m!=='EFSFPS'||o.h!==hash(o.d))throw Error('校验失败：数据被篡改');return o.d}
+
+/* ===== 场景 ===== */
+let renderer,scene,camera,clock,ready=false;
+const colliders=[],shootables=[],enemies=[],loots=[];
+let exfil=null;
+function solid(m){m.castShadow=m.receiveShadow=true;scene.add(m);colliders.push(m);return m}
+function box(w,h,d,c,x,y,z,noCol){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:c,roughness:.8}));m.position.set(x,y,z);if(noCol){scene.add(m);return m}return solid(m)}
+function init(){
+ renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x8fb7d9);scene.fog=new THREE.Fog(0x8fb7d9,40,160);
+ camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,500);clock=new THREE.Clock();
+ scene.add(new THREE.HemisphereLight(0xbfd8ff,0x8a7a5a,.9));
+ const sun=new THREE.DirectionalLight(0xfff2df,1.6);sun.position.set(40,60,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-70;sun.shadow.camera.right=70;sun.shadow.camera.top=70;sun.shadow.camera.bottom=-70;sun.shadow.camera.far=200;scene.add(sun);
+ const g=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x6c8f5e}));g.rotation.x=-Math.PI/2;g.receiveShadow=true;scene.add(g);
+ const tr=new THREE.Mesh(new THREE.RingGeometry(28,34,64),new THREE.MeshStandardMaterial({color:0x9a3b2f,side:THREE.DoubleSide}));tr.rotation.x=-Math.PI/2;tr.position.y=.01;tr.position.x=-30;scene.add(tr);
+ buildSchool();setupWorld();ready=true
+}
+function buildSchool(){
+ box(60,12,16,0xd9c6a3,0,6,-20);box(60,.6,16,0x6b5a45,0,12.3,-20);
+ for(let i=0;i<12;i++){box(2.4,2.4,.3,0x88ccee,-26+i*5,5.5,-12.15,true);box(2.4,2.4,.3,0x88ccee,-26+i*5,9,-12.15,true)}
+ box(6,3.4,.4,0xcfbc9a,0,1.7,-12.0);box(.6,3.4,.4,0xcfbc9a,-3.3,1.7,-12.0);box(.6,3.4,.4,0xcfbc9a,3.3,1.7,-12.0);
+ box(16,12,40,0xd9c6a3,-30,6,0);box(16,.6,40,0x6b5a45,-30,12.3,0);
+ box(16,12,40,0xd9c6a3,30,6,0);box(16,.6,40,0x6b5a45,30,12.3,0);
+ box(30,10,14,0xcfbc9a,0,5,25);box(30,.6,14,0x6b5a45,0,10.3,25);
+ box(80,2.5,.5,0x8a9aa8,0,1.25,-35);box(.5,2.5,70,0x8a9aa8,-40,1.25,0);box(.5,2.5,70,0x8a9aa8,40,1.25,0);box(80,2.5,.5,0x8a9aa8,0,1.25,35);
+ box(1.2,3,.8,0x555555,-4,1.5,-35);box(1.2,3,.8,0x555555,4,1.5,-35);
+ const pole=new THREE.Mesh(new THREE.CylinderGeometry(.2,.25,8),new THREE.MeshStandardMaterial({color:0xccc}));pole.position.set(0,4,8);scene.add(pole);
+ const flag=new THREE.Mesh(new THREE.PlaneGeometry(2,1.2),new THREE.MeshStandardMaterial({color:0xd62828,side:THREE.DoubleSide}));flag.position.set(1.1,7.2,8);scene.add(flag);
+}
+function spawnEnemy(x,z){const h=1.7;const b=new THREE.Mesh(new THREE.CapsuleGeometry(.4,h-.8),new THREE.MeshStandardMaterial({color:0x3b4a6b}));b.position.set(x,h/2,z);b.castShadow=true;const hd=new THREE.Mesh(new THREE.SphereGeometry(.28),new THREE.MeshStandardMaterial({color:0xe0b28a}));hd.position.set(x,h+.1,z);hd.castShadow=true;scene.add(b);scene.add(hd);shootables.push(b,hd);return{x,z,hp:100,alive:true,body:b,head:hd,speed:2.5,aggro:false,atkCd:0}}
+function spawnLoot(x,z,t){const C={ammo:0x555533,med:0xcc3333,cash:0xffd54a,gun:0x333355};const m=new THREE.Mesh(new THREE.BoxGeometry(.6,.5,.6),new THREE.MeshStandardMaterial({color:C[t]}));m.position.set(x,.25,z);m.castShadow=true;scene.add(m);shootables.push(m);return{x,z,type:t,mesh:m,taken:false}}
+function spawnExfil(x,z){const r=new THREE.Mesh(new THREE.RingGeometry(1.5,2,32),new THREE.MeshStandardMaterial({color:0x33ff88,emissive:0x33ff88,emissiveIntensity:.6,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.set(x,.05,z);scene.add(r);const b=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,8,16,1,true),new THREE.MeshStandardMaterial({color:0x33ff88,emissive:0x33ff88,emissiveIntensity:.4,transparent:true,opacity:.25,side:THREE.DoubleSide}));b.position.set(x,4,z);scene.add(b);exfil={x,z}}
+function setupWorld(){enemies.forEach(e=>{scene.remove(e.body);scene.remove(e.head)});loots.forEach(l=>scene.remove(l.mesh));enemies.length=0;loots.length=0;
+ [[-18,2],[18,2],[-10,18],[15,18],[0,-8]].forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
+ loots.push(spawnLoot(-22,2,'ammo'),spawnLoot(22,2,'ammo'),spawnLoot(-12,12,'med'),spawnLoot(12,12,'med'),spawnLoot(-30,18,'cash'),spawnLoot(30,18,'cash'),spawnLoot(0,22,'gun'),spawnLoot(-8,28,'cash'),spawnLoot(8,28,'cash'));
+ spawnExfil(0,-30)}
+
+/* ===== 玩家 ===== */
+const P={pos:new THREE.Vector3(0,1.6,5),vel:new THREE.Vector3(),yaw:0,pitch:0,hp:100,ammo:12,reserve:60,onGround:true,sprinting:false};
+let joy={dx:0,dy:0,active:false};const keys={};let locked=false,state='menu',enemyTick=0,startTime=0,fpsA=0,fpsN=0;
+function fwd(){const d=new THREE.Vector3(0,0,-1);d.applyAxisAngle(new THREE.Vector3(1,0,0),P.pitch);d.applyAxisAngle(new THREE.Vector3(0,1,0),P.yaw);return d}
+function clampP(){P.pitch=Math.max(-1.5,Math.min(1.5,P.pitch))}
+function hit(p){const dx=p.x-P.pos.x,dz=p.z-P.pos.z;return Math.hypot(dx,dz)}
+function col(px,py,pz){for(const c of colliders){const R=.5;if(px>c.position.x-c.scale.x-R&&px<c.position.x+c.scale.x+R&&pz>c.position.z-c.scale.z-R&&pz<c.position.z+c.scale.z+R){if(py<c.geometry.parameters.height/2+c.position.y&&py+1>c.position.y-c.geometry.parameters.height/2)return true}}return false}
+function fire(){if(state!=='play')return;if(P.ammo<=0){reload();return}P.ammo--;upd();P.pitch+=.008;const rc=new THREE.Raycaster(P.pos,fwd(),.1,80);const h=rc.intersectObjects(shootables,false);if(h.length){const o=h[0].object;let en=enemies.find(e=>e.body===o||e.head===o);if(en){en.hp-=34;en.aggro=true;mark();if(en.hp<=0&&en.alive)killed(en)}else if(o.geometry.type==='BoxGeometry'&&!o.position){}else{mark()}}}
+function mark(){const m=$('hitmark');m.style.opacity=1;setTimeout(()=>m.style.opacity=0,120)}
+function killed(en){en.alive=false;scene.remove(en.body);scene.remove(en.head);SAVE.money+=200+Math.floor(Math.random()*150);SAVE.kills++;persist();toast('💀 击杀 +货币');upd();en.respawn=performance.now()+8000}
+function reload(){if(P.reserve<=0||P.ammo>=12)return;const t=Math.min(12-P.ammo,P.reserve);P.ammo+=t;P.reserve-=t;toast('换弹');upd()}
+function jump(){if(P.onGround){P.vel.y=7;P.onGround=false}}
+function interact(){if(state!=='play')return;for(const l of loots){if(!l.taken&&hit(l)<1.8){l.taken=true;scene.remove(l.mesh);if(l.type==='ammo')P.reserve+=24;if(l.type==='med'){P.hp=Math.min(100,P.hp+40)}if(l.type==='cash')SAVE.money+=150+Math.floor(Math.random()*200);if(l.type==='gun')SAVE.money+=400;persist();toast('拾取物资');upd();updHP();loots.splice(loots.indexOf(l),1);return}}if(exfil&&hit(exfil)<3){SAVE.money+=300;SAVE.exfil++;SAVE.hp=Math.max(P.hp,50);persist();toast('🏁 撤离成功 +300');updMenu();setTimeout(menu,1200);return}toast('无可交互物')}
+
+/* ===== 循环 ===== */
+function animate(){requestAnimationFrame(animate);if(!ready)return;const dt=Math.min(.05,clock.getDelta());if(state==='play'){updP(dt);updE(dt);if(exfil&&hit(exfil)<2.5){$('prompt').textContent='按 E 撤离';$('prompt').style.opacity=1}else$('prompt').style.opacity=0;const s=Math.floor((performance.now()-startTime)/1000);$('timer').textContent=('0'+Math.floor(s/60)).slice(-2)+':'+('0'+s%60).slice(-2)}renderer.render(scene,camera);fpsA+=dt;fpsN++;if(fpsA>=1){$('fpscount').textContent=fpsN+' FPS';fpsA=0;fpsN=0}}
+function updP(dt){let ix=0,iz=0;if(keys.KeyW)iz--;if(keys.KeyS)iz++;if(keys.KeyA)ix--;if(keys.KeyD)ix++;if(joy.active){ix=joy.dx;iz=joy.dy}const sp=P.sprinting?8:5;const f=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),P.yaw);const r=new THREE.Vector3(1,0,0).applyAxisAngle(new THREE.Vector3(0,1,0),P.yaw);const mv=new THREE.Vector3().addScaledVector(r,ix).addScaledVector(f,iz);if(mv.length()>1)mv.normalize();mv.multiplyScalar(sp);P.vel.x=mv.x;P.vel.z=mv.z;P.vel.y-=22*dt;const nx=P.pos.x+P.vel.x*dt,nz=P.pos.z+P.vel.z*dt;let ny=P.pos.y+P.vel.y*dt;if(!col(nx,P.pos.y,P.pos.z))P.pos.x=nx;if(!col(P.pos.x,P.pos.y,nz))P.pos.z=nz;if(ny<=0){ny=0;P.vel.y=0;P.onGround=true}else P.onGround=false;P.pos.y=ny;P.pos.x=Math.max(-45,Math.min(45,P.pos.x));P.pos.z=Math.max(-38,Math.min(38,P.pos.z));camera.position.copy(P.pos);camera.quaternion.setFromEuler(new THREE.Euler(P.pitch,P.yaw,0,'YXZ'))}
+function updE(dt){enemyTick+=dt;while(enemyTick>=.2){enemyTick-=.2;for(const e of enemies){if(!e.alive){if(performance.now()>=e.respawn){e.alive=true;e.hp=100;e.aggro=false;e.body.position.set(e.x,.85,e.z);e.head.position.set(e.x,1.8,e.z);scene.add(e.body);scene.add(e.head)}continue}const dx=P.pos.x-e.x,dz=P.pos.z-e.z,d=Math.hypot(dx,dz);if(e.aggro||d<8){e.aggro=true;if(d>1.2){const nx=e.x+dx/d*e.speed*.2,nz=e.z+dz/d*e.speed*.2;if(!col(nx,.8,nz)){e.x=nx;e.z=nz}}e.body.position.set(e.x,.85,e.z);e.head.position.set(e.x,1.8,e.z);e.atkCd-=.2;if(d<1.6&&e.atkCd<=0){P.hp-=12;e.atkCd=1;updHP();if(P.hp<=0)die()}}}}}
+function updHP(){$('hpNum').textContent=Math.max(0,Math.round(P.hp));const f=$('hpfill');f.style.width=Math.max(0,P.hp)+'%';f.classList.toggle('low',P.hp<30)}
+function upd(){$('money').textContent=SAVE.money;$('ammo').textContent=P.ammo;$('ammoReserve').textContent=P.reserve}
+function updMenu(){$('mMoney').textContent=SAVE.money;$('mExfil').textContent=SAVE.exfil;$('mKills').textContent=SAVE.kills}
+function toast(t){const e=$('toast');e.textContent=t;e.style.opacity=1;clearTimeout(e._t);e._t=setTimeout(()=>e.style.opacity=0,1800)}
+function die(){state='menu';if(locked)document.exitPointerLock();$('death').style.display='flex';$('deathInfo').textContent='失去 30% 货币，当前 '+SAVE.money;SAVE.money=Math.floor(SAVE.money*.7);persist()}
+function menu(){state='menu';if(locked)document.exitPointerLock();$('menu').style.display='flex';$('death').style.display='none';updMenu()}
+
+/* ===== 输入 ===== */
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='KeyE')interact();if(e.code==='Space'){e.preventDefault();jump()}if(e.code==='ShiftLeft'||e.code==='ShiftRight')P.sprinting=true;if(e.code==='Escape')toggleLock()});
+window.addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='ShiftLeft'||e.code==='ShiftRight')P.sprinting=false});
+function toggleLock(){if(locked)document.exitPointerLock();else$('c').requestPointerLock()}
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===$('c');if(!locked&&state==='play')menu()});
+document.addEventListener('mousemove',e=>{if(!locked||state!=='play')return;P.yaw-=e.movementX*.0022;P.pitch-=e.movementY*.0022;clampP()});
+document.addEventListener('mousedown',e=>{if(locked&&state==='play'&&e.button===0)fire()});
+const isTouch='ontouchstart'in window||navigator.maxTouchPoints>0;
+function setupTouch(){if(!isTouch)return;$('joyZone').style.display='block';$('actZone').style.display='block';$('crosshair').style.display='none';const jb=$('joyBase'),js=$('joyStick');let jid=null;jb.addEventListener('touchstart',e=>{e.preventDefault();jid=e.changedTouches[0].identifier;stk(e,jb,js)},{passive:false});jb.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===jid)stk(e,jb,js)},{passive:false});jb.addEventListener('touchend',e=>{for(const t of e.changedTouches)if(t.identifier===jid){jid=null;joy.active=false;joy.dx=joy.dy=0;js.style.left='50%';js.style.top='50%'}});let lx=0,ly=0,lk=false;$('actZone').addEventListener('touchstart',e=>{if(e.target.classList.contains('actbtn'))return;lk=true;lx=e.changedTouches[0].clientX;ly=e.changedTouches[0].clientY});window.addEventListener('touchmove',e=>{if(!lk)return;const t=e.changedTouches[0];P.yaw-=(t.clientX-lx)*.005;P.pitch-=(t.clientY-ly)*.005;lx=t.clientX;ly=t.clientY;clampP()});window.addEventListener('touchend',()=>lk=false);$('btnFire').addEventListener('touchstart',e=>{e.preventDefault();fire()});$('btnJump').addEventListener('touchstart',jump);$('btnReload').addEventListener('touchstart',reload);$('btnInteract').addEventListener('touchstart',interact);$('btnSprint').addEventListener('touchstart',()=>P.sprinting=true);$('btnSprint').addEventListener('touchend',()=>P.sprinting=false)}
+function stk(e,jb,js){const r=jb.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,mx=r.width/2;const t=e.changedTouches[0];let dx=t.clientX-cx,dy=t.clientY-cy;const l=Math.hypot(dx,dy);if(l>mx){dx*=mx/l;dy*=mx/l}joy.active=true;joy.dx=dx/mx;joy.dy=dy/mx;js.style.left=(50+joy.dx*50)+'%';js.style.top=(50+joy.dy*50)+'%'}
+
+/* ===== 菜单按钮 ===== */
+$('btnPlay').onclick=()=>{$('menu').style.display='none';$('death').style.display='none';state='play';P.hp=SAVE.hp||100;P.ammo=12;P.reserve=SAVE.ammo||60;SAVE.ammo=P.reserve;P.pos.set(0,1.6,5);P.yaw=0;P.pitch=0;setupWorld();startTime=performance.now();upd();updHP();if(!isTouch)$('c').requestPointerLock()};
+$('btnShop').onclick=openShop;
+$('btnBack').onclick=()=>location.href='../index.html';
+$('btnReset').onclick=()=>{if(confirm('确定清空所有数据？')){SAVE={money:500,exfil:0,kills:0,hp:100,med:2,ammo:60};persist();updMenu();toast('已重置')}};
+$('btnRespawn').onclick=()=>{$('death').style.display='none';$('btnPlay').onclick()};
+$('btnDeathMenu').onclick=()=>{$('death').style.display='none';menu()};
+$('btnExport').onclick=async()=>{const p=prompt('设置加密密码（导出）');if(!p)return;const c=await encryptSave(p);const t=document.createElement('textarea');t.value=c;document.body.appendChild(t);t.select();try{document.execCommand('copy')}catch(e){}document.body.removeChild(t);toast('已复制加密存档到剪贴板')};
+$('btnImport').onclick=async()=>{const c=prompt('粘贴加密存档内容');if(!c)return;const p=prompt('输入密码');if(!p)return;try{const d=await decryptSave(c,p);SAVE=d;persist();updMenu();toast('导入成功')}catch(e){toast('❌ '+e.message)}};
+
+/* 商店 */
+let shopMode=false;
+function openShop(){let h='<div style="position:fixed;inset:0;z-index:110;background:rgba(5,7,12,.94);display:flex;align-items:center;justify-content:center;padding:20px"><div style="width:100%;max-width:420px;background:var(--panel);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:24px"><h2 style="margin-bottom:6px">🛒 商店</h2><p style="color:#98a0b0;font-size:13px;margin-bottom:12px">余额：<b style="color:#ffd54a">'+SAVE.money+'</b></p>';const items=[['医疗包','回复 50 HP',300,'med',()=>{P.hp=Math.min(100,P.hp+50);updHP()}],['弹匣补给','+60 备弹',150,'ammo',()=>{P.reserve+=60}],['护甲','+50 最大血量',800,'armor',()=>{SAVE.hp=Math.min(100,SAVE.hp+50)}],['枪械升级','伤害+20%（demo占位）',1200,'gun',()=>{}]];for(const it of items){h+='<div class="shoprow"><div class="info"><div class="n">'+it[0]+'</div><div class="d">'+it[1]+'</div></div><div class="price">'+it[2]+'</div><button class="btn small" id="buy'+it[3]+'">购买</button></div>'}h+='<div class="row"><button class="btn ghost" id="shopClose">关闭</button></div></div></div>';$('shop').innerHTML=h;$('shop').style.display='block';$('shopClose').onclick=()=>{try{document.exitPointerLock()}catch(e){}$('shop').style.display='none'};for(const it of items){const b=$('buy'+it[3]);b.onclick=()=>{if(SAVE.money<it[2]){toast('货币不足');return}SAVE.money-=it[2];it[4]();persist();upd();updMenu();updHP();toast('购买 '+it[0]);b.disabled=true;b.textContent='已购'}}}
+
+init();setupTouch();upd();updMenu();updHP();
+animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>

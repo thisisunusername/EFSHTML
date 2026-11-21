@@ -489,6 +489,9 @@ function bindInput(){
     })(ms[q]);
   }
   document.getElementById('startBtn').addEventListener('click',function(){ startGame(S.diff); });
+  /* FPS 搜打撤：跳到独立 three.js 页面 */
+  var fb=document.getElementById('fpsModeBtn');
+  if(fb) fb.addEventListener('click',function(){ location.href='FPS/index.html'; });
   var bb=document.getElementById('boardBtn');
   if(bb) bb.addEventListener('click',function(){ openBoard(); });
   var ab=document.getElementById('achBtn');

@@ -187,13 +187,23 @@ function pac9Notched(x0,y0,x1,y1,s){
 
 /* ---- 三种常用「拉伸 + 摆位」封装，名字对应原版 xr / qo / Rt ----
 /* 沿 Y 轴轮廓、沿 X 方向拉伸（枪身侧面件） */
+/* 对应原版 xr(pts, e, t, n)：
+     ① ExtrudeGeometry 沿 +z 拉伸 (t-e-2n)
+     ② translate(0, 0, e+n)   —— 注意原版是 e+n，不是 -t+n
+     ③ rotateY(PI/2)：把「拉伸方向 z」转到「世界 x」，
+        同时「轮廓的 x」变成「世界 -z」
+   最终效果：pts 的 [px, py] 中 px 是前后（映射到 -z），py 是上下；
+   拉伸厚度沿 x（左右）。这正是机匣、握把、枪托这类「侧面板件」需要的。 */
 function pac9Side(pts, y0, y1, bevel, base, wear, holes){
-  const g = pac9Extrude(pts, y1-y0, bevel, holes);
+  const b = bevel || 0;
+  const depth = Math.max(1e-4, (y1 - y0) - 2*b);
+  const g = pac9Extrude(pts, y1 - y0, b, holes);
   pac9Colorize(g, base, wear||0, pac9IsEdge);
   pac9FixNormals(g);
-  g.translate(0, 0, -(y1-y0)/2);
+  /* ② 原版 translate(0,0,e+n)：把拉伸体沿 z 推到 [e+b, t-b] */
+  g.translate(0, 0, y0 + b);
+  /* ③ 拉伸方向 z -> 世界 x，轮廓 x -> 世界 -z */
   g.rotateY(Math.PI/2);
-  g.translate(0, (y0+y1)/2, 0);
   return g;
 }
 /* 沿 X 轮廓、沿 Z 方向拉伸（机匣、弹匣） */
@@ -420,9 +430,15 @@ function buildRifle(PAL){
   add(pac9Box(0.004, 0.012, 0.008, -0.010, 0.044, 0.392, MAT_ANO, 0.3), mAno);
   add(pac9Box(0.004, 0.012, 0.008, 0.010, 0.044, 0.392, MAT_ANO, 0.3), mAno);
 
-  /* ============ 最后：把「原版 +z 枪口」映射成「引擎 -z 枪口」 ============
-     只转整组，不改子节点局部坐标。 */
-  g.rotation.y = Math.PI;
+  /* ============ 不再做整组翻转 ============
+     【关键纠正】原版的 -z 本来就是枪口方向，和引擎约定一致。
+     精确推演 qo(pts, a, b, n)：ExtrudeGeometry 沿 +z 拉伸 b-a-2n，
+     再 translate(0,0,-b+n)，最终 z 范围 = [-b+n, -a-n]。
+       · 护木 qo(E, .101, .398) -> z = -0.397 .. -0.102  （枪口端）
+       · 导轨底座 qo(pts, -.096, .397) -> z = -0.397 .. +0.096
+     所以 -z 是枪口、+z 是枪托，与手枪/霰弹枪完全一致，
+     这里再加 rotation.y = PI 就等于把枪又翻了一次，
+     枪会变成「枪托朝前、枪管朝后」，机瞄自然跑到枪尾。 */
   return g;
 }
 

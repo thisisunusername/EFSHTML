@@ -10546,22 +10546,34 @@ function buildGridWalls(m, y, g, wallColor, doorAt){
      用来和主楼正门门洞（世界 x=0 附近）对齐。
      不加这一步的话，格子地图的外墙是封闭的 ——
      玩家虽然从主楼门洞进了楼，却会被自己家里的外墙挡在外面。 */
-  const X0 = -(m.w)/2, Z0 = -29;   /* 格子(0,0)左上角对应的世界坐标（x 居中） */
+  const X0 = -(m.w)/2, Z0 = Z_BASE - (m.h - 1);   /* 格(ix,0) 左上角世界坐标：x 居中，z 从南端往回推 */
   const WT=0.30;          /* 墙厚 30cm */
   const WH=FLOOR_H-0.1;   /* 墙高：略低于天花板，留缝给顶灯 */
   const col = wallColor || 0xd8d2c4;
+  /* 【只建主楼范围内的墙】各层地图进深不同（16 或 18 格），
+     18 格的那三层北端会达 z=-31，比主楼北墙（z=-30）多出 1 米。
+     那 1 米在主楼外面，玩家永远走不到，建出来只会是一排悬空的墙。
+     所以这里按世界 z 过滤：超出 -30 的行直接跳过。 */
   for(let iy=0; iy<m.h; iy++){
+    const rowZ = Z_BASE - (m.h - 1 - iy);      /* 这一行所在的世界 z */
+    if(rowZ < -30) continue;                    /* 超出主楼北墙，不建 */
+    /* 【门洞判定必须做成函数，并在两处都调用】
+       上一版的 bug：只在「起点格」判断门洞，而合并循环
+       while(j+1<m.w && m.g[iy][j+1]===1) j++ 会一路吞并到行尾，
+       结果 1F 南墙（整行 32 格全实心）被合成一根 32 米长的墙段，
+       doorAt 跳过的 4 格被包在里面 —— 门口依然是一堵墙。 */
+    const isDoorGap = function(gx){
+      if(!doorAt || iy !== m.h-1) return false;
+      const halfG = (doorAt.gw||4)/2;
+      return gx >= doorAt.gx-halfG && gx < doorAt.gx+halfG;
+    };
     let ix=0;
     while(ix<m.w){
-      /* 南墙开门：iy 是最后一行，且 ix 落在门口宽度内则跳过 */
-      if(doorAt && iy === m.h-1){
-        const halfG = (doorAt.gw||4)/2;
-        if(ix >= doorAt.gx-halfG && ix < doorAt.gx+halfG){ ix++; continue; }
-      }
+      if(isDoorGap(ix)){ ix++; continue; }
       if(m.g[iy][ix]!==1){ ix++; continue; }
-      /* 往右合并连续墙格 */
+      /* 往右合并连续墙格 —— 遇到门洞格必须断开 */
       let j=ix;
-      while(j+1<m.w && m.g[iy][j+1]===1) j++;
+      while(j+1<m.w && m.g[iy][j+1]===1 && !isDoorGap(j+1)) j++;
       const len = j-ix+1;
       const cx = X0 + ix + len/2;
       const cz = Z0 + iy + 0.5;
@@ -10591,6 +10603,17 @@ function gridOriginX(m){ return -(m && typeof m.w === 'number' ? m.w : 32)/2; }
    ②原来没传 m，而 gridOriginX(m) 会直读 m.w，于是
    “Cannot read properties of undefined (reading 'w')” —— 整个 init 挂掉、画面全黑。
    这里做容错：不传 m 时取「当前正在构建/所在的那一层」的地图。 */
+/* 【Z_BASE 为什么是 -14】
+   主楼是一个 box(60,14,16, y=7, z=-22)，也就是 z 从 -30 到 -14。
+   carveMainDoor() 在正南面（z=-14）开出 4.4 米宽门洞，
+   玩家是从 z=-14 这一面走进去的。
+   但各层格子地图进深不同：2F/B3 是 16 格，1F/B1/B2 是 18 格。
+   如果简单用「z = -29 + gy」，南墙就分别落在 -13 / -11 ——
+   都比门洞的 -14 更靠里 1~3 米，于是玩家一进门先撞上格子外墙，
+   而且五层的南墙在 z=-13、-11 各叠两堵，看起来就是「门口一堆墙」。
+   现在统一：每层地图的南边最后一格对齐到 z=-14，楼体向北长。
+   这样各层南墙共面、都贴着门洞，进门直接进走廊。 */
+const Z_BASE = -14;   /* 各层地图南端（最后一行）所在的世界 z */
 function gridToWorld(gx, gy, m){
   let mm = m;
   if(!mm){
@@ -10602,9 +10625,9 @@ function gridToWorld(gx, gy, m){
   }
   if(!mm || typeof mm.w !== 'number'){
     /* 最后的兜底：用 1F 的宽度（32）居中，返回一个合法坐标，绝不抛错 */
-    return { x: -(32)/2 + gx, z: -29 + gy };
+    return { x: -(32)/2 + gx, z: Z_BASE - (17 - gy) };
   }
-  return { x: gridOriginX(mm) + gx, z: -29 + gy };
+  return { x: gridOriginX(mm) + gx, z: Z_BASE - (mm.h - 1 - gy) };
 }
 /* gridOriginX 也加保护，防止别处直接传 undefined */
 
@@ -10614,7 +10637,7 @@ function buildRoomsFurniture(m, y, g, depth){
   for(const r of m.rooms){
     const OX = gridOriginX(m);
     const cx = OX + (r.x0 + r.x1)/2 + 0.5;
-    const cz = -29 + (r.y0 + r.y1)/2 + 0.5;
+    const cz = Z_BASE - (m.h - 1) + (r.y0 + r.y1)/2 + 0.5;
     const rw = r.x1 - r.x0 + 1, rd = r.y1 - r.y0 + 1;
     if(rw < 3 || rd < 3) continue;
     switch(r.style){
@@ -10737,8 +10760,12 @@ function buildFloorContent(fi, g){
     /* 南门位置换算：主楼门洞在世界 x≈0，
        对应格子 = 世界x - (格子原点x)，即 0 - (-m.w/2) = m.w/2。 */
     const doorGX = Math.round(gm.w/2);
-    const isUpper = (f.id==='1F' || f.id==='2F');
-    buildGridWalls(gm, y, g, wallC, isUpper ? {gx:doorGX, gw:4} : null);
+    /* 【每一层南墙都要开门】
+       原来只有 1F/2F 开门，B1/B2/B3 是封闭的 ——
+       但玩家在 B1 从楼梯下来后，想出去也会撞到那面南墙。
+       各层地图南端现在统一贴 z=Z_BASE(-14)，也就是主楼门洞那条线，
+       所以所有层都在同一位置开一个 4 格宽的口子，与主楼门洞对齐。 */
+    buildGridWalls(gm, y, g, wallC, {gx:doorGX, gw:4});
     buildRoomsFurniture(gm, y, g, depth);
     buildGridStairs(gm, y, g, depth);
   }
@@ -10919,7 +10946,7 @@ function updFloors(dt){
          玩家站上去时楼梯检测整段被跳过，就换不了层。
          改成按当前楼层地图的真实进深算。 */
       const _gm = (typeof GRID_MAPS!=='undefined') ? GRID_MAPS[FLOORS[curFloor].id] : null;
-      const _zEnd = _gm ? (-29 + _gm.h) : -15;
+      const _zEnd = Z_BASE + 0.5;   /* 南端就在门洞处，稍微留一点容差 */
       inB = (px>-29 && px<29 && pz>-29 && pz<_zEnd);
       if(inB){
         /* 【改】楼梯点位由 rebuildStairSpots() 按当前层 objs 生成，
@@ -11216,13 +11243,23 @@ function pac9Notched(x0,y0,x1,y1,s){
 
 /* ---- 三种常用「拉伸 + 摆位」封装，名字对应原版 xr / qo / Rt ----
 /* 沿 Y 轴轮廓、沿 X 方向拉伸（枪身侧面件） */
+/* 对应原版 xr(pts, e, t, n)：
+     ① ExtrudeGeometry 沿 +z 拉伸 (t-e-2n)
+     ② translate(0, 0, e+n)   —— 注意原版是 e+n，不是 -t+n
+     ③ rotateY(PI/2)：把「拉伸方向 z」转到「世界 x」，
+        同时「轮廓的 x」变成「世界 -z」
+   最终效果：pts 的 [px, py] 中 px 是前后（映射到 -z），py 是上下；
+   拉伸厚度沿 x（左右）。这正是机匣、握把、枪托这类「侧面板件」需要的。 */
 function pac9Side(pts, y0, y1, bevel, base, wear, holes){
-  const g = pac9Extrude(pts, y1-y0, bevel, holes);
+  const b = bevel || 0;
+  const depth = Math.max(1e-4, (y1 - y0) - 2*b);
+  const g = pac9Extrude(pts, y1 - y0, b, holes);
   pac9Colorize(g, base, wear||0, pac9IsEdge);
   pac9FixNormals(g);
-  g.translate(0, 0, -(y1-y0)/2);
+  /* ② 原版 translate(0,0,e+n)：把拉伸体沿 z 推到 [e+b, t-b] */
+  g.translate(0, 0, y0 + b);
+  /* ③ 拉伸方向 z -> 世界 x，轮廓 x -> 世界 -z */
   g.rotateY(Math.PI/2);
-  g.translate(0, (y0+y1)/2, 0);
   return g;
 }
 /* 沿 X 轮廓、沿 Z 方向拉伸（机匣、弹匣） */
@@ -11449,9 +11486,15 @@ function buildRifle(PAL){
   add(pac9Box(0.004, 0.012, 0.008, -0.010, 0.044, 0.392, MAT_ANO, 0.3), mAno);
   add(pac9Box(0.004, 0.012, 0.008, 0.010, 0.044, 0.392, MAT_ANO, 0.3), mAno);
 
-  /* ============ 最后：把「原版 +z 枪口」映射成「引擎 -z 枪口」 ============
-     只转整组，不改子节点局部坐标。 */
-  g.rotation.y = Math.PI;
+  /* ============ 不再做整组翻转 ============
+     【关键纠正】原版的 -z 本来就是枪口方向，和引擎约定一致。
+     精确推演 qo(pts, a, b, n)：ExtrudeGeometry 沿 +z 拉伸 b-a-2n，
+     再 translate(0,0,-b+n)，最终 z 范围 = [-b+n, -a-n]。
+       · 护木 qo(E, .101, .398) -> z = -0.397 .. -0.102  （枪口端）
+       · 导轨底座 qo(pts, -.096, .397) -> z = -0.397 .. +0.096
+     所以 -z 是枪口、+z 是枪托，与手枪/霰弹枪完全一致，
+     这里再加 rotation.y = PI 就等于把枪又翻了一次，
+     枪会变成「枪托朝前、枪管朝后」，机瞄自然跑到枪尾。 */
   return g;
 }
 

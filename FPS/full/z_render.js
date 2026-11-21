@@ -125,6 +125,12 @@ try{ if(typeof i18nInitUI==='function') i18nInitUI(); }catch(e){ console.error('
    同样放最后：orientRefresh 里会调 window.__relayout，
    那是上面刚定义的，必须已存在。 */
 try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('orient init failed', e); }
-
+/* 【GM 面板】绑拖动 + 加钱按钮。
+   必须放在这里而不是 f_ui.js 的 bindUI 里：bindUI 在脚本执行到
+   f_ui.js 时就跑了（那时文档已 ready），而 initGM 定义在后面的
+   x_ext.js —— 那一刻还不存在，typeof 检查会静默跳过，
+   结果就是「连点 D 15 次面板也不出来，而且没有任何报错」。
+   initGM 内部有 dataset.bound 幂等保护，重复调用无害。 */
+try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

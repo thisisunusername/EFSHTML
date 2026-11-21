@@ -2513,9 +2513,11 @@ function bindUI(){
      都可能触发二次执行。
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
-  /* GM 面板：绑拖动 + 加钱按钮。放在这里而不是 game init 里，
-     因为它是纯 UI，主菜单阶段就该能用。 */
-  if(typeof initGM==='function'){ try{ initGM(); }catch(e){} }
+  /* 【GM 面板的初始化不放在这里】
+     这个函数在 <script> 执行到 f_ui.js 时就会跑（文档已经 ready），
+     而 initGM 定义在后面的 x_ext.js 里 —— 那一刻它还不存在，
+     这里的 typeof 检查会静默跳过，导致面板永远绑不上按钮。
+     现在由 z_render.js 末尾的启动段负责调用 initGM()。 */
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
   initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 
@@ -4202,6 +4204,8 @@ function gmToggle(force){
   if(!el) return;
   _gmOpen = (typeof force==='boolean') ? force : !_gmOpen;
   el.classList.toggle('on', _gmOpen);
+  /* 在控制台里手动试的时候方便：__gm() 直接看状态 */
+  if(window.__GM_DEBUG) console.log('[GM] open='+_gmOpen);
   if(_gmOpen){
     gmPaint();
     /* 第一次打开时把位置初始化到右下角，之后由拖动决定 */
@@ -4303,15 +4307,32 @@ function initGM(){
 
 /* 主菜单 D 键计数。
    【要点】只在菜单可见时计数，游戏中按 D 是「向右走」，
-   不该被当成彩蛋触发。 */
-function gmHitD(){
+   不该被当成彩蛋触发。
+   【为什么不能只查 style.display】菜单的默认显示来自 CSS 的
+   `#menu{display:flex}`，内联 style.display 是空串而不是 'flex'，
+   一旦哪天有人把内联值改掉（或换成 class 控制），
+   这里的判断就会一直误判成「不可见」，面板怎么也开不出来。
+   所以按优先级依次确认：内联 display: none -> 不可见；
+   否则看计算样式（getComputedStyle）；拿不到计算样式时才退回内联值。 */
+function gmMenuVisible(){
   const menu=document.getElementById('menu');
-  const visible=menu && menu.style.display!=='none';
-  if(!visible) return;
+  if(!menu) return false;
+  if(menu.style && menu.style.display==='none') return false;
+  let vis='';
+  try{
+    if(window.getComputedStyle) vis=(window.getComputedStyle(menu).display||'');
+  }catch(e){}
+  if(!vis) vis=(menu.style&&menu.style.display)||'';
+  return vis!=='none' && vis!=='';
+}
+function gmHitD(){
+  if(!gmMenuVisible()) return;
   const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
   if(now-_gmLast>GM_RESET_MS) _gmCount=0;
   _gmLast=now;
   _gmCount++;
+  /* 调试用：控制台里敲 __gm() 就能看到还差几次 */
+  if(window.__GM_DEBUG) console.log('[GM] '+_gmCount+'/'+GM_HITS);
   if(_gmCount>=GM_HITS){
     _gmCount=0;
     gmToggle(true);
@@ -5852,7 +5873,13 @@ try{ if(typeof i18nInitUI==='function') i18nInitUI(); }catch(e){ console.error('
    同样放最后：orientRefresh 里会调 window.__relayout，
    那是上面刚定义的，必须已存在。 */
 try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('orient init failed', e); }
-
+/* 【GM 面板】绑拖动 + 加钱按钮。
+   必须放在这里而不是 f_ui.js 的 bindUI 里：bindUI 在脚本执行到
+   f_ui.js 时就跑了（那时文档已 ready），而 initGM 定义在后面的
+   x_ext.js —— 那一刻还不存在，typeof 检查会静默跳过，
+   结果就是「连点 D 15 次面板也不出来，而且没有任何报错」。
+   initGM 内部有 dataset.bound 幂等保护，重复调用无害。 */
+try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);
 </script>

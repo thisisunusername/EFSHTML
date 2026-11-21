@@ -92,9 +92,11 @@ function bindUI(){
      都可能触发二次执行。
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
-  /* GM 面板：绑拖动 + 加钱按钮。放在这里而不是 game init 里，
-     因为它是纯 UI，主菜单阶段就该能用。 */
-  if(typeof initGM==='function'){ try{ initGM(); }catch(e){} }
+  /* 【GM 面板的初始化不放在这里】
+     这个函数在 <script> 执行到 f_ui.js 时就会跑（文档已经 ready），
+     而 initGM 定义在后面的 x_ext.js 里 —— 那一刻它还不存在，
+     这里的 typeof 检查会静默跳过，导致面板永远绑不上按钮。
+     现在由 z_render.js 末尾的启动段负责调用 initGM()。 */
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
   initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 

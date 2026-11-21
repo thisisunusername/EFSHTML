@@ -369,6 +369,8 @@ function gmToggle(force){
   if(!el) return;
   _gmOpen = (typeof force==='boolean') ? force : !_gmOpen;
   el.classList.toggle('on', _gmOpen);
+  /* 在控制台里手动试的时候方便：__gm() 直接看状态 */
+  if(window.__GM_DEBUG) console.log('[GM] open='+_gmOpen);
   if(_gmOpen){
     gmPaint();
     /* 第一次打开时把位置初始化到右下角，之后由拖动决定 */
@@ -470,15 +472,32 @@ function initGM(){
 
 /* 主菜单 D 键计数。
    【要点】只在菜单可见时计数，游戏中按 D 是「向右走」，
-   不该被当成彩蛋触发。 */
-function gmHitD(){
+   不该被当成彩蛋触发。
+   【为什么不能只查 style.display】菜单的默认显示来自 CSS 的
+   `#menu{display:flex}`，内联 style.display 是空串而不是 'flex'，
+   一旦哪天有人把内联值改掉（或换成 class 控制），
+   这里的判断就会一直误判成「不可见」，面板怎么也开不出来。
+   所以按优先级依次确认：内联 display: none -> 不可见；
+   否则看计算样式（getComputedStyle）；拿不到计算样式时才退回内联值。 */
+function gmMenuVisible(){
   const menu=document.getElementById('menu');
-  const visible=menu && menu.style.display!=='none';
-  if(!visible) return;
+  if(!menu) return false;
+  if(menu.style && menu.style.display==='none') return false;
+  let vis='';
+  try{
+    if(window.getComputedStyle) vis=(window.getComputedStyle(menu).display||'');
+  }catch(e){}
+  if(!vis) vis=(menu.style&&menu.style.display)||'';
+  return vis!=='none' && vis!=='';
+}
+function gmHitD(){
+  if(!gmMenuVisible()) return;
   const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
   if(now-_gmLast>GM_RESET_MS) _gmCount=0;
   _gmLast=now;
   _gmCount++;
+  /* 调试用：控制台里敲 __gm() 就能看到还差几次 */
+  if(window.__GM_DEBUG) console.log('[GM] '+_gmCount+'/'+GM_HITS);
   if(_gmCount>=GM_HITS){
     _gmCount=0;
     gmToggle(true);

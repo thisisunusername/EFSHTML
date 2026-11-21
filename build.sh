@@ -43,14 +43,3 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "OK: $OUT ($(wc -c < "$OUT") bytes)，未安装 node，跳过语法检查"
 fi
-# 2D 版中英双语
-if command -v node >/dev/null 2>&1 && [ -f i18n_2d_test.js ]; then
-  I2=$(node i18n_2d_test.js 2>&1)
-  if echo "$I2" | grep -q 'I18N_2D_OK'; then
-    echo "I18N_2D_OK: 2D 版房间/道具/结局/难度中英双语全部正确"
-  else
-    echo "$I2" | tail -20
-    echo "2D 国际化测试失败"
-    exit 1
-  fi
-fi

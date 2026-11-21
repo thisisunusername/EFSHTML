@@ -126,6 +126,50 @@
            width:64px; height:64px; border-color:#7c5cff; }
   #btnAim .ico{ width:28px; height:28px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
+  /* 检视按钮：放在开镜左边一格，不抢开火键的位置 */
+  #btnInspect{ right:calc(16px + (var(--big) + var(--gap))*2); bottom:16px; }
+  #btnInspect .ico{ width:24px; height:24px; }
+
+  /* ==== GM 隐藏面板（主菜单连点 D 15 次）====
+     浮在屏幕上层，可拖动、可收起。z-index 比遮罩(9999)略低但比
+     菜单(100)/商店(210)都高，这样开着商店也能调出 GM 加钱。 */
+  #gmPanel{ position:fixed; right:18px; bottom:18px; z-index:9000; width:236px;
+    background:rgba(12,15,24,.96); border:1px solid rgba(124,92,255,.55);
+    border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65),
+    0 0 0 1px rgba(124,92,255,.18) inset; display:none;
+    font-size:12.5px; color:#e8ecf5; backdrop-filter:blur(10px);
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #gmPanel.on{ display:block; }
+  #gmPanel.min .gmb{ display:none; }
+  #gmPanel.min{ width:auto; }
+  /* 标题栏：拖动区 */
+  #gmHead{ display:flex; align-items:center; gap:8px; padding:9px 11px;
+    cursor:grab; border-bottom:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(180deg,rgba(124,92,255,.26),rgba(124,92,255,.06));
+    border-radius:13px 13px 0 0; }
+  #gmPanel.min #gmHead{ border-bottom:none; border-radius:13px; }
+  #gmHead:active{ cursor:grabbing; }
+  #gmHead .t{ font-weight:800; letter-spacing:.06em; font-size:12px;
+    color:#c9b8ff; flex:1; white-space:nowrap; }
+  #gmHead .dot{ width:7px; height:7px; border-radius:50%; background:#48d99a;
+    box-shadow:0 0 8px #48d99a; flex:none; }
+  #gmMin{ flex:none; width:22px; height:22px; line-height:1; border:none;
+    background:rgba(255,255,255,.12); color:#dfe5f0; border-radius:7px;
+    font-size:14px; font-weight:700; cursor:pointer; padding:0; }
+  #gmMin:active{ background:rgba(255,255,255,.26); }
+  .gmb{ padding:11px; display:flex; flex-direction:column; gap:8px; }
+  .gmrow{ display:flex; gap:6px; }
+  .gmbtn{ flex:1; border:1px solid rgba(255,255,255,.14); border-radius:9px;
+    background:rgba(255,255,255,.07); color:#e8ecf5; font-size:12px;
+    font-weight:700; padding:9px 6px; cursor:pointer; transition:.12s; }
+  .gmbtn:active{ transform:scale(.95); background:rgba(124,92,255,.5); }
+  .gmbtn.money{ background:linear-gradient(180deg,rgba(255,213,74,.28),rgba(255,213,74,.10));
+    border-color:rgba(255,213,74,.5); color:#ffe89a; }
+  .gmbtn.money:active{ background:rgba(255,213,74,.55); }
+  #gmCash{ font-size:19px; font-weight:800; color:#ffd54a; text-align:center;
+    letter-spacing:.02em; padding:2px 0 4px; }
+  #gmCash small{ font-size:10px; color:#8d97a8; font-weight:600;
+    letter-spacing:.08em; display:block; margin-bottom:2px; }
 
   /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
   #btnInteract{ right:50%; transform:translateX(50%);
@@ -538,6 +582,13 @@ html[data-lang="en"] #bagBtn span{
       <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
     </svg>
   </div>
+  <div class="actbtn" id="btnInspect" title="检视武器 (F)">
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- 检视：一只眼睛，代表「看看手上这把」 -->
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </div>
   <div class="actbtn" id="btnJump" title="跳跃">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide move-up：向上箭头 -->
@@ -631,6 +682,29 @@ html[data-lang="en"] #bagBtn span{
 <div id="stash" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- GM 隐藏面板：主菜单连续点 D 15 次显示 -->
+<div id="gmPanel">
+  <div id="gmHead">
+    <span class="dot"></span>
+    <span class="t">GM · DEV</span>
+    <button id="gmMin" title="收起">−</button>
+  </div>
+  <div class="gmb">
+    <div id="gmCash"><small>当前资金</small><span id="gmCashNum">0</span></div>
+    <div class="gmrow">
+      <button class="gmbtn money" data-gm="1000">+1 千</button>
+      <button class="gmbtn money" data-gm="10000">+1 万</button>
+    </div>
+    <div class="gmrow">
+      <button class="gmbtn money" data-gm="100000">+10 万</button>
+      <button class="gmbtn money" data-gm="1000000">+100 万</button>
+    </div>
+    <div class="gmrow">
+      <button class="gmbtn" id="gmSet" title="直接设定金额">设定…</button>
+      <button class="gmbtn" id="gmHide">关闭</button>
+    </div>
+  </div>
+</div>
 <!-- 死亡界面 -->
 <div id="death">
 <h2>💀 你阵亡了</h2>
@@ -1143,7 +1217,35 @@ const I18N_EN = {
     'Hell mode: all normal exits are sealed — you must use the electronic door or the basement',
   '三个电闸已全部拉下，电子门通了': 'All three breakers are down — the electronic door has power',
   '拉下监控总闸：全楼的监控都黑了': 'CCTV master breaker pulled — every camera is dark',
-
+  /* ---------- 3D 版：近战武器（刀型）+ 武器皮肤 + 检视 ---------- */
+  '爪刀': 'Karambit',
+  '弯刃 · 出手极快 · 近身利器': 'Curved blade · blazing fast · close-quarters tool',
+  '太刀': 'Katana',
+  '细长刀身 · 挥砍范围最大': 'Long blade · widest swing reach',
+  '战术斧': 'Tactical Axe',
+  '沉重· 一击必杀，但挥得慢': 'Heavy · one-shot kill, but slow swing',
+  '原厂涂装': 'Factory Finish',
+  '默认外观，不花一分钱': 'Default look, costs nothing',
+  '霓虹夜光': 'Neon Glow',
+  '青蓝发光 · 环绕光带': 'Cyan glow · orbiting light rings',
+  '赤血红': 'Crimson Blood',
+  '血红发光 · 杀气十足': 'Blood-red glow · pure menace',
+  '毒液幽绿': 'Toxic Venom',
+  '幽绿毒光 · 环绕光带': 'Toxic green glow · orbiting light rings',
+  '虚空紫': 'Void Purple',
+  '暗紫辐射 · 最强发光': 'Dark purple radiation · strongest glow',
+  '黄金': 'Gold',
+  '土豪金 · 无光但最闪': 'Rich gold · no glow, maximum shine',
+  '武器皮肤': 'Weapon Skins',
+  '检视': 'Inspect',
+  '检视武器': 'Inspect Weapon',
+  '检视武器 (F)': 'Inspect Weapon (F)',
+  '先买一把枪再买皮肤': 'Buy a gun first before buying a skin',
+  /* ---------- 3D 版：GM 隐藏面板 ---------- */
+  '当前资金': 'Balance',
+  '设定资金（当前 {0}）': 'Set balance (current {0})',
+  '直接设定金额': 'Set exact amount',
+  'GM 面板已解锁': 'GM panel unlocked',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */
@@ -1545,6 +1647,10 @@ const P={
   vel:new THREE.Vector3(),
   yaw:0, pitch:0,
   firing:false,            // 扳机是否按住（全自动连发靠它）
+  /* 武器皮肤：{ 物品 id: 皮肤 id }。
+     存的是「这把枪用什么皮肤」而不是「当前用什么皮肤」，
+     这样切枪时每把枪都能记住自己的涂装。 */
+  skins:{},
   hp:100, armor:0,
   /* ammo=手枪弹匣 / gun=长枪弹匣 / rifle|pistol|sniper|shot=各类后备弹。
      sniper 和 shot 以前没初始化，撒弹枪和狙击买了弹也只能靠
@@ -1884,10 +1990,21 @@ let enemyTick=0;
    【霰弹】pellets>1 的枪一次发多条射线，每条独立算伤害；
    单颗伤害很低（14），但近距离九颗全中就是 126，一枪带走；
    距离拉开后散得很开，大部分弹丸打空 —— 这就是「近距离伤害高」，
-   不需要额外写衰减公式，散射本身就是衰减。 */
+   不需要额外写衰减公式，散射本身就是衰减。
+
+   【近战为什么以前打不出伤害】
+   近战是 1 条 3 米长的射线，但敌人胶囊体的 COLLIDER 只在
+   spawnEnemy 里 push 进了 shootables，而刀挥出去的时机通常是
+   敌人已经贴脸（<1m）—— 射线起点在相机（y≈1.62），刀又往下挥，
+   3 米内的射线常常从胶囊体旁边擦过去。表现就是「砍了没反应」。
+   现在近战改成【半球形近身判定】：不看准星射线，直接遍历所有
+   敌人算水平距离 + 高度差，只要在 2.6 米内、且大致在正面
+   120° 扇区内就算命中。这才是刀该有的手感。 */
 function fireOnce(dirOverride){
   const melee=curIsMelee();
-  const t=curAmmoKey();             // melee 时为 null
+  /* 近战不做射线检测，走独立的近身判定（见 meleeSwing） */
+  if(melee){ meleeSwing(); return; }
+  const t=curAmmoKey();
   const dir=dirOverride||lookDir();
   const origin=camera.position.clone();
   const pellets=melee?1:curPellets();
@@ -1932,6 +2049,59 @@ function fireOnce(dirOverride){
   }
   if(headAny) sfxHeadshot(); else if(hitAny) sfxHit();
 }
+/* ---- 近战近身判定 ----
+   不用射线，改为「圆锥扇形 + 距离」判定：
+     1) 水平距离 <= MELEE_RANGE（2.6m）
+     2) 与视线方向的水平夹角 <= MELEE_ARC/2（60°，即正面 120° 扇区）
+     3) 高度差 <= 2.2m（站着也能砍到趴着的，但打不到楼上的）
+   这样贴脸乱砍一定砍得到，而不是刀从人身上穿过去没反应。
+   命中的每个敌人独立扣血，一次挥砍最多打 MELEE_MAX（2）个，
+   避免一刀把一屋子人全清了。 */
+const MELEE_RANGE=2.6;      // 挥砍半径（米）
+const MELEE_ARC=Math.PI/3;  // 半扇区 60°，正面总共 120°
+const MELEE_MAX=2;          // 一刀最多命中几个
+function meleeSwing(){
+  if(!camera) return;
+  const dmg=curDamage();
+  /* 每把刀的挥砍半径不同：太刀最长，斧头重但短 */
+  const mit=(typeof curMeleeItem==='function')?curMeleeItem():null;
+  const reach=(mit&&mit.meleeRange)||MELEE_RANGE;
+  const cp=camera.position;
+  /* 视线水平方向：相机 forward 拍平 */
+  const fx=-Math.sin(P.yaw||0), fz=-Math.cos(P.yaw||0);
+  const cands=[];
+  for(const e of enemies){
+    if(!e.alive) continue;
+    const dx=(e.x||0)-cp.x, dz=(e.z||0)-cp.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>reach) continue;
+    if(Math.abs(cp.y-(e.body&&e.body.position?e.body.position.y:cp.y))>2.2) continue;
+    /* 贴得极近时方向没意义，直接算命中 */
+    let ang=0;
+    if(dist>0.25){
+      const dot=(dx*fx+dz*fz)/dist;
+      ang=Math.acos(Math.max(-1,Math.min(1,dot)));
+    }
+    if(ang>MELEE_ARC) continue;
+    cands.push({e:e,dist:dist});
+  }
+  /* 近的先挨刀 */
+  cands.sort((a,b)=>a.dist-b.dist);
+  const n=Math.min(cands.length, MELEE_MAX);
+  for(let i=0;i<n;i++){
+    const e=cands[i].e;
+    e.hp-=dmg;
+    e.aggro=true;
+    if(e.hp<=0 && e.alive){
+      e.alive=false;
+      if(e.body) e.body.visible=false;
+      if(e.head) e.head.visible=false;
+      sfxKill();
+    }
+  }
+  if(n>0) sfxHit();
+  return n;
+}
 /* 霰弹散射半角（弧度/轴向偏移量）：0.028 约等于 1.6 度，
    8 米处散开半径约 22cm —— 正好覆盖一个人上半身。 */
 const SHOT_SPREAD=0.028;
@@ -1939,6 +2109,8 @@ const SHOT_SPREAD=0.028;
 /* 实际扣板机入口：检查冷却/弹药，播放声音，决定是否进入泵动/栓动装填 */
 function fire(){
   if(P.reload) return;
+  /* 检视武器时枪已经转到脸前了，这时候还能开火会很穿帮 */
+  if(typeof isInspecting==='function' && isInspecting()) return;
   if(P.shootCd>0) return;
   /* 泵动/栓动：上一发的拉栓动作没做完，不许再开火。
      这条比 shootCd 更严格，因为 fireCd（0.20）比拉栓时间（0.58）短。 */
@@ -1991,6 +2163,7 @@ function updFireHold(dt){
      用 typeof 保护：单块静态检查时可能还没加载 b_world。 */
   if(typeof ready==='boolean' ? !ready : !canShootYet()) return;
   if(P.reload||curIsMelee()) return;
+  if(typeof isInspecting==='function' && isInspecting()) return;
   if(!curIsAuto()) return;
   if(P.shootCd>0||wPump>0) return;
   fire();
@@ -2340,6 +2513,9 @@ function bindUI(){
      都可能触发二次执行。
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
+  /* GM 面板：绑拖动 + 加钱按钮。放在这里而不是 game init 里，
+     因为它是纯 UI，主菜单阶段就该能用。 */
+  if(typeof initGM==='function'){ try{ initGM(); }catch(e){} }
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
   initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 
@@ -2463,6 +2639,13 @@ if(window.__uiBound) return; window.__uiBound=true;
     if(e.code==='Digit1'&&!e.repeat) switchSlot('primary');
     if(e.code==='Digit2'&&!e.repeat) switchSlot('secondary');
     if(e.code==='Digit3'&&!e.repeat) switchSlot('melee');
+    /* F = 检视当前武器（看皮肤/看刀型）。
+       用 !e.repeat 避免长按 F 每帧都重新触发一次。 */
+    if(e.code==='KeyF'&&!e.repeat){ if(typeof startInspect==='function') startInspect(); }
+    /* 主菜单连点 D 15 次解锁 GM 面板。
+       游戏里按 D 是向右走，gmHitD 内部会先判断菜单是否可见，
+       所以不会误触。 */
+    if(e.code==='KeyD'&&!e.repeat){ if(typeof gmHitD==='function') gmHitD(); }
     /* X = 循环切枪，懒得记槽位时用 */
     if(e.code==='KeyX'&&!e.repeat) cycleSlot();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
@@ -2747,6 +2930,17 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     /* 换弹时自动退出开镜，否则换弹动画和 FOV 会互相打架 */
   }
   window.__setAim=setAim;
+  /* 检视按钮：点一下把武器在脸前转一圈，用来欣赏皮肤和刀型。
+     用 touchstart 防止 300ms 延迟，同时 preventDefault 避免
+     触发后面的 mousedown 造成双重调用。 */
+  const inspectBtn=$('btnInspect');
+  if(inspectBtn){
+    const doIns=(e)=>{ if(typeof startInspect==='function') startInspect();
+      if(e&&e.preventDefault) e.preventDefault();
+      if(e&&e.stopPropagation) e.stopPropagation(); };
+    inspectBtn.addEventListener('touchstart',doIns,{passive:false});
+    inspectBtn.addEventListener('click',doIns);
+  }
   // 键盘右键也可开镜（桌面端，按住式）
   /* 右键瞄准：按住开镜，松开还原。
      必须同时屏蔽浏览器右键菜单，否则一按右键先弹出一个菜单，
@@ -2876,8 +3070,19 @@ const SHOP_ITEMS={
   gun_m870:   {cat:'gun',    get name(){ return T('雷明顿 M870'); }, icon:'🔫', price:5200, get desc(){ return T('泵动 · 9 颗弹丸 · 近距一枪致命'); }, ammoType:'shot', dmg:14, fireMode:'pump', fireCd:0.20, mag:7, pumpTime:0.58, pellets:9, recoil:1.0, adsZ:0.60, adsY:0.014, sightY:0.090},
   pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('半自动 · 应急副武器'); }, ammoType:'pistol', dmg:14, fireMode:'semi', fireCd:0.17, mag:12, recoil:0.90, adsZ:0.40, adsY:0.012, sightY:0.093},
   pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('半自动 · 高伤副武器'); }, ammoType:'pistol', dmg:24, fireMode:'semi', fireCd:0.24, mag:8, recoil:0.75, adsZ:0.42, adsY:0.013, sightY:0.093},
-  melee_knife:{cat:'melee',  get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹'); }, dmg:35},
-  melee_baton:{cat:'melee',  get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28},
+  melee_knife:{cat:'melee', get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹 · 出手快'); }, dmg:35, knife:'knife', meleeCd:0.42, meleeRange:2.6},
+  melee_baton:{cat:'melee', get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28, knife:'machete', meleeCd:0.46, meleeRange:2.8},
+  /* ---- 更多刀型：只改外观，伤害各有微调 ---- */
+  melee_karambit:{cat:'melee', get name(){ return T('爪刀'); }, icon:'🗡️', price:1400, get desc(){ return T('弯刃 · 出手极快 · 近身利器'); }, dmg:42, knife:'karambit', meleeCd:0.30, meleeRange:2.2},
+  melee_katana:{cat:'melee', get name(){ return T('太刀'); },   icon:'⚔️', price:2600, get desc(){ return T('细长刀身 · 挥砍范围最大'); }, dmg:56, knife:'katana', meleeCd:0.52, meleeRange:3.3},
+  melee_axe:{cat:'melee',    get name(){ return T('战术斧'); }, icon:'🪓', price:3600, get desc(){ return T('沉重· 一击必杀，但挥得慢'); }, dmg:95, knife:'axe', meleeCd:0.78, meleeRange:2.7},
+  /* ---- 武器皮肤：纯外观，不提供任何属性加成 ---- */
+  skin_none:{cat:'skin', get name(){ return T('原厂涂装'); }, icon:'⬜', price:0,    get desc(){ return T('默认外观，不花一分钱'); }, skin:'skin_none'},
+  skin_neon:{cat:'skin', get name(){ return T('霓虹夜光'); },   icon:'🟦', price:2000, get desc(){ return T('青蓝发光 · 环绕光带'); }, skin:'skin_neon'},
+  skin_blood:{cat:'skin',get name(){ return T('赤血红'); },     icon:'🟥', price:3200, get desc(){ return T('血红发光 · 杀气十足'); }, skin:'skin_blood'},
+  skin_toxic:{cat:'skin',get name(){ return T('毒液幽绿'); },   icon:'🟩', price:3800, get desc(){ return T('幽绿毒光 · 环绕光带'); }, skin:'skin_toxic'},
+  skin_void:{cat:'skin', get name(){ return T('虚空紫'); },     icon:'🟪', price:5000, get desc(){ return T('暗紫辐射 · 最强发光'); }, skin:'skin_void'},
+  skin_gold:{cat:'skin', get name(){ return T('黄金'); },       icon:'🟨', price:9000, get desc(){ return T('土豪金 · 无光但最闪'); }, skin:'skin_gold'},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
   chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('额外 2 个弹匣位'); }, mags:2},
   chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('额外 4 个弹匣位'); }, mags:4},
@@ -2891,6 +3096,7 @@ const SHOP_CATS=[
   {id:'gun',    get name(){ return T('主武器'); }},
   {id:'pistol', get name(){ return T('手枪'); }},
   {id:'melee',  get name(){ return T('副武器'); }},
+  {id:'skin',   get name(){ return T('武器皮肤'); }},
   {id:'chest',  get name(){ return T('胸挂'); }},
   {id:'med',    get name(){ return T('医药'); }},
   {id:'tool',   get name(){ return T('道具'); }},
@@ -3041,6 +3247,29 @@ function buyItem(id){
     sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); return;
   }
 
+  /* 【武器皮肤】买完立刻套到当前手持的主武器上。
+     皮肤是纯外观，没有属性，所以不需要进仓库再装备 ——
+     买完直接生效手感最好，也避免玩家买了不知道怎么用。
+     如果手上不是枪（比如拿到了刀），就存进 P.skins 里，
+     等真正装备那把枪时自动生效（curSkinId 会去查）。
+     由于皮肤只能给枪上，我们把 skin 存到 P.equip.primary 这把枪的 id 上。 */
+  if(cat==='skin'){
+    const skinId=it.skin||id;
+    /* 找一把能套的武器：优先当前手持的主武器，其次手里任何一把枪 */
+    let target=(P.equip&&P.equip.primary)||null;
+    if(!target && P.equip && P.equip.secondary) target=P.equip.secondary;
+    if(!target){
+      /* 一把枪都没有，不允许买，不然花了钱什么都看不到 */
+      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); return;
+    }
+    P.ammo.cash-=it.price;
+    stashAdd(id,1);
+    if(typeof setSkin==='function') setSkin(target, skinId);
+    if(typeof _modelCache==='object') _modelCache.key=null;
+    sfxBuy();
+    toast('皮肤已应用 '+(SHOP_ITEMS[target]?SHOP_ITEMS[target].name:'')+' · '+it.name);
+    refreshHUD(); buildShop(); return;
+  }
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;
   stashAdd(id,1);
@@ -3929,6 +4158,167 @@ function bindDoorHint(){
   el.addEventListener('click',tap);
 }
 
+/* ============ GM 隐藏面板 ============
+   入口：主菜单连续点键盘 D 键 15 次。
+   【为什么不用一个显眼的按钮】
+   这是个调试/爽玩用的后门，不该让正常玩家误触，
+   所以埋成打击键的彩蛋。连续按，中间断了就重新计数。
+   面板可拖动（拖标题栏）、可收起（− 或 关闭），
+   且不拦截游戏输入 —— 它浮在最上层，但点它自己的按钮才会响应。 */
+const GM_HITS=15;              // 需要连点的次数
+const GM_RESET_MS=1200;        // 超过这么久没按就清零
+let _gmCount=0, _gmLast=0, _gmOpen=false;
+
+/* 加钱：直接改 P.ammo.cash，并立刻刷新所有显示金额的地方。
+   注意不能只改 DOM —— P.ammo.cash 才是数据源，
+   否则一刷新 HUD 就把假数字盖回去了。 */
+function gmAddCash(n){
+  const v=Number(n)||0;
+  /* 只允许加钱：这个面板是「开发者给自己发钱」，
+     不该能当扣钱按钮用（万一误点到 -9999999 把存档搞坏就麻烦了）。
+     要减少金额请用「设定…」直接输入目标值。 */
+  if(!(v>0)) return;
+  P.ammo.cash=Math.max(0,(P.ammo.cash|0)+v);
+  gmPaint();
+  try{ refreshHUD(); }catch(e){}
+  try{ if(typeof buildShop==='function') buildShop(); }catch(e){}
+  try{ if(typeof buildMenuStats==='function') buildMenuStats(); }catch(e){}
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+}
+function gmSetCash(n){
+  const v=Math.max(0,Math.floor(Number(n)||0));
+  P.ammo.cash=v;
+  gmPaint();
+  try{ refreshHUD(); }catch(e){}
+  try{ if(typeof buildShop==='function') buildShop(); }catch(e){}
+}
+function gmPaint(){
+  const el=document.getElementById('gmCashNum');
+  if(el) el.textContent=(P.ammo.cash|0).toLocaleString('en-US');
+}
+
+function gmToggle(force){
+  const el=document.getElementById('gmPanel');
+  if(!el) return;
+  _gmOpen = (typeof force==='boolean') ? force : !_gmOpen;
+  el.classList.toggle('on', _gmOpen);
+  if(_gmOpen){
+    gmPaint();
+    /* 第一次打开时把位置初始化到右下角，之后由拖动决定 */
+    gmClampPos(el);
+  }
+}
+/* 把面板夹在可视区域内，避免拖到屏幕外面就找不回来了 */
+function gmClampPos(el){
+  if(!el) return;
+  const w=el.offsetWidth||236, h=el.offsetHeight||80;
+  const W=window.innerWidth||360, H=window.innerHeight||640;
+  let x=parseFloat(el.dataset.gx);
+  let y=parseFloat(el.dataset.gy);
+  if(!isFinite(x)) x=W-w-18;
+  if(!isFinite(y)) y=H-h-18;
+  x=Math.max(4,Math.min(W-w-4,x));
+  y=Math.max(4,Math.min(H-h-4,y));
+  el.dataset.gx=x; el.dataset.gy=y;
+  el.style.left=x+'px'; el.style.top=y+'px';
+  el.style.right='auto'; el.style.bottom='auto';
+}
+/* 拖动：pointer 事件对鼠标和触摸都生效，比分别绑 mousedown/touchstart 简洁。
+   只在标题栏上发起拖动，避免在按钮上拖时点不到按钮。 */
+function gmBindDrag(el, head){
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+  const down=(e)=>{
+    if(e.target && e.target.id==='gmMin') return;   // 收起按钮不触发拖动
+    dragging=true;
+    const p=gmPoint(e);
+    sx=p.x; sy=p.y;
+    ox=parseFloat(el.dataset.gx)||0;
+    oy=parseFloat(el.dataset.gy)||0;
+    if(e.cancelable) e.preventDefault();
+  };
+  const move=(e)=>{
+    if(!dragging) return;
+    const p=gmPoint(e);
+    const W=window.innerWidth||360, H=window.innerHeight||640;
+    const w=el.offsetWidth||236, h=el.offsetHeight||80;
+    let nx=ox+(p.x-sx), ny=oy+(p.y-sy);
+    nx=Math.max(4,Math.min(W-w-4,nx));
+    ny=Math.max(4,Math.min(H-h-4,ny));
+    el.dataset.gx=nx; el.dataset.gy=ny;
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+    if(e.cancelable) e.preventDefault();
+  };
+  const up=()=>{ dragging=false; };
+  head.addEventListener('pointerdown',down);
+  window.addEventListener('pointermove',move,{passive:false});
+  window.addEventListener('pointerup',up);
+  window.addEventListener('pointercancel',up);
+  /* 没有 pointer 事件的老 WebView 退化为 touch + mouse */
+  if(!window.PointerEvent){
+    head.addEventListener('touchstart',down,{passive:false});
+    head.addEventListener('touchmove',move,{passive:false});
+    head.addEventListener('touchend',up);
+    head.addEventListener('mousedown',down);
+    window.addEventListener('mousemove',move);
+    window.addEventListener('mouseup',up);
+  }
+}
+function gmPoint(e){
+  if(e.touches && e.touches.length) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+  if(e.changedTouches && e.changedTouches.length) return {x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+  return {x:e.clientX||0,y:e.clientY||0};
+}
+
+/* 初始化：绑按钮 + 挂 D 键计数 */
+function initGM(){
+  const el=document.getElementById('gmPanel');
+  if(!el || el.dataset.bound==='1') return;
+  el.dataset.bound='1';
+  const head=document.getElementById('gmHead');
+  if(head) gmBindDrag(el, head);
+  /* 金额按钮 */
+  for(const btn of el.querySelectorAll('[data-gm]')){
+    const amt=parseInt(btn.getAttribute('data-gm'),10);
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); gmAddCash(amt); });
+  }
+  const setBtn=document.getElementById('gmSet');
+  if(setBtn) setBtn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    /* 用原生 prompt：这个面板就是给开发者自己用的，
+       为了它引入一个自制弹窗不划算。 */
+    const cur=String(P.ammo.cash|0);
+    const v=(typeof prompt==='function') ? prompt('设定资金（当前 '+cur+'）', cur) : null;
+    if(v!==null && v!==undefined && v!=='') gmSetCash(v);
+  });
+  const hideBtn=document.getElementById('gmHide');
+  if(hideBtn) hideBtn.addEventListener('click',(e)=>{ e.stopPropagation(); gmToggle(false); });
+  const minBtn=document.getElementById('gmMin');
+  if(minBtn) minBtn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    el.classList.toggle('min');
+    minBtn.textContent=el.classList.contains('min')?'+':'−';
+    gmClampPos(el);
+  });
+}
+
+/* 主菜单 D 键计数。
+   【要点】只在菜单可见时计数，游戏中按 D 是「向右走」，
+   不该被当成彩蛋触发。 */
+function gmHitD(){
+  const menu=document.getElementById('menu');
+  const visible=menu && menu.style.display!=='none';
+  if(!visible) return;
+  const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(now-_gmLast>GM_RESET_MS) _gmCount=0;
+  _gmLast=now;
+  _gmCount++;
+  if(_gmCount>=GM_HITS){
+    _gmCount=0;
+    gmToggle(true);
+    try{ toast('GM 面板已解锁'); }catch(e){}
+  }
+}
+
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
 let weaponRoot=null, weaponPistol=null, weaponRifle=null, weaponKnife=null, weaponShotgun=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
@@ -3942,6 +4332,8 @@ let wSprint=0, wAds=0;
 /* 泵动/栓动作动进度：fire() 里置 1，updPump 每帧衰减到 0。
    声明在这里的原因同上：模块严格模式下给未声明变量赋值会抛 ReferenceError。 */
 let wPump=0, wPumpDur=0.58;
+/* 检视进度：1 -> 0，updWeapon 末尾读它叠加姿势 */
+let wInsT=0, wInsDur=1.5;
 
 function mat(color,rough,metal){
   return new THREE.MeshStandardMaterial({
@@ -3951,12 +4343,14 @@ function mat(color,rough,metal){
 }
 
 /* 用基础几何体拼一支枪（无需外部模型文件） */
-function buildPistol(){
+function buildPistol(PAL){
   const g=new THREE.Group();
-  const dark=mat(0x2a2d33,0.45,0.9);
-  const black=mat(0x14161a,0.6,0.85);
-  const steel=mat(0x5a5f68,0.35,0.95);
-  const grip=mat(0x1e2126,0.85,0.2);
+  /* 不传配色就用原厂默认值，这样旧调用点不会炸 */
+  const C=PAL||{main:0x2a2d33,dark:0x14161a,steel:0x5a5f68,grip:0x1e2126};
+  const dark=mat(C.main,0.45,0.9);
+  const black=mat(C.dark,0.6,0.85);
+  const steel=mat(C.steel,0.35,0.95);
+  const grip=mat(C.grip,0.85,0.2);
 
   // 套筒（上）
   const slide=new THREE.Mesh(new THREE.BoxGeometry(0.075,0.075,0.34), dark);
@@ -3985,12 +4379,13 @@ function buildPistol(){
   return g;
 }
 
-function buildRifle(){
+function buildRifle(PAL){
   const g=new THREE.Group();
-  const dark=mat(0x2e3238,0.5,0.85);
-  const black=mat(0x15171b,0.62,0.8);
-  const steel=mat(0x646a74,0.3,0.95);
-  const poly=mat(0x3a3f47,0.8,0.25);
+  const C=PAL||{main:0x2e3238,dark:0x15171b,steel:0x646a74,poly:0x3a3f47};
+  const dark=mat(C.main,0.5,0.85);
+  const black=mat(C.dark,0.62,0.8);
+  const steel=mat(C.steel,0.3,0.95);
+  const poly=mat(C.poly,0.8,0.25);
 
   // 上机匣
   const upper=new THREE.Mesh(new THREE.BoxGeometry(0.078,0.08,0.40), dark);
@@ -4029,6 +4424,70 @@ function buildRifle(){
   return g;
 }
 
+/* ============ 武器皮肤（颜色 + 发光特效） ============
+   皮肤只改材质，不改几何体 —— 这样一支枪能用任意皮肤，
+   不用给每个组合都建一遍模型。
+   结构：SKINS[id] = { name, colors:{涂装色}, glow:{发光色, 强度}, deco:'aura'|'none' }
+   glow 用 MeshStandardMaterial 的 emissive/emissiveIntensity，
+   不需要额外的后期处理就能有很明显的「这把枪在发光」的观感。 */
+const SKINS={
+  skin_none:{ get name(){ return T('原厂'); },
+    main:0x2e3238, dark:0x15171b, steel:0x646a74, poly:0x3a3f47, grip:0x1e2126,
+    glow:0x000000, glowI:0, deco:'none' },
+  skin_neon:{ get name(){ return T('霓虹夜光'); },
+    main:0x1a2436, dark:0x0d1220, steel:0x39e8ff, poly:0x131b2a, grip:0x0e1420,
+    glow:0x18e0ff, glowI:0.95, deco:'aura' },
+  skin_blood:{ get name(){ return T('赤血红'); },
+    main:0x2a0d10, dark:0x140507, steel:0xff3b3b, poly:0x1d0a0c, grip:0x120607,
+    glow:0xff2233, glowI:1.15, deco:'aura' },
+  skin_gold:{ get name(){ return T('黄金'); },
+    main:0x3a2c10, dark:0x1d1607, steel:0xffd24a, poly:0x4a3812, grip:0x241b0a,
+    glow:0xffb524, glowI:0.55, deco:'none' },
+  skin_toxic:{ get name(){ return T('毒液幽绿'); },
+    main:0x12220f, dark:0x081207, steel:0x7cff4a, poly:0x0f1c0c, grip:0x0a1208,
+    glow:0x6cff3a, glowI:1.05, deco:'aura' },
+  skin_void:{ get name(){ return T('虚空紫'); },
+    main:0x1c1030, dark:0x0c0618, steel:0xb46cff, poly:0x160c26, grip:0x0e0719,
+    glow:0x9a4dff, glowI:1.25, deco:'aura' },
+};
+const SKIN_IDS=Object.keys(SKINS);
+/* 皮肤加成：只给一点主题色，不破坏平衡（纯外观，零属性） */
+function skinOf(id){ return SKINS[id]||SKINS.skin_none; }
+
+/* 根据皮肤造一组材质。
+   【为什么要重建而不是改色】
+   MeshStandardMaterial 的 color 可以 setHex 临时改，但每个 mesh 可能
+   共享同一个材质对象（mat() 每次新建所以其实不共享），
+   为了安全起见重新造一套最省心，而且开火前的重建频率只有「换武器/换皮肤」
+   这一次，不在每帧执行。 */
+function skinMats(sk){
+  const g=Math.max(0,sk.glowI||0);
+  const mk=(col)=>{ const m=mat(col,0.42,0.85);
+    if(g>0 && sk.glow){
+      m.emissive=new THREE.Color(sk.glow);
+      m.emissiveIntensity=g;
+    }
+    return m;
+  };
+  return { main:mk(sk.main), dark:mk(sk.dark), steel:mk(sk.steel),
+           poly:mk(sk.poly), grip:mk(sk.grip) };
+}
+
+/* 当前装备的皮肤（存在 P.skins[slot] 里，没设就用原厂） */
+function curSkinId(){
+  const id=slotItem(P.slot);
+  if(!id) return 'skin_none';
+  const m=(P.skins&&P.skins[id])||null;
+  return (m&&SKINS[m]) ? m : 'skin_none';
+}
+function setSkin(itemId, skinId){
+  if(!SKINS[skinId]) return false;
+  if(!P.skins) P.skins={};
+  P.skins[itemId]=skinId;
+  _modelCache.key=null;        // 强制下次 applyWeaponModel 重建
+  return true;
+}
+
 /* ---- 雷明顿 M870 泵动霰弹枪 ----
    结构和步枪不同：
      1) 下挂弹管（tube）—— 泵动枪的标志，子弹塞在枪管下面
@@ -4037,12 +4496,13 @@ function buildRifle(){
      3) 没有弹匣，靠弹管供弹
    护木必须单独拿出来建，并挂到 g.userData 之外通过返回值带出去，
    因为动画要单独改它的 position.z。 */
-function buildM870(){
+function buildM870(PAL){
   const g=new THREE.Group();
-  const dark=mat(0x35302a,0.62,0.45);   // 深木色/聚合物
-  const black=mat(0x15171b,0.6,0.85);
-  const steel=mat(0x5e646e,0.34,0.95);
-  const wood=mat(0x5a3d22,0.78,0.15);
+  const C=PAL||{main:0x35302a,dark:0x15171b,steel:0x5e646e,poly:0x5a3d22};
+  const dark=mat(C.main,0.62,0.45);   // 木纹/聚合物
+  const black=mat(C.dark,0.6,0.85);
+  const steel=mat(C.steel,0.34,0.95);
+  const wood=mat(C.poly,0.78,0.15);
 
   // 机匣
   const recv=new THREE.Mesh(new THREE.BoxGeometry(0.075,0.082,0.26), dark);
@@ -4113,80 +4573,197 @@ function buildHand(isLeft){
   return g;
 }
 
-/* 战术小刀：刀刃 + 刀柄 + 护手。
-   melee 槽的视觉表现。近战武器在 FPS 里视角要更靠中间，
-   所以整体往画面中心挪一点，握持角度也换成「反手握」的侧面姿态。 */
-function buildKnife(){
-  const g=new THREE.Group();
-  const steel=mat(0xc9d3e0,0.35,0.65);
-  const grip=mat(0x23272e,0.95,0.05);
-  const rim=mat(0x8a939f,0.5,0.4);
+/* ============ 近战武器模型 ============
+   五种刀，形状各不相同：
+     knife   战术小刀  —— 短、直、通用
+     karambit 爪刀      —— 弯刃，视觉最骚，反手握
+     katana  太刀/长刀  —— 细长，挥砍感强
+     machete 砍刀      —— 宽刃，厚背
+     axe     战术斧    —— 斧头，沉重
+   每个都是「刀刃 + 护手 + 刀柄 + 握持手」，只是几何参数和角度不同。
+   配色来自皮肤系统，发光皮肤会让刀刃发光。
 
-  // 刀柄（带指槽）
+   姿态说明：近战武器在 FPS 里视角要更靠中间，
+   所以整体往画面中心挪一点，握持角度也换成「反手握」的侧面姿态。 */
+
+/* 在刀柄上叠几道指槽，所有刀共用 */
+function knifeGrooves(g,rim,y0,n,step,w,h,z){
+  for(let i=0;i<n;i++){
+    const groove=new THREE.Mesh(new THREE.BoxGeometry(w,h,w*0.95), rim);
+    groove.position.set(0,y0+i*step,z); g.add(groove);
+  }
+}
+
+/* ---- 战术小刀：短直刃 ---- */
+function buildKnifeTypeKnife(PAL){
+  const g=new THREE.Group();
+  const C=PAL||{steel:0xc9d3e0,grip:0x23272e,rim:0x8a939f};
+  const steel=mat(C.steel,0.35,0.65);
+  const grip=mat(C.grip,0.95,0.05);
+  const rim=mat(C.rim||C.grip,0.5,0.4);
   const handle=new THREE.Mesh(new THREE.BoxGeometry(0.030,0.115,0.030), grip);
   handle.position.set(0,-0.03,0.02); g.add(handle);
-  for(let i=0;i<3;i++){
-    const groove=new THREE.Mesh(new THREE.BoxGeometry(0.034,0.008,0.032), rim);
-    groove.position.set(0,-0.065+i*0.028,0.02); g.add(groove);
-  }
-  // 护手
+  knifeGrooves(g,rim,-0.065,3,0.028,0.034,0.008,0.02);
   const guard=new THREE.Mesh(new THREE.BoxGeometry(0.062,0.012,0.034), rim);
   guard.position.set(0,0.032,0.02); g.add(guard);
-  // 刀刃：底宽顶窄，用两段近似（没有自定义几何体时这样最省）
   const blade=new THREE.Mesh(new THREE.BoxGeometry(0.026,0.20,0.010), steel);
   blade.position.set(0,0.14,0.02); blade.rotation.x=-0.04; g.add(blade);
   const tip=new THREE.Mesh(new THREE.ConeGeometry(0.014,0.055,4), steel);
   tip.position.set(0,0.265,0.018); tip.rotation.y=Math.PI/4; g.add(tip);
+  return g;
+}
 
-  /* 握刀的手：右手掌心包住刀柄 */
+/* ---- 爪刀：弯刃，反手 ---- */
+function buildKnifeTypeKarambit(PAL){
+  const g=new THREE.Group();
+  const C=PAL||{steel:0xc9d3e0,grip:0x1b1f26,rim:0x8a939f};
+  const steel=mat(C.steel,0.30,0.75);
+  const grip=mat(C.grip,0.92,0.08);
+  const rim=mat(C.rim||C.grip,0.45,0.5);
+  /* 指环：爪刀的灵魂，放在刀柄尾部 */
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.028,0.008,8,16), rim);
+  ring.position.set(0,-0.075,0.02); ring.rotation.x=Math.PI/2; g.add(ring);
+  /* 刀柄（短，带指槽） */
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.026,0.085,0.028), grip);
+  handle.position.set(0,-0.028,0.02); handle.rotation.x=-0.12; g.add(handle);
+  knifeGrooves(g,rim,-0.055,2,0.032,0.030,0.009,0.02);
+  /* 弯刃：三段拼接画出弧线（不用自定义几何体） */
+  const seg1=new THREE.Mesh(new THREE.BoxGeometry(0.022,0.085,0.009), steel);
+  seg1.position.set(0.004,0.048,0.024); seg1.rotation.z=0.18; g.add(seg1);
+  const seg2=new THREE.Mesh(new THREE.BoxGeometry(0.020,0.085,0.009), steel);
+  seg2.position.set(0.026,0.104,0.024); seg2.rotation.z=0.62; g.add(seg2);
+  const seg3=new THREE.Mesh(new THREE.BoxGeometry(0.018,0.075,0.009), steel);
+  seg3.position.set(0.062,0.140,0.024); seg3.rotation.z=1.05; g.add(seg3);
+  /* 刃尖 */
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.011,0.050,4), steel);
+  tip.position.set(0.098,0.152,0.024); tip.rotation.z=-2.5; g.add(tip);
+  return g;
+}
+
+/* ---- 太刀：细长弯刃 ---- */
+function buildKnifeTypeKatana(PAL){
+  const g=new THREE.Group();
+  const C=PAL||{steel:0xdfe8f2,grip:0x1a1a22,rim:0xc9a227};
+  const steel=mat(C.steel,0.22,0.85);
+  const grip=mat(C.grip,0.9,0.1);
+  const rim=mat(C.rim||C.grip,0.35,0.7);
+  /* 长刀柄（双手握，比较粗长） */
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.032,0.20,0.032), grip);
+  handle.position.set(0,-0.085,0.02); g.add(handle);
+  /* 柄卷：一圈圈的菱形记号 */
+  for(let i=0;i<6;i++){
+    const wrap=new THREE.Mesh(new THREE.BoxGeometry(0.036,0.012,0.036), rim);
+    wrap.position.set(0,-0.165+i*0.032,0.02); wrap.rotation.z=0.25; g.add(wrap);
+  }
+  /* 镡（圆形护手） */
+  const tsuba=new THREE.Mesh(new THREE.CylinderGeometry(0.042,0.042,0.010,16), rim);
+  tsuba.rotation.x=Math.PI/2; tsuba.position.set(0,0.030,0.02); g.add(tsuba);
+  /* 刀身：很长，轻微弯（两段折角近似弧度） */
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.024,0.42,0.008), steel);
+  blade.position.set(0.004,0.245,0.02); blade.rotation.z=0.035; g.add(blade);
+  const upper=new THREE.Mesh(new THREE.BoxGeometry(0.022,0.16,0.008), steel);
+  upper.position.set(0.022,0.525,0.02); upper.rotation.z=0.16; g.add(upper);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.011,0.062,4), steel);
+  tip.position.set(0.048,0.628,0.02); tip.rotation.z=2.9; g.add(tip);
+  return g;
+}
+
+/* ---- 砍刀：宽厚刃 ---- */
+function buildKnifeTypeMachete(PAL){
+  const g=new THREE.Group();
+  const C=PAL||{steel:0xa8b4c4,grip:0x2b2118,rim:0x6b5540};
+  const steel=mat(C.steel,0.45,0.55);
+  const grip=mat(C.grip,0.9,0.08);
+  const rim=mat(C.rim||C.grip,0.7,0.2);
+  /* 木柄 */
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.036,0.145,0.042), grip);
+  handle.position.set(0,-0.048,0.02); g.add(handle);
+  knifeGrooves(g,rim,-0.095,3,0.036,0.040,0.010,0.02);
+  /* 厚背护手 */
+  const guard=new THREE.Mesh(new THREE.BoxGeometry(0.058,0.020,0.048), rim);
+  guard.position.set(0,0.030,0.02); g.add(guard);
+  /* 宽刃：底面比小刀宽一倍，前端稍斜 */
+  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.052,0.30,0.012), steel);
+  blade.position.set(0.004,0.185,0.02); blade.rotation.z=-0.03; g.add(blade);
+  /* 刃背加强脊 */
+  const spine=new THREE.Mesh(new THREE.BoxGeometry(0.014,0.29,0.016), steel);
+  spine.position.set(-0.022,0.183,0.02); g.add(spine);
+  /* 斜尖 */
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.030,0.085,4), steel);
+  tip.position.set(0.008,0.370,0.02); tip.rotation.z=0.28; tip.rotation.y=Math.PI/4; g.add(tip);
+  return g;
+}
+
+/* ---- 战术斧：斧头 ---- */
+function buildKnifeTypeAxe(PAL){
+  const g=new THREE.Group();
+  const C=PAL||{steel:0x8f9aa8,grip:0x241a12,rim:0x5c4632};
+  const steel=mat(C.steel,0.42,0.7);
+  const grip=mat(C.grip,0.94,0.06);
+  const rim=mat(C.rim||C.grip,0.8,0.15);
+  /* 长柄：竖直圆柱 */
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.019,0.52,10), grip);
+  shaft.position.set(0,0.02,0.02); g.add(shaft);
+  /* 柄尾缠绕 */
+  for(let i=0;i<3;i++){
+    const wrap=new THREE.Mesh(new THREE.CylinderGeometry(0.021,0.021,0.014,10), rim);
+    wrap.position.set(0,-0.16+i*0.026,0.02); g.add(wrap);
+  }
+  /* 斧头：一块厚楔形 —— 用 Box 斜切近似 */
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.030,0.13,0.020), steel);
+  head.position.set(0.040,0.235,0.02); g.add(head);
+  /* 斧刃：前端薄片，稍微外扩 */
+  const edge=new THREE.Mesh(new THREE.BoxGeometry(0.048,0.155,0.010), steel);
+  edge.position.set(0.076,0.235,0.02); edge.rotation.z=0.06; g.add(edge);
+  /* 斧背：反面的钝头 */
+  const poll=new THREE.Mesh(new THREE.BoxGeometry(0.026,0.075,0.028), steel);
+  poll.position.set(-0.010,0.235,0.02); g.add(poll);
+  /* 斧头和柄的连接座 */
+  const collar=new THREE.Mesh(new THREE.BoxGeometry(0.034,0.060,0.034), rim);
+  collar.position.set(0.006,0.235,0.02); g.add(collar);
+  return g;
+}
+
+/* 刀型分派：物品 id -> 形状 */
+const KNIFE_BUILDERS={
+  knife:  buildKnifeTypeKnife,
+  karambit: buildKnifeTypeKarambit,
+  katana: buildKnifeTypeKatana,
+  machete: buildKnifeTypeMachete,
+  axe:    buildKnifeTypeAxe,
+};
+/* 根据物品 id 决定用哪个刀型；认不出就当战术小刀 */
+function knifeKindOf(itemId){
+  const it=(typeof SHOP_ITEMS!=='undefined') && SHOP_ITEMS[itemId];
+  const k=it && it.knife;
+  return (k && KNIFE_BUILDERS[k]) ? k : 'knife';
+}
+/* 建刀 + 挂握持手（原来的 buildKnife 保持可用，供旧调用点） */
+function buildKnife(kind, PAL){
+  const fn=KNIFE_BUILDERS[kind]||KNIFE_BUILDERS.knife;
+  const g=fn(PAL);
   const hand=buildHand(false);
   hand.position.set(0,-0.075,0.045);
   hand.rotation.x=-0.15;
   g.add(hand);
   return g;
 }
-
 /* 初始化武器（挂在相机上，跟随视角） */
 function initWeapon(){
   if(weaponRoot) return;
   weaponRoot=new THREE.Group();
-  // 位置：右下方，略微内收
+  // 位置：右下方，略微内收（腰射基准位姿，updWeapon 会每帧重算）
   weaponRoot.position.set(0.19,-0.17,-0.38);
-
-  weaponPistol=buildPistol();
-  weaponRifle=buildRifle();
-  weaponKnife=buildKnife();
-  weaponShotgun=buildM870();
-  weaponRifle.visible=false;
-  weaponKnife.visible=false;
-  weaponShotgun.visible=false;
-
-  // 左右手分别挂在枪上，随枪一起动
-  const rHand=buildHand(false); rHand.position.set(0.012,-0.115,0.10);
-  const lHand=buildHand(true);  lHand.position.set(0.0,-0.115,0.10);
-
-  weaponPistol.add(rHand.clone());
-  weaponPistol.add(lHand.clone());
-  weaponRifle.add(rHand.clone());
-  weaponRifle.add(lHand.clone());
-  /* 霰弹枪两只手都上：左手托护木（泵动时跟着走），右手握枪颈 */
-  const sR=buildHand(false); sR.position.set(0.012,-0.115,0.10);
-  const sL=buildHand(true);  sL.position.set(0.004,-0.078,-0.30);
-  weaponShotgun.add(sR); weaponShotgun.add(sL);
-  /* 刀已经自带一只握刀的手，另一只手不用挂 */
-
-  weaponRoot.add(weaponPistol);
-  weaponRoot.add(weaponRifle);
-  weaponRoot.add(weaponKnife);
-  weaponRoot.add(weaponShotgun);
-
+  /* 【模型改为按需创建】
+     以前这里一次性预建 rifle/pistol/knife 三把模型常驻内存，
+     但它们既不支持皮肤也不支持多种刀型。
+     现在只建一个空引擎，真的模型交给 applyWeaponModel()
+     按「当前物品 id + 皮肤」生成，换枪时重建。 */
   camera.add(weaponRoot);
   if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
-  wsk={pistol:weaponPistol, rifle:weaponRifle, knife:weaponKnife, shotgun:weaponShotgun,
-       pumpGrip:(weaponShotgun.userData&&weaponShotgun.userData.pumpGrip)||null};
-  syncWeapon();
+  wsk={ activeModel:null, pumpGrip:null };
+  applyWeaponModel();
 }
-
 /* ===== 手持武器槽：切换与查询 =====
    三个可用槽位，优先级就是数组顺序：
      primary   主武器（步枪/冲锋枪/狙击）—— 耗对应步枪弹
@@ -4230,7 +4807,12 @@ function curReserveKey(){
 }
 /* 当前武器的伤害（数据来自物品表，买更好的枪就更疼） */
 function curDamage(){
-  if(curIsMelee()) return 40;          // 近战固定伤害（够一刀砍死普通敌人）
+  /* 近战读物品表的 dmg：小刀 35 / 爪刀 42 / 太刀 56 / 战术斧 95。
+     以前这里写死成 40，导致买更贵的刀伤害完全没变（花钱没效果）。 */
+  if(curIsMelee()){
+    const mit=curMeleeItem();
+    return (mit&&mit.dmg) || 40;
+  }
   const id=slotItem(P.slot);
   const it=id&&SHOP_ITEMS[id];
   return (it&&it.dmg) || (curIsPrimary()?26:14);
@@ -4249,6 +4831,12 @@ function curItem(){
   const id=slotItem(P.slot);
   return (id&&SHOP_ITEMS[id])||null;
 }
+/* 取当前手持武器的物品数据，近战也算（curItem 对近战返回 null，
+   因为枪械逻辑要把刀排除在外，但刀的伤害/间隔/范围需要读表）。 */
+function curMeleeItem(){
+  const id=slotItem(P.slot);
+  return (id&&SHOP_ITEMS[id])||null;
+}
 function curFireMode(){
   if(curIsMelee()) return 'melee';
   const it=curItem();
@@ -4262,7 +4850,11 @@ function curIsAuto(){ return curFireMode()==='auto'; }
    以前写死成 primary 0.12 / secondary 0.18，导致狙击枪和步枪
    射速一模一样，栓动枪完全没有手感。 */
 function curFireCd(){
-  if(curIsMelee()) return 0.42;
+  /* 近战武器各有自己的挥砍间隔（斧头慢、爪刀快） */
+  if(curIsMelee()){
+    const mit=curMeleeItem();
+    return (mit&&mit.meleeCd) || 0.42;
+  }
   const it=curItem();
   if(it && it.fireCd) return it.fireCd;
   return curIsPrimary() ? 0.12 : 0.18;
@@ -4349,37 +4941,29 @@ function fixSlot(){
   return P.slot;
 }
 
-/* 根据当前武器切换显示 */
+/* 根据当前武器切换显示。
+   模型的生命周期已经交给 applyWeaponModel()，这里只需要
+   在切槽时刷新一次即可（它内部会做脏检查，重复调用无代价）。 */
 function syncWeapon(){
-  if(!wsk) return;
-  /* 现在三把模型：rifle / pistol / knife。
-     melee 用刀，别的按主副武器分。 */
-  const s=P.slot;
-  /* 主武器槽里可能是步枪 / 冲锋枪 / DMR / 霰弹枪，
-     具体显示哪个模型由 applyWeaponModel() 按物品 id 决定，
-     这里只负责「该显示主武器了」这个粗粒度开关。 */
-  const showRifle = s==='primary';
-  const showPistol = s==='secondary';
-  const showKnife = s==='melee';
-  if(wsk.rifle) wsk.rifle.visible=showRifle;
-  if(wsk.pistol) wsk.pistol.visible=showPistol;
-  if(wsk.knife) wsk.knife.visible=showKnife;
-  if(wsk.shotgun) wsk.shotgun.visible=false;   // 由 applyWeaponModel 打开
+  if(!weaponRoot) return;
+  _modelCache.key=null;     // 强制重建，因为槽位变了
+  applyWeaponModel();
   /* 换枪瞬间把武器往下甩一点（P.slotT 控制），
-     0 -> 1 表示「放下旧枪又抬上新枪」的过渡。
-     updWeapon 里会读这个值做下坠位移。 */
+     0 -> 1 表示「放下旧枪又抬上新枪」的过渡。 */
   if(P.slotT!==undefined) P.slotT=Math.min(1,P.slotT);
 }
+/* ---- 按「物品 id + 皮肤」重建模型 ----
+   以前主武器槽只有一个步枪模型，买什么长枪都长一样。
+   现在模型 = 物品 id 对应的形状 × 当前皮肤配色，
+   换枪/换皮肤都需要重建，所以用 cacheKey 做脏检查。
 
-/* ---- 按物品 id 选模型 ----
-   以前主武器槽只有「步枪」一个模型，不管买的是冲锋枪还是狙击枪都长一个样。
-   现在分成三组：
-     霰弹枪（pellets>1 或 ammoType==='shot'） -> M870 模型
-     手枪槽                                  -> 手枪模型
-     其余长枪                                -> 步枪模型
-   为了避免每帧都写一堆 visible，这里用 lastModelId 缓存上一次的决定，
-   只有真的换枪了才动节点。 */
-const _modelCache={id:null};
+   【为什么要重建而不是只改材质颜色】
+   皮肤会改发光（emissive），而 MeshStandardMaterial 的 emissive
+   在一个条链路上套用不上时不好统一改；重建一次只发生在换枪瞬间，
+   每帧跑不到，性能上是可接受的。
+   旧模型必须从 weaponRoot 里 remove 掉，否则换几次皮肤就会
+   在相机前面叠一堆看不见的废模型。 */
+const _modelCache={key:null};
 function curModelKind(){
   if(P.slot==='melee') return 'knife';
   if(P.slot==='secondary') return 'pistol';
@@ -4387,20 +4971,110 @@ function curModelKind(){
   if(it && (it.pellets>1 || it.ammoType==='shot')) return 'shotgun';
   return 'rifle';
 }
-function applyWeaponModel(){
-  if(!wsk) return;
-  const id=slotItem(P.slot)||'__none__';
-  if(_modelCache.id===id) return;     // 没换枪，什么都不做
-  _modelCache.id=id;
-  const kind=curModelKind();
-  if(wsk.rifle)   wsk.rifle.visible   = (kind==='rifle');
-  if(wsk.shotgun) wsk.shotgun.visible = (kind==='shotgun');
-  if(wsk.pistol)  wsk.pistol.visible  = (kind==='pistol');
-  if(wsk.knife)   wsk.knife.visible   = (kind==='knife');
-  /* 换枪时把泵动进度清零，否则新枪一拿出来就在拉护木 */
-  wPump=0;
+/* 把皮肤配色转成各 builder 认识的形式 */
+function skinPaletteFor(kind){
+  const sk=skinOf(curSkinId());
+  if(kind==='knife'){
+    return { steel:sk.steel, grip:sk.grip, rim:sk.steel };
+  }
+  return { main:sk.main, dark:sk.dark, steel:sk.steel,
+           poly:sk.poly, grip:sk.grip };
 }
-/* ---- 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 + 机瞄 ----
+function buildWeaponFor(kind){
+  const PAL=skinPaletteFor(kind);
+  if(kind==='knife'){
+    const id=slotItem(P.slot);
+    return buildKnife(knifeKindOf(id), PAL);
+  }
+  if(kind==='pistol') return buildPistol(PAL);
+  if(kind==='shotgun') return buildM870(PAL);
+  return buildRifle(PAL);
+}
+function applyWeaponModel(){
+  if(!weaponRoot) return;
+  const id=slotItem(P.slot)||'__none__';
+  const kind=curModelKind();
+  const skin=curSkinId();
+  const key=id+'|'+kind+'|'+skin;
+  if(_modelCache.key===key) return;      // 什么都没变，不碰节点
+  _modelCache.key=key;
+  /* 旧模型移走：不动 visible 而是直接 remove，避免堆积 */
+  const old=wsk.activeModel;
+  if(old && weaponRoot.children.indexOf(old)>=0) weaponRoot.remove(old);
+  /* 新模型 */
+  const m=buildWeaponFor(kind);
+  /* 重新挂双手（新模型是新建的 Group，手也得重新加） */
+  if(kind==='shotgun'){
+    const sR=buildHand(false); sR.position.set(0.012,-0.115,0.10);
+    const sL=buildHand(true);  sL.position.set(0.004,-0.078,-0.30);
+    m.add(sR); m.add(sL);
+  }else if(kind!=='knife'){
+    /* 刀自带一只手，不额外加 */
+    const rH=buildHand(false); rH.position.set(0.012,-0.115,0.10);
+    const lH=buildHand(true);  lH.position.set(0.0,-0.115,0.10);
+    m.add(rH); m.add(lH);
+  }
+  m.visible=true;
+  weaponRoot.add(m);
+  wsk.activeModel=m;
+  /* 霰弹枪的护木引用要跟着换新模型更新，否则泵动动画会去动一个
+     已经被 remove 掉的旧节点（表现为护木不动） */
+  if(kind==='shotgun' && m.userData && m.userData.pumpGrip){
+    wsk.pumpGrip=m.userData.pumpGrip;
+  }else{
+    wsk.pumpGrip=null;
+  }
+  /* 换枪时清零泵动进度，避免新枪一出来就在拉护木 */
+  wPump=0;
+  /* 皮肤带的装饰光环要重挂（因为整个模型换了） */
+  attachAura(kind, skin);
+}
+
+/* ---- 皮肤装饰：环绕光环（只有 deco==='aura' 的皮肤才有） ----
+   用两个半透明环叠在枪身上，配合 emissive 发光，
+   看起来像「枪周围有一圈能量」。它们在 updWeapon 里缓缓旋转。 */
+let _aura=null;
+function attachAura(kind, skinId){
+  if(_aura && _aura.parent) _aura.parent.remove(_aura);
+  _aura=null;
+  const sk=skinOf(skinId);
+  if(!sk || sk.deco!=='aura') return;
+  const m=wsk&&wsk.activeModel;
+  if(!m) return;
+  const col=new THREE.Color(sk.glow||sk.steel);
+  const g=new THREE.Group();
+  const rmat=new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:0.34,
+    side:THREE.DoubleSide });
+  const r1=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.006,6,22), rmat);
+  r1.rotation.x=Math.PI/2; r1.position.set(0,0.02,-0.18); g.add(r1);
+  const r2=new THREE.Mesh(new THREE.TorusGeometry(0.09,0.004,6,18), rmat);
+  r2.position.set(0,0.02,-0.10); g.add(r2);
+  m.add(g);
+  _aura=g;
+}
+
+/* ============ 检视武器（Inspect） ============
+   按 F（桌面）或点 HUD 上的「检视」按钮，武器会在摄像头前
+   转一圈给玩家看 —— 这是让皮肤/刀型能被看见的关键。
+   时长 INSPECT_TIME 秒，wInsT 从 1 线性降到 0，
+   姿势由 updWeapon 末尾按 sin 曲线叠加，结束时自动归位。
+   检视期间不能开火（枪都转过去了），但可以移动。 */
+const INSPECT_TIME=1.5;
+function startInspect(){
+  if(P.reload) return false;
+  if(wInsT>0) return false;       // 正在检视就不重来
+  wInsT=1;
+  wInsDur=INSPECT_TIME;
+  if(typeof sfxUI==='function') sfxUI();
+  return true;
+}
+function updInspect(dt){
+  if(wInsT<=0) return;
+  wInsT=Math.max(0, wInsT - dt/Math.max(0.1,wInsDur));
+}
+function isInspecting(){ return wInsT>0; }
+
+/* ---- 每帧更新：走路晃动/* ---- 每帧更新：走路晃动 + 后坐力回弹 + 换弹动作 + 奔跑收枪 + 机瞄 ----
    【机瞄位姿】
    开镜（P.aiming）时不能只缩 FOV —— 那样枪还停在屏幕右下方，
    看起来像「把镜头拉近了」而已，根本不像举枪瞄准。
@@ -4416,17 +5090,12 @@ function applyWeaponModel(){
    以前 wAds 声明了但从不赋值、也不参与计算，等于死代码。 */
 function updWeapon(dt){
   if(!weaponRoot||!wsk) return;
-  /* 想用的枪：以 P.slot 为准，不再看 inv.gun 布尔。
-     这里只做「检测到不一致就同步一次」，不要每帧 syncWeapon ——
-     那会每帧遍历三个模型改 visible，白费性能。 */
-  const wantRifle = (P.slot==='primary');
-  const wantPistol = (P.slot==='secondary');
-  const wantKnife = (P.slot==='melee');
-  if(wsk.rifle.visible!==wantRifle || wsk.pistol.visible!==wantPistol
-     || (wsk.knife && wsk.knife.visible!==wantKnife)) syncWeapon();
-  /* 把当前武器按 id 换成对应的模型：
-     以前只有 rifle / pistol 两个模型，买了 M870 还是显示步枪。
-     现在按 SHOP_ITEMS[id].model 决定，没写的退回步枪模型。 */
+  /* 把当前武器按「物品 id + 刀型 + 皮肤」换成对应模型。
+     【注意】以前这里会先比较 wsk.rifle/pistol/knife 三个模型的 visible
+     再决定要不要 syncWeapon()，但那种「预建三个模型、靠 visible 切换」
+     的做法已经被淘汰了（不支持皮肤和多刀型）。
+     现在只有一个 activeModel，检查工作全在 applyWeaponModel() 里
+     用 key 做脏检查，不一致才重建，一致就什么都不做。 */
   applyWeaponModel();
   /* 换枪动画：切槽后 P.slotT 从 0 涨到 1，
      这段时间武器整体往下沉，做「放下旧枪、抬起新枪」的观感。 */
@@ -4441,12 +5110,17 @@ function updWeapon(dt){
   /* 机瞄插值：直接复用 updP 算好的 P.aimT（0~1）。
      奔跑时禁止机瞄：端着枪跑还开着镜不合逻辑，且会和冲刺姿态打架。
      近战没有机瞄（刀没瞄具），强制归零。 */
-  const adsTarget = (P.aimT||0) * (1-wSprint) * (curIsMelee()?0:1);
+  /* 检视时也压掉机瞄：一边转枪一边开镜会互相打架 */
+  const adsTarget = (P.aimT||0) * (1-wSprint) * (curIsMelee()?0:1) * (wInsT>0?0:1);
   const adsK = Math.min(1, dt*14);
   wAds += (adsTarget - wAds)*adsK;
   if(wAds<0.0005) wAds=0;
   // ===== 泵动/栓动作动：拉护木 =====
   updPump(dt, wAds);
+  // ===== 皮肤光环缓缓旋转 =====
+  if(_aura){ _aura.rotation.y += dt*1.35; _aura.rotation.z += dt*0.55; }
+  // ===== 检视武器 =====
+  updInspect(dt);
   // 走路晃动：冲刺时频率和幅度都加大
   wBobT+=dt*(moving?spd*(sprinting?2.1:1.6):0);
   const bobAmt=moving?Math.min(spd/10,1):0;
@@ -4495,6 +5169,19 @@ function updWeapon(dt){
                           + (recoilVis*0.05)*a;
   weaponRoot.rotation.z = (Math.sin(wBobT*0.5)*0.02*bobAmt + reloadRot*0.25 + 0.30*s2)*(1-a);
   weaponRoot.rotation.y = ((P.reload?0.3:0) + 0.22*s2)*(1-a);
+  /* ---- 叠加检视姿势（最后一步，直接加到已有位姿上） ----
+     用 additive 的方式，这样不用重写前面那一大堆插值公式，
+     检视结束后各分量回 0，武器自然回到原来的姿态。 */
+  if(wInsT>0){
+    const p=wInsT;                      // 1 -> 0
+    const swing=Math.sin((1-p)*Math.PI); // 0 -> 1 -> 0 的来回
+    weaponRoot.position.x += -0.26*p + Math.sin((1-p)*Math.PI*2)*0.05*p;
+    weaponRoot.position.y += 0.10*p;
+    weaponRoot.position.z += 0.12*p;
+    weaponRoot.rotation.y += 1.15*swing + 0.35*p;
+    weaponRoot.rotation.x += -0.28*swing;
+    weaponRoot.rotation.z += 0.45*swing;
+  }
 }
 /* 泵动动画：开完一枪后护木往后拉再推回去。
    wPump 在 fire() 里被置为 1，这里每帧衰减。

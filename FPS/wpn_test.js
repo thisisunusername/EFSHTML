@@ -146,9 +146,14 @@ console.log('\n[5] 不同枪的伤害不同');
 S.switchSlot('secondary', true);
 ok(S.curDamage()===IT['pis_default'].dmg,'手枪伤害 '+S.curDamage());
 S.switchSlot('melee', true);
-/* 近战伤害在 curDamage 里是固定值 40（不看物品表），
-   这样买的刀和警棍手感一致，不会一刀砍不死。 */
-ok(S.curDamage()===40,'副武器固定伤害 '+S.curDamage());
+/* 近战伤害改回从物品表读：小刀 35、爪刀 42、太刀 56、战术斧 95。
+   以前这里写死 return 40，导致「买更贵的刀伤害完全没变」，
+   等于花钱只买了个外观。 */
+ok(S.curDamage()===IT['melee_knife'].dmg,
+   '近战伤害读物品表（小刀 '+S.curDamage()+'）');
+P.equip.melee='melee_axe';
+ok(S.curDamage()===IT['melee_axe'].dmg,'换战术斧伤害跟着变 -> '+S.curDamage());
+P.equip.melee='melee_knife';
 
 console.log('\n[6] 副武器不消耗弹药（按 curAmmoKey 判空来验证）');
 /* 不真的调 fire()：它要用 camera/raycaster，测试桩里没建场景。

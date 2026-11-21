@@ -4,6 +4,10 @@ const P={
   vel:new THREE.Vector3(),
   yaw:0, pitch:0,
   firing:false,            // 扳机是否按住（全自动连发靠它）
+  /* 武器皮肤：{ 物品 id: 皮肤 id }。
+     存的是「这把枪用什么皮肤」而不是「当前用什么皮肤」，
+     这样切枪时每把枪都能记住自己的涂装。 */
+  skins:{},
   hp:100, armor:0,
   /* ammo=手枪弹匣 / gun=长枪弹匣 / rifle|pistol|sniper|shot=各类后备弹。
      sniper 和 shot 以前没初始化，撒弹枪和狙击买了弹也只能靠

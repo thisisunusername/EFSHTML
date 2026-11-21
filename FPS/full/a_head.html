@@ -126,6 +126,50 @@
            width:64px; height:64px; border-color:#7c5cff; }
   #btnAim .ico{ width:28px; height:28px; }
   #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
+  /* 检视按钮：放在开镜左边一格，不抢开火键的位置 */
+  #btnInspect{ right:calc(16px + (var(--big) + var(--gap))*2); bottom:16px; }
+  #btnInspect .ico{ width:24px; height:24px; }
+
+  /* ==== GM 隐藏面板（主菜单连点 D 15 次）====
+     浮在屏幕上层，可拖动、可收起。z-index 比遮罩(9999)略低但比
+     菜单(100)/商店(210)都高，这样开着商店也能调出 GM 加钱。 */
+  #gmPanel{ position:fixed; right:18px; bottom:18px; z-index:9000; width:236px;
+    background:rgba(12,15,24,.96); border:1px solid rgba(124,92,255,.55);
+    border-radius:14px; box-shadow:0 14px 44px rgba(0,0,0,.65),
+    0 0 0 1px rgba(124,92,255,.18) inset; display:none;
+    font-size:12.5px; color:#e8ecf5; backdrop-filter:blur(10px);
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #gmPanel.on{ display:block; }
+  #gmPanel.min .gmb{ display:none; }
+  #gmPanel.min{ width:auto; }
+  /* 标题栏：拖动区 */
+  #gmHead{ display:flex; align-items:center; gap:8px; padding:9px 11px;
+    cursor:grab; border-bottom:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(180deg,rgba(124,92,255,.26),rgba(124,92,255,.06));
+    border-radius:13px 13px 0 0; }
+  #gmPanel.min #gmHead{ border-bottom:none; border-radius:13px; }
+  #gmHead:active{ cursor:grabbing; }
+  #gmHead .t{ font-weight:800; letter-spacing:.06em; font-size:12px;
+    color:#c9b8ff; flex:1; white-space:nowrap; }
+  #gmHead .dot{ width:7px; height:7px; border-radius:50%; background:#48d99a;
+    box-shadow:0 0 8px #48d99a; flex:none; }
+  #gmMin{ flex:none; width:22px; height:22px; line-height:1; border:none;
+    background:rgba(255,255,255,.12); color:#dfe5f0; border-radius:7px;
+    font-size:14px; font-weight:700; cursor:pointer; padding:0; }
+  #gmMin:active{ background:rgba(255,255,255,.26); }
+  .gmb{ padding:11px; display:flex; flex-direction:column; gap:8px; }
+  .gmrow{ display:flex; gap:6px; }
+  .gmbtn{ flex:1; border:1px solid rgba(255,255,255,.14); border-radius:9px;
+    background:rgba(255,255,255,.07); color:#e8ecf5; font-size:12px;
+    font-weight:700; padding:9px 6px; cursor:pointer; transition:.12s; }
+  .gmbtn:active{ transform:scale(.95); background:rgba(124,92,255,.5); }
+  .gmbtn.money{ background:linear-gradient(180deg,rgba(255,213,74,.28),rgba(255,213,74,.10));
+    border-color:rgba(255,213,74,.5); color:#ffe89a; }
+  .gmbtn.money:active{ background:rgba(255,213,74,.55); }
+  #gmCash{ font-size:19px; font-weight:800; color:#ffd54a; text-align:center;
+    letter-spacing:.02em; padding:2px 0 4px; }
+  #gmCash small{ font-size:10px; color:#8d97a8; font-weight:600;
+    letter-spacing:.08em; display:block; margin-bottom:2px; }
 
   /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
   #btnInteract{ right:50%; transform:translateX(50%);
@@ -538,6 +582,13 @@ html[data-lang="en"] #bagBtn span{
       <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
     </svg>
   </div>
+  <div class="actbtn" id="btnInspect" title="检视武器 (F)">
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- 检视：一只眼睛，代表「看看手上这把」 -->
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </div>
   <div class="actbtn" id="btnJump" title="跳跃">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide move-up：向上箭头 -->
@@ -631,6 +682,29 @@ html[data-lang="en"] #bagBtn span{
 <div id="stash" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- GM 隐藏面板：主菜单连续点 D 15 次显示 -->
+<div id="gmPanel">
+  <div id="gmHead">
+    <span class="dot"></span>
+    <span class="t">GM · DEV</span>
+    <button id="gmMin" title="收起">−</button>
+  </div>
+  <div class="gmb">
+    <div id="gmCash"><small>当前资金</small><span id="gmCashNum">0</span></div>
+    <div class="gmrow">
+      <button class="gmbtn money" data-gm="1000">+1 千</button>
+      <button class="gmbtn money" data-gm="10000">+1 万</button>
+    </div>
+    <div class="gmrow">
+      <button class="gmbtn money" data-gm="100000">+10 万</button>
+      <button class="gmbtn money" data-gm="1000000">+100 万</button>
+    </div>
+    <div class="gmrow">
+      <button class="gmbtn" id="gmSet" title="直接设定金额">设定…</button>
+      <button class="gmbtn" id="gmHide">关闭</button>
+    </div>
+  </div>
+</div>
 <!-- 死亡界面 -->
 <div id="death">
 <h2>💀 你阵亡了</h2>

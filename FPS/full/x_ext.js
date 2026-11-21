@@ -324,3 +324,164 @@ function bindDoorHint(){
   el.addEventListener('touchstart',tap,{passive:false});
   el.addEventListener('click',tap);
 }
+
+/* ============ GM 隐藏面板 ============
+   入口：主菜单连续点键盘 D 键 15 次。
+   【为什么不用一个显眼的按钮】
+   这是个调试/爽玩用的后门，不该让正常玩家误触，
+   所以埋成打击键的彩蛋。连续按，中间断了就重新计数。
+   面板可拖动（拖标题栏）、可收起（− 或 关闭），
+   且不拦截游戏输入 —— 它浮在最上层，但点它自己的按钮才会响应。 */
+const GM_HITS=15;              // 需要连点的次数
+const GM_RESET_MS=1200;        // 超过这么久没按就清零
+let _gmCount=0, _gmLast=0, _gmOpen=false;
+
+/* 加钱：直接改 P.ammo.cash，并立刻刷新所有显示金额的地方。
+   注意不能只改 DOM —— P.ammo.cash 才是数据源，
+   否则一刷新 HUD 就把假数字盖回去了。 */
+function gmAddCash(n){
+  const v=Number(n)||0;
+  /* 只允许加钱：这个面板是「开发者给自己发钱」，
+     不该能当扣钱按钮用（万一误点到 -9999999 把存档搞坏就麻烦了）。
+     要减少金额请用「设定…」直接输入目标值。 */
+  if(!(v>0)) return;
+  P.ammo.cash=Math.max(0,(P.ammo.cash|0)+v);
+  gmPaint();
+  try{ refreshHUD(); }catch(e){}
+  try{ if(typeof buildShop==='function') buildShop(); }catch(e){}
+  try{ if(typeof buildMenuStats==='function') buildMenuStats(); }catch(e){}
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+}
+function gmSetCash(n){
+  const v=Math.max(0,Math.floor(Number(n)||0));
+  P.ammo.cash=v;
+  gmPaint();
+  try{ refreshHUD(); }catch(e){}
+  try{ if(typeof buildShop==='function') buildShop(); }catch(e){}
+}
+function gmPaint(){
+  const el=document.getElementById('gmCashNum');
+  if(el) el.textContent=(P.ammo.cash|0).toLocaleString('en-US');
+}
+
+function gmToggle(force){
+  const el=document.getElementById('gmPanel');
+  if(!el) return;
+  _gmOpen = (typeof force==='boolean') ? force : !_gmOpen;
+  el.classList.toggle('on', _gmOpen);
+  if(_gmOpen){
+    gmPaint();
+    /* 第一次打开时把位置初始化到右下角，之后由拖动决定 */
+    gmClampPos(el);
+  }
+}
+/* 把面板夹在可视区域内，避免拖到屏幕外面就找不回来了 */
+function gmClampPos(el){
+  if(!el) return;
+  const w=el.offsetWidth||236, h=el.offsetHeight||80;
+  const W=window.innerWidth||360, H=window.innerHeight||640;
+  let x=parseFloat(el.dataset.gx);
+  let y=parseFloat(el.dataset.gy);
+  if(!isFinite(x)) x=W-w-18;
+  if(!isFinite(y)) y=H-h-18;
+  x=Math.max(4,Math.min(W-w-4,x));
+  y=Math.max(4,Math.min(H-h-4,y));
+  el.dataset.gx=x; el.dataset.gy=y;
+  el.style.left=x+'px'; el.style.top=y+'px';
+  el.style.right='auto'; el.style.bottom='auto';
+}
+/* 拖动：pointer 事件对鼠标和触摸都生效，比分别绑 mousedown/touchstart 简洁。
+   只在标题栏上发起拖动，避免在按钮上拖时点不到按钮。 */
+function gmBindDrag(el, head){
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+  const down=(e)=>{
+    if(e.target && e.target.id==='gmMin') return;   // 收起按钮不触发拖动
+    dragging=true;
+    const p=gmPoint(e);
+    sx=p.x; sy=p.y;
+    ox=parseFloat(el.dataset.gx)||0;
+    oy=parseFloat(el.dataset.gy)||0;
+    if(e.cancelable) e.preventDefault();
+  };
+  const move=(e)=>{
+    if(!dragging) return;
+    const p=gmPoint(e);
+    const W=window.innerWidth||360, H=window.innerHeight||640;
+    const w=el.offsetWidth||236, h=el.offsetHeight||80;
+    let nx=ox+(p.x-sx), ny=oy+(p.y-sy);
+    nx=Math.max(4,Math.min(W-w-4,nx));
+    ny=Math.max(4,Math.min(H-h-4,ny));
+    el.dataset.gx=nx; el.dataset.gy=ny;
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+    if(e.cancelable) e.preventDefault();
+  };
+  const up=()=>{ dragging=false; };
+  head.addEventListener('pointerdown',down);
+  window.addEventListener('pointermove',move,{passive:false});
+  window.addEventListener('pointerup',up);
+  window.addEventListener('pointercancel',up);
+  /* 没有 pointer 事件的老 WebView 退化为 touch + mouse */
+  if(!window.PointerEvent){
+    head.addEventListener('touchstart',down,{passive:false});
+    head.addEventListener('touchmove',move,{passive:false});
+    head.addEventListener('touchend',up);
+    head.addEventListener('mousedown',down);
+    window.addEventListener('mousemove',move);
+    window.addEventListener('mouseup',up);
+  }
+}
+function gmPoint(e){
+  if(e.touches && e.touches.length) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+  if(e.changedTouches && e.changedTouches.length) return {x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+  return {x:e.clientX||0,y:e.clientY||0};
+}
+
+/* 初始化：绑按钮 + 挂 D 键计数 */
+function initGM(){
+  const el=document.getElementById('gmPanel');
+  if(!el || el.dataset.bound==='1') return;
+  el.dataset.bound='1';
+  const head=document.getElementById('gmHead');
+  if(head) gmBindDrag(el, head);
+  /* 金额按钮 */
+  for(const btn of el.querySelectorAll('[data-gm]')){
+    const amt=parseInt(btn.getAttribute('data-gm'),10);
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); gmAddCash(amt); });
+  }
+  const setBtn=document.getElementById('gmSet');
+  if(setBtn) setBtn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    /* 用原生 prompt：这个面板就是给开发者自己用的，
+       为了它引入一个自制弹窗不划算。 */
+    const cur=String(P.ammo.cash|0);
+    const v=(typeof prompt==='function') ? prompt('设定资金（当前 '+cur+'）', cur) : null;
+    if(v!==null && v!==undefined && v!=='') gmSetCash(v);
+  });
+  const hideBtn=document.getElementById('gmHide');
+  if(hideBtn) hideBtn.addEventListener('click',(e)=>{ e.stopPropagation(); gmToggle(false); });
+  const minBtn=document.getElementById('gmMin');
+  if(minBtn) minBtn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    el.classList.toggle('min');
+    minBtn.textContent=el.classList.contains('min')?'+':'−';
+    gmClampPos(el);
+  });
+}
+
+/* 主菜单 D 键计数。
+   【要点】只在菜单可见时计数，游戏中按 D 是「向右走」，
+   不该被当成彩蛋触发。 */
+function gmHitD(){
+  const menu=document.getElementById('menu');
+  const visible=menu && menu.style.display!=='none';
+  if(!visible) return;
+  const now=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+  if(now-_gmLast>GM_RESET_MS) _gmCount=0;
+  _gmLast=now;
+  _gmCount++;
+  if(_gmCount>=GM_HITS){
+    _gmCount=0;
+    gmToggle(true);
+    try{ toast('GM 面板已解锁'); }catch(e){}
+  }
+}

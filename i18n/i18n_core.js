@@ -497,7 +497,35 @@ const I18N_EN = {
     'Hell mode: all normal exits are sealed — you must use the electronic door or the basement',
   '三个电闸已全部拉下，电子门通了': 'All three breakers are down — the electronic door has power',
   '拉下监控总闸：全楼的监控都黑了': 'CCTV master breaker pulled — every camera is dark',
-
+  /* ---------- 3D 版：近战武器（刀型）+ 武器皮肤 + 检视 ---------- */
+  '爪刀': 'Karambit',
+  '弯刃 · 出手极快 · 近身利器': 'Curved blade · blazing fast · close-quarters tool',
+  '太刀': 'Katana',
+  '细长刀身 · 挥砍范围最大': 'Long blade · widest swing reach',
+  '战术斧': 'Tactical Axe',
+  '沉重· 一击必杀，但挥得慢': 'Heavy · one-shot kill, but slow swing',
+  '原厂涂装': 'Factory Finish',
+  '默认外观，不花一分钱': 'Default look, costs nothing',
+  '霓虹夜光': 'Neon Glow',
+  '青蓝发光 · 环绕光带': 'Cyan glow · orbiting light rings',
+  '赤血红': 'Crimson Blood',
+  '血红发光 · 杀气十足': 'Blood-red glow · pure menace',
+  '毒液幽绿': 'Toxic Venom',
+  '幽绿毒光 · 环绕光带': 'Toxic green glow · orbiting light rings',
+  '虚空紫': 'Void Purple',
+  '暗紫辐射 · 最强发光': 'Dark purple radiation · strongest glow',
+  '黄金': 'Gold',
+  '土豪金 · 无光但最闪': 'Rich gold · no glow, maximum shine',
+  '武器皮肤': 'Weapon Skins',
+  '检视': 'Inspect',
+  '检视武器': 'Inspect Weapon',
+  '检视武器 (F)': 'Inspect Weapon (F)',
+  '先买一把枪再买皮肤': 'Buy a gun first before buying a skin',
+  /* ---------- 3D 版：GM 隐藏面板 ---------- */
+  '当前资金': 'Balance',
+  '设定资金（当前 {0}）': 'Set balance (current {0})',
+  '直接设定金额': 'Set exact amount',
+  'GM 面板已解锁': 'GM panel unlocked',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */

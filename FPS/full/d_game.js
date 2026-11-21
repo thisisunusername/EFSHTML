@@ -18,10 +18,21 @@ let enemyTick=0;
    【霰弹】pellets>1 的枪一次发多条射线，每条独立算伤害；
    单颗伤害很低（14），但近距离九颗全中就是 126，一枪带走；
    距离拉开后散得很开，大部分弹丸打空 —— 这就是「近距离伤害高」，
-   不需要额外写衰减公式，散射本身就是衰减。 */
+   不需要额外写衰减公式，散射本身就是衰减。
+
+   【近战为什么以前打不出伤害】
+   近战是 1 条 3 米长的射线，但敌人胶囊体的 COLLIDER 只在
+   spawnEnemy 里 push 进了 shootables，而刀挥出去的时机通常是
+   敌人已经贴脸（<1m）—— 射线起点在相机（y≈1.62），刀又往下挥，
+   3 米内的射线常常从胶囊体旁边擦过去。表现就是「砍了没反应」。
+   现在近战改成【半球形近身判定】：不看准星射线，直接遍历所有
+   敌人算水平距离 + 高度差，只要在 2.6 米内、且大致在正面
+   120° 扇区内就算命中。这才是刀该有的手感。 */
 function fireOnce(dirOverride){
   const melee=curIsMelee();
-  const t=curAmmoKey();             // melee 时为 null
+  /* 近战不做射线检测，走独立的近身判定（见 meleeSwing） */
+  if(melee){ meleeSwing(); return; }
+  const t=curAmmoKey();
   const dir=dirOverride||lookDir();
   const origin=camera.position.clone();
   const pellets=melee?1:curPellets();
@@ -66,6 +77,59 @@ function fireOnce(dirOverride){
   }
   if(headAny) sfxHeadshot(); else if(hitAny) sfxHit();
 }
+/* ---- 近战近身判定 ----
+   不用射线，改为「圆锥扇形 + 距离」判定：
+     1) 水平距离 <= MELEE_RANGE（2.6m）
+     2) 与视线方向的水平夹角 <= MELEE_ARC/2（60°，即正面 120° 扇区）
+     3) 高度差 <= 2.2m（站着也能砍到趴着的，但打不到楼上的）
+   这样贴脸乱砍一定砍得到，而不是刀从人身上穿过去没反应。
+   命中的每个敌人独立扣血，一次挥砍最多打 MELEE_MAX（2）个，
+   避免一刀把一屋子人全清了。 */
+const MELEE_RANGE=2.6;      // 挥砍半径（米）
+const MELEE_ARC=Math.PI/3;  // 半扇区 60°，正面总共 120°
+const MELEE_MAX=2;          // 一刀最多命中几个
+function meleeSwing(){
+  if(!camera) return;
+  const dmg=curDamage();
+  /* 每把刀的挥砍半径不同：太刀最长，斧头重但短 */
+  const mit=(typeof curMeleeItem==='function')?curMeleeItem():null;
+  const reach=(mit&&mit.meleeRange)||MELEE_RANGE;
+  const cp=camera.position;
+  /* 视线水平方向：相机 forward 拍平 */
+  const fx=-Math.sin(P.yaw||0), fz=-Math.cos(P.yaw||0);
+  const cands=[];
+  for(const e of enemies){
+    if(!e.alive) continue;
+    const dx=(e.x||0)-cp.x, dz=(e.z||0)-cp.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>reach) continue;
+    if(Math.abs(cp.y-(e.body&&e.body.position?e.body.position.y:cp.y))>2.2) continue;
+    /* 贴得极近时方向没意义，直接算命中 */
+    let ang=0;
+    if(dist>0.25){
+      const dot=(dx*fx+dz*fz)/dist;
+      ang=Math.acos(Math.max(-1,Math.min(1,dot)));
+    }
+    if(ang>MELEE_ARC) continue;
+    cands.push({e:e,dist:dist});
+  }
+  /* 近的先挨刀 */
+  cands.sort((a,b)=>a.dist-b.dist);
+  const n=Math.min(cands.length, MELEE_MAX);
+  for(let i=0;i<n;i++){
+    const e=cands[i].e;
+    e.hp-=dmg;
+    e.aggro=true;
+    if(e.hp<=0 && e.alive){
+      e.alive=false;
+      if(e.body) e.body.visible=false;
+      if(e.head) e.head.visible=false;
+      sfxKill();
+    }
+  }
+  if(n>0) sfxHit();
+  return n;
+}
 /* 霰弹散射半角（弧度/轴向偏移量）：0.028 约等于 1.6 度，
    8 米处散开半径约 22cm —— 正好覆盖一个人上半身。 */
 const SHOT_SPREAD=0.028;
@@ -73,6 +137,8 @@ const SHOT_SPREAD=0.028;
 /* 实际扣板机入口：检查冷却/弹药，播放声音，决定是否进入泵动/栓动装填 */
 function fire(){
   if(P.reload) return;
+  /* 检视武器时枪已经转到脸前了，这时候还能开火会很穿帮 */
+  if(typeof isInspecting==='function' && isInspecting()) return;
   if(P.shootCd>0) return;
   /* 泵动/栓动：上一发的拉栓动作没做完，不许再开火。
      这条比 shootCd 更严格，因为 fireCd（0.20）比拉栓时间（0.58）短。 */
@@ -125,6 +191,7 @@ function updFireHold(dt){
      用 typeof 保护：单块静态检查时可能还没加载 b_world。 */
   if(typeof ready==='boolean' ? !ready : !canShootYet()) return;
   if(P.reload||curIsMelee()) return;
+  if(typeof isInspecting==='function' && isInspecting()) return;
   if(!curIsAuto()) return;
   if(P.shootCd>0||wPump>0) return;
   fire();

@@ -92,6 +92,9 @@ function bindUI(){
      都可能触发二次执行。
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
+  /* GM 面板：绑拖动 + 加钱按钮。放在这里而不是 game init 里，
+     因为它是纯 UI，主菜单阶段就该能用。 */
+  if(typeof initGM==='function'){ try{ initGM(); }catch(e){} }
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
   initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 
@@ -215,6 +218,13 @@ if(window.__uiBound) return; window.__uiBound=true;
     if(e.code==='Digit1'&&!e.repeat) switchSlot('primary');
     if(e.code==='Digit2'&&!e.repeat) switchSlot('secondary');
     if(e.code==='Digit3'&&!e.repeat) switchSlot('melee');
+    /* F = 检视当前武器（看皮肤/看刀型）。
+       用 !e.repeat 避免长按 F 每帧都重新触发一次。 */
+    if(e.code==='KeyF'&&!e.repeat){ if(typeof startInspect==='function') startInspect(); }
+    /* 主菜单连点 D 15 次解锁 GM 面板。
+       游戏里按 D 是向右走，gmHitD 内部会先判断菜单是否可见，
+       所以不会误触。 */
+    if(e.code==='KeyD'&&!e.repeat){ if(typeof gmHitD==='function') gmHitD(); }
     /* X = 循环切枪，懒得记槽位时用 */
     if(e.code==='KeyX'&&!e.repeat) cycleSlot();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
@@ -499,6 +509,17 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     /* 换弹时自动退出开镜，否则换弹动画和 FOV 会互相打架 */
   }
   window.__setAim=setAim;
+  /* 检视按钮：点一下把武器在脸前转一圈，用来欣赏皮肤和刀型。
+     用 touchstart 防止 300ms 延迟，同时 preventDefault 避免
+     触发后面的 mousedown 造成双重调用。 */
+  const inspectBtn=$('btnInspect');
+  if(inspectBtn){
+    const doIns=(e)=>{ if(typeof startInspect==='function') startInspect();
+      if(e&&e.preventDefault) e.preventDefault();
+      if(e&&e.stopPropagation) e.stopPropagation(); };
+    inspectBtn.addEventListener('touchstart',doIns,{passive:false});
+    inspectBtn.addEventListener('click',doIns);
+  }
   // 键盘右键也可开镜（桌面端，按住式）
   /* 右键瞄准：按住开镜，松开还原。
      必须同时屏蔽浏览器右键菜单，否则一按右键先弹出一个菜单，
@@ -628,8 +649,19 @@ const SHOP_ITEMS={
   gun_m870:   {cat:'gun',    get name(){ return T('雷明顿 M870'); }, icon:'🔫', price:5200, get desc(){ return T('泵动 · 9 颗弹丸 · 近距一枪致命'); }, ammoType:'shot', dmg:14, fireMode:'pump', fireCd:0.20, mag:7, pumpTime:0.58, pellets:9, recoil:1.0, adsZ:0.60, adsY:0.014, sightY:0.090},
   pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('半自动 · 应急副武器'); }, ammoType:'pistol', dmg:14, fireMode:'semi', fireCd:0.17, mag:12, recoil:0.90, adsZ:0.40, adsY:0.012, sightY:0.093},
   pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('半自动 · 高伤副武器'); }, ammoType:'pistol', dmg:24, fireMode:'semi', fireCd:0.24, mag:8, recoil:0.75, adsZ:0.42, adsY:0.013, sightY:0.093},
-  melee_knife:{cat:'melee',  get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹'); }, dmg:35},
-  melee_baton:{cat:'melee',  get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28},
+  melee_knife:{cat:'melee', get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹 · 出手快'); }, dmg:35, knife:'knife', meleeCd:0.42, meleeRange:2.6},
+  melee_baton:{cat:'melee', get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28, knife:'machete', meleeCd:0.46, meleeRange:2.8},
+  /* ---- 更多刀型：只改外观，伤害各有微调 ---- */
+  melee_karambit:{cat:'melee', get name(){ return T('爪刀'); }, icon:'🗡️', price:1400, get desc(){ return T('弯刃 · 出手极快 · 近身利器'); }, dmg:42, knife:'karambit', meleeCd:0.30, meleeRange:2.2},
+  melee_katana:{cat:'melee', get name(){ return T('太刀'); },   icon:'⚔️', price:2600, get desc(){ return T('细长刀身 · 挥砍范围最大'); }, dmg:56, knife:'katana', meleeCd:0.52, meleeRange:3.3},
+  melee_axe:{cat:'melee',    get name(){ return T('战术斧'); }, icon:'🪓', price:3600, get desc(){ return T('沉重· 一击必杀，但挥得慢'); }, dmg:95, knife:'axe', meleeCd:0.78, meleeRange:2.7},
+  /* ---- 武器皮肤：纯外观，不提供任何属性加成 ---- */
+  skin_none:{cat:'skin', get name(){ return T('原厂涂装'); }, icon:'⬜', price:0,    get desc(){ return T('默认外观，不花一分钱'); }, skin:'skin_none'},
+  skin_neon:{cat:'skin', get name(){ return T('霓虹夜光'); },   icon:'🟦', price:2000, get desc(){ return T('青蓝发光 · 环绕光带'); }, skin:'skin_neon'},
+  skin_blood:{cat:'skin',get name(){ return T('赤血红'); },     icon:'🟥', price:3200, get desc(){ return T('血红发光 · 杀气十足'); }, skin:'skin_blood'},
+  skin_toxic:{cat:'skin',get name(){ return T('毒液幽绿'); },   icon:'🟩', price:3800, get desc(){ return T('幽绿毒光 · 环绕光带'); }, skin:'skin_toxic'},
+  skin_void:{cat:'skin', get name(){ return T('虚空紫'); },     icon:'🟪', price:5000, get desc(){ return T('暗紫辐射 · 最强发光'); }, skin:'skin_void'},
+  skin_gold:{cat:'skin', get name(){ return T('黄金'); },       icon:'🟨', price:9000, get desc(){ return T('土豪金 · 无光但最闪'); }, skin:'skin_gold'},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
   chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('额外 2 个弹匣位'); }, mags:2},
   chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('额外 4 个弹匣位'); }, mags:4},
@@ -643,6 +675,7 @@ const SHOP_CATS=[
   {id:'gun',    get name(){ return T('主武器'); }},
   {id:'pistol', get name(){ return T('手枪'); }},
   {id:'melee',  get name(){ return T('副武器'); }},
+  {id:'skin',   get name(){ return T('武器皮肤'); }},
   {id:'chest',  get name(){ return T('胸挂'); }},
   {id:'med',    get name(){ return T('医药'); }},
   {id:'tool',   get name(){ return T('道具'); }},
@@ -793,6 +826,29 @@ function buyItem(id){
     sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); return;
   }
 
+  /* 【武器皮肤】买完立刻套到当前手持的主武器上。
+     皮肤是纯外观，没有属性，所以不需要进仓库再装备 ——
+     买完直接生效手感最好，也避免玩家买了不知道怎么用。
+     如果手上不是枪（比如拿到了刀），就存进 P.skins 里，
+     等真正装备那把枪时自动生效（curSkinId 会去查）。
+     由于皮肤只能给枪上，我们把 skin 存到 P.equip.primary 这把枪的 id 上。 */
+  if(cat==='skin'){
+    const skinId=it.skin||id;
+    /* 找一把能套的武器：优先当前手持的主武器，其次手里任何一把枪 */
+    let target=(P.equip&&P.equip.primary)||null;
+    if(!target && P.equip && P.equip.secondary) target=P.equip.secondary;
+    if(!target){
+      /* 一把枪都没有，不允许买，不然花了钱什么都看不到 */
+      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); return;
+    }
+    P.ammo.cash-=it.price;
+    stashAdd(id,1);
+    if(typeof setSkin==='function') setSkin(target, skinId);
+    if(typeof _modelCache==='object') _modelCache.key=null;
+    sfxBuy();
+    toast('皮肤已应用 '+(SHOP_ITEMS[target]?SHOP_ITEMS[target].name:'')+' · '+it.name);
+    refreshHUD(); buildShop(); return;
+  }
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;
   stashAdd(id,1);

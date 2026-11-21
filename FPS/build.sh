@@ -199,3 +199,13 @@ if command -v node >/dev/null 2>&1 && [ -f firemode_test.js ]; then
     exit 1
   fi
 fi
+# 近战 / 武器皮肤 / 检视 / GM 隐藏面板
+if command -v node >/dev/null 2>&1 && [ -f skin_test.js ]; then
+  SK=$(node skin_test.js 2>&1)
+  if echo "$SK" | grep -q '❌'; then
+    echo "$SK" | grep '❌'
+    echo "近战/皮肤/GM 测试失败"
+    exit 1
+  fi
+  echo "SKIN_OK: 近战半球判定命中、5 种刀型、6 种皮肤发光、检视、GM 加钱面板全部正确"
+fi

@@ -1,6 +1,13 @@
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
 let weaponRoot=null, weaponPistol=null, weaponRifle=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
+/* 奔跑/瞄准姿态的平滑插值量。
+   【必须在这里声明】本项目所有分块被打包进同一个 <script type="module">，
+   模块严格模式下给未声明的变量赋值会抛 ReferenceError，
+   而 updWeapon 是在 animate() 里逐帧调用的——
+   一旦它抛错，后面的 refreshHUD() 和 renderer.render() 就再也不会执行，
+   表现就是整个 3D 场景、枪、人物全部变黑。 */
+let wSprint=0, wAds=0;
 
 function mat(color,rough,metal){
   return new THREE.MeshStandardMaterial({

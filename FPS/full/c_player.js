@@ -118,10 +118,11 @@ function updP(dt){
   if(window.__dbgEl){
     const t=window.__joyTouch||{};
     window.__dbgEl.textContent=
-      'joyX='+(P.joyX||0).toFixed(2)+' joyY='+(P.joyY||0).toFixed(2)+'\n'+
+      'EVT start='+(window.__evtStart||0)+' move='+(window.__evtMove||0)+'\n'+
+      'joy='+(P.joyX||0).toFixed(2)+','+(P.joyY||0).toFixed(2)+'\n'+
       'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
       'pos='+P.pos.x.toFixed(1)+','+P.pos.z.toFixed(1)+'\n'+
-      'touch='+(t.active?'Y':'N')+' id='+(t.active?(t.sx|0):'-');
+      'touch='+(t.active?'Y':'N');
   }
 }
 

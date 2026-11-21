@@ -18,10 +18,14 @@ function toast(t){
 }
 
 /* ---- 主菜单 / 开始 / 结束按钮 ---- */
-// 触摸设备才显示摇杆和操作按钮（桌面也可通过触屏检测启用）
+/* 显示摇杆和操作按钮。
+   【不要再依赖触摸检测】原来写了 if(!isTouch) return;
+   而 isTouch 来自 'ontouchstart' in window || navigator.maxTouchPoints>0。
+   某些 Android WebView / 内置浏览器里这两个值都拿不到（或为 0），
+   于是这段直接 return，#joyZone 永远停在 CSS 的 display:none，
+   display:none 的元素收不到任何事件 —— 手怎么拖都没反应。
+   反正桌面端本来也有鼠标拖拽摇杆的兜底，所以干脆无条件显示。 */
 function showTouchUI(){
-  const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-  if(!isTouch) return;
   const jz=$('joyZone'); if(jz) jz.style.display='block';
   const az=$('actZone'); if(az) az.style.display='block';
   const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
@@ -106,6 +110,7 @@ function bindUI(){
     const startJoy=(cx,cy)=>{
       sx=cx; sy=cy;
       activeId=1;
+      window.__evtStart=(window.__evtStart||0)+1;
       /* 摇杆固定出现在按下位置，用 translate(-50%,-50%) 精确居中 */
       joyBase.style.left=cx+'px';
       joyBase.style.top=cy+'px';
@@ -116,6 +121,7 @@ function bindUI(){
     };
 
     const moveJoy=(cx,cy)=>{
+      window.__evtMove=(window.__evtMove||0)+1;
       let dx=cx-sx, dy=cy-sy;
       const max=48, d=Math.hypot(dx,dy);
       if(d>max){ dx*=max/d; dy*=max/d; }
@@ -128,7 +134,10 @@ function bindUI(){
       activeId=null; P.joyX=0; P.joyY=0;
       if(window.__joyTouch) window.__joyTouch.active=false;
       joyStick.style.transform='translate(-50%,-50%)';
-      joyBase.style.display='none';
+      /* 松开后回到常驻位置（左下角），而不是隐藏——
+         常驻可见才能一眼确认摇杆是否真的在工作。 */
+      joyBase.style.left='110px';
+      joyBase.style.top='calc(100% - 110px)';
     };
 
     joyZone.addEventListener('touchstart',e=>{

@@ -176,5 +176,8 @@ try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('th
    必须在 DOM 就绪后跑，但不必等 init()（init 是点「开始」才执行的）。
    放在启动之前，这样主菜单一出现就有难度可选。 */
 try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff init failed', e); }
+/* 【主菜单生涯统计首次填充】打开页面就要显示真实的击杀数/撤离次数，
+   不能等打完一局才出现。P.stats 会被存档读回，所以这里直接渲染即可。 */
+try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

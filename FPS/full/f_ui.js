@@ -159,6 +159,20 @@ function toggleSound(){
   return on;
 }
 /* 把当前声音状态同步到所有显示「开/关」的地方 */
+/* 【主菜单生涯统计】把 P.stats 写进 #mKills / #mExfil。
+   这两个 div 在 a_head.html 里一直存在，但从来没有 JS 写它们，
+   所以永远显示 0。主菜单每次显示 / 每局结算后都要调用本函数。 */
+function refreshMenuStats(){
+  try{
+    const st = (typeof P==='object' && P && P.stats) ? P.stats : null;
+    const k = st ? (st.kills|0) : 0;
+    const x = st ? (st.exfils|0) : 0;
+    const elK=document.getElementById('mKills');
+    if(elK) elK.textContent = String(k);
+    const elX=document.getElementById('mExfil');
+    if(elX) elX.textContent = String(x);
+  }catch(e){}
+}
 function syncSoundUI(){
   const on = !!(typeof sfxOn!=='undefined' && sfxOn);
   const txt = on ? T('开') : T('关');

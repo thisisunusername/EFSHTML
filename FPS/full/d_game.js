@@ -70,6 +70,8 @@ function fireOnce(dirOverride){
         if(obj===e.head && !melee) headAny=true;
         if(e.hp<=0 && e.alive){
           e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill();
+          /* 【击杀统计】主菜单要显示生涯击杀数 */
+          try{ if(P.stats) P.stats.kills=(P.stats.kills|0)+1; }catch(_e){}
         }
         break;
       }
@@ -134,6 +136,8 @@ function meleeSwing(){
       if(e.body) e.body.visible=false;
       if(e.head) e.head.visible=false;
       sfxKill();
+      /* 【击杀统计】近战击杀也要计数，否则拿刀流永远 0 杀 */
+      try{ if(P.stats) P.stats.kills=(P.stats.kills|0)+1; }catch(_e){}
     }
   }
   if(n>0) sfxHit();
@@ -526,6 +530,8 @@ function showMainMenuAfterRaid(){
   }catch(e){}
   /* 主菜单的几个统计要刷新（钱少了、槽位空了要立刻看到） */
   try{ if(typeof refreshHUD==='function') refreshHUD(); }catch(e){}
+  /* 生涯统计（击杀数 / 撤离次数）也要刷新 —— 刚打完这一局要立刻看到变化 */
+  try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
   try{ if(typeof buildWpnBar==='function') buildWpnBar(); }catch(e){}
   try{ if(typeof i18nRebuildAll==='function') i18nRebuildAll(); }catch(e){}
 }
@@ -590,6 +596,8 @@ function checkExfil(){
   if(hit){
     exfiled=true;
     sfxExfil();
+    /* 【撤离统计】主菜单要显示生涯撤离次数 */
+    try{ if(P.stats) P.stats.exfils=(P.stats.exfils|0)+1; }catch(_e){}
     const spotName = hit.name || '撤离点';
     /* 【撤离结算】局内背包里的所有东西并回仓库，
        身上的头盔/护甲/背包继续保留可以用。 */

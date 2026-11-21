@@ -176,9 +176,17 @@ function buildFloors(){
   setFloorVisible();
 }
 
+/* 【楼外不显示楼层】这是「开局玩家在天上」的根因所在。
+   主楼 5 层是叠在一起的：2F@12 / 1F@8 / B1@4 / B2@0 / B3@-4。
+   玩家出生在楼外操场（0, 1.6, 5），而 curFloor 默认是 1（1F@y8）——
+   于是在楼外抬头能看到一整层悬在 8 米高空的楼板家具，
+   视觉上就是「开局人在天上」。
+   现在：只有玩家真的在楼里（inBuilding）才显示当前层，
+   在楼外时 5 层全部隐藏，看到的只有主楼外壳。 */
 function setFloorVisible(){
+  const show = (typeof inBuilding==='boolean') ? inBuilding : true;
   for(let i=0;i<floorGroups.length;i++){
-    if(floorGroups[i]) floorGroups[i].visible = (i===curFloor);
+    if(floorGroups[i]) floorGroups[i].visible = show && (i===curFloor);
   }
 }
 
@@ -256,7 +264,22 @@ function updFloors(dt){
       }
     }
   }catch(e){}
+  /* 【进出楼切换可见性】inBuilding 一变就要刷新分层显隐：
+     进楼 → 显示当前层；出楼 → 5 层全隐藏（否则楼板悬在半空）。
+     顺带在「刚进楼」这一刻把玩家抬到本层地板 ——
+     因为玩家是从 z=-14 的门口水平走进来的，脚还在地面 y=0，
+     而 1F 地板在 y=8，不抬上去会卡在楼板下面。 */
+  const wasInB = inBuilding;
   inBuilding = inB;
+  if(inB !== wasInB){
+    setFloorVisible();
+    if(inB && typeof P === 'object' && P.pos){
+      const base = floorY(curFloor) + (typeof P.eyeH==='number'?P.eyeH:1.7);
+      P.pos.y = base;
+      P.vel.y = 0;
+      P.onGround = true;
+    }
+  }
   nearFloorThing = inB ? nd : null;
 
   /* 楼内时把玩家的 y 锁在本层地板附近，防止从楼板缝隙掉下去。

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Escape Form School</title>
+<title>逃离学校 EFS · Escape From School</title>
 <style>
   /* ============ Web 字体（3D 版原来完全没有，这就是「切字体没效果」的根因） ============
      【问题是什么】s_theme.js 的 FONT_FAMILY 里写了 "ZCOOLXiaoWei"、"MaShanZheng"、
@@ -446,6 +446,9 @@ html[data-lang="en"] #bagBtn span{
   .kk span{ color:#98a0b0; }
   .keysbox-note{ margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.09); font-size:11.5px; color:#8b93a6; line-height:1.6; }
   h1{ font-size:var(--fs-title); margin-bottom:4px; font-family:var(--font-ui); } h1 span{ color:var(--accent2); }
+  /* 主标题里的英文缩写（EFS）：比中文小一号、半透明，不抢视觉重心 */
+  h1 .h1en{ font-size:.48em; font-weight:600; letter-spacing:.08em;
+    color:rgba(255,255,255,.42); vertical-align:.28em; margin-left:6px; }
   .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
   .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
   /* ============ 难度选择（v_diff.js 渲染） ============
@@ -1289,7 +1292,9 @@ background:rgba(90,220,255,.03); cursor:default; }
 <!-- 主菜单 -->
 <div id="menu">
   <div class="box">
-    <h1>🔫 Escape <span>Form</span> School</h1>
+    <!-- 【标题】原来写的是英文原名 Escape Form School（含 Form/From 拼写问题）。
+         按需求改成中文「逃离学校」并在后面带 (EFS) 缩写。 -->
+    <h1>🔫 逃离<span>学校</span> <small class="h1en">EFS</small></h1>
     <p class="sub">搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。</p>
     <div class="keysbox">
       <div class="keysbox-t">⌨️ 操作说明</div>
@@ -3597,6 +3602,11 @@ const P={
      这里只记「搜来的数量」，仓库里总数减掉它就是自己买的。
      结构：{ itemId: 搜来的数量 } */
   looted:{},
+  /* 【生涯统计】主菜单「撤离次数 / 击杀数」两块牌子要读这两个数。
+     以前这两个 <div> 在 a_head.html 里就有，但从来没有 JS 写过它们，
+     所以永远显示 0 —— 不是「算错了」，是根本没接数据。
+     这里放在 P 里，跟着 autoSaveSnapshot 一起存档/导出。 */
+  stats:{ kills:0, exfils:0, deaths:0, raids:0 },
   /* 【局内来源记录】本次出击从仓库带走的物品里，有多少件是搜来的。
      撤离成功时按这个数把它们「还原成搜来的」（否则带进带出几次就
      莫名从 1.35 倍跌成 0.6 倍）；阵亡时直接清空（东西都没了）。 */
@@ -4027,6 +4037,8 @@ function fireOnce(dirOverride){
         if(obj===e.head && !melee) headAny=true;
         if(e.hp<=0 && e.alive){
           e.alive=false; e.body.visible=false; e.head.visible=false; sfxKill();
+          /* 【击杀统计】主菜单要显示生涯击杀数 */
+          try{ if(P.stats) P.stats.kills=(P.stats.kills|0)+1; }catch(_e){}
         }
         break;
       }
@@ -4091,6 +4103,8 @@ function meleeSwing(){
       if(e.body) e.body.visible=false;
       if(e.head) e.head.visible=false;
       sfxKill();
+      /* 【击杀统计】近战击杀也要计数，否则拿刀流永远 0 杀 */
+      try{ if(P.stats) P.stats.kills=(P.stats.kills|0)+1; }catch(_e){}
     }
   }
   if(n>0) sfxHit();
@@ -4483,6 +4497,8 @@ function showMainMenuAfterRaid(){
   }catch(e){}
   /* 主菜单的几个统计要刷新（钱少了、槽位空了要立刻看到） */
   try{ if(typeof refreshHUD==='function') refreshHUD(); }catch(e){}
+  /* 生涯统计（击杀数 / 撤离次数）也要刷新 —— 刚打完这一局要立刻看到变化 */
+  try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
   try{ if(typeof buildWpnBar==='function') buildWpnBar(); }catch(e){}
   try{ if(typeof i18nRebuildAll==='function') i18nRebuildAll(); }catch(e){}
 }
@@ -4547,6 +4563,8 @@ function checkExfil(){
   if(hit){
     exfiled=true;
     sfxExfil();
+    /* 【撤离统计】主菜单要显示生涯撤离次数 */
+    try{ if(P.stats) P.stats.exfils=(P.stats.exfils|0)+1; }catch(_e){}
     const spotName = hit.name || '撤离点';
     /* 【撤离结算】局内背包里的所有东西并回仓库，
        身上的头盔/护甲/背包继续保留可以用。 */
@@ -4822,7 +4840,11 @@ function autoSaveSnapshot(){
        花几千块买的瞄具凭空消失，打完的枪又变满耐久，
        等于「耐久」和「改枪」两个系统都变成摆设。 */
     gunDur: P.gunDur || {},
-    gunMods: P.gunMods || {}
+    gunMods: P.gunMods || {},
+    /* 【生涯统计】击杀数 / 撤离次数 / 阵亡数 / 出击数。
+       放进快照才会被 autoSave 和「导出存档」一起带走，
+       换设备导入后主菜单的数字才是对的。 */
+    stats: P.stats || {}
   };
 }
 
@@ -4997,6 +5019,18 @@ function autoSaveApply(o){
       P.gunMods=clean;
     } else if(typeof P.gunMods!=='object'){
       P.gunMods={};
+    }
+    /* 【生涯统计】读回来。旧存档没有这个字段，那就保持初始的 0。
+       每个值都做一次整数夹取，防止手改存档塞进 NaN/负数。 */
+    if(o.stats && typeof o.stats==='object'){
+      P.stats = P.stats || {};
+      const ks=['kills','exfils','deaths','raids'];
+      for(const k of ks){
+        const v=Number(o.stats[k]);
+        P.stats[k] = isFinite(v) ? Math.max(0, v|0) : (P.stats[k]|0);
+      }
+    } else if(!P.stats || typeof P.stats!=='object'){
+      P.stats={ kills:0, exfils:0, deaths:0, raids:0 };
     }
     return true;
   }catch(e){ return false; }
@@ -5234,6 +5268,20 @@ function toggleSound(){
   return on;
 }
 /* 把当前声音状态同步到所有显示「开/关」的地方 */
+/* 【主菜单生涯统计】把 P.stats 写进 #mKills / #mExfil。
+   这两个 div 在 a_head.html 里一直存在，但从来没有 JS 写它们，
+   所以永远显示 0。主菜单每次显示 / 每局结算后都要调用本函数。 */
+function refreshMenuStats(){
+  try{
+    const st = (typeof P==='object' && P && P.stats) ? P.stats : null;
+    const k = st ? (st.kills|0) : 0;
+    const x = st ? (st.exfils|0) : 0;
+    const elK=document.getElementById('mKills');
+    if(elK) elK.textContent = String(k);
+    const elX=document.getElementById('mExfil');
+    if(elX) elX.textContent = String(x);
+  }catch(e){}
+}
 function syncSoundUI(){
   const on = !!(typeof sfxOn!=='undefined' && sfxOn);
   const txt = on ? T('开') : T('关');
@@ -10021,9 +10069,17 @@ function buildFloors(){
   setFloorVisible();
 }
 
+/* 【楼外不显示楼层】这是「开局玩家在天上」的根因所在。
+   主楼 5 层是叠在一起的：2F@12 / 1F@8 / B1@4 / B2@0 / B3@-4。
+   玩家出生在楼外操场（0, 1.6, 5），而 curFloor 默认是 1（1F@y8）——
+   于是在楼外抬头能看到一整层悬在 8 米高空的楼板家具，
+   视觉上就是「开局人在天上」。
+   现在：只有玩家真的在楼里（inBuilding）才显示当前层，
+   在楼外时 5 层全部隐藏，看到的只有主楼外壳。 */
 function setFloorVisible(){
+  const show = (typeof inBuilding==='boolean') ? inBuilding : true;
   for(let i=0;i<floorGroups.length;i++){
-    if(floorGroups[i]) floorGroups[i].visible = (i===curFloor);
+    if(floorGroups[i]) floorGroups[i].visible = show && (i===curFloor);
   }
 }
 
@@ -10101,7 +10157,22 @@ function updFloors(dt){
       }
     }
   }catch(e){}
+  /* 【进出楼切换可见性】inBuilding 一变就要刷新分层显隐：
+     进楼 → 显示当前层；出楼 → 5 层全隐藏（否则楼板悬在半空）。
+     顺带在「刚进楼」这一刻把玩家抬到本层地板 ——
+     因为玩家是从 z=-14 的门口水平走进来的，脚还在地面 y=0，
+     而 1F 地板在 y=8，不抬上去会卡在楼板下面。 */
+  const wasInB = inBuilding;
   inBuilding = inB;
+  if(inB !== wasInB){
+    setFloorVisible();
+    if(inB && typeof P === 'object' && P.pos){
+      const base = floorY(curFloor) + (typeof P.eyeH==='number'?P.eyeH:1.7);
+      P.pos.y = base;
+      P.vel.y = 0;
+      P.onGround = true;
+    }
+  }
   nearFloorThing = inB ? nd : null;
 
   /* 楼内时把玩家的 y 锁在本层地板附近，防止从楼板缝隙掉下去。
@@ -12882,6 +12953,9 @@ try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('th
    必须在 DOM 就绪后跑，但不必等 init()（init 是点「开始」才执行的）。
    放在启动之前，这样主菜单一出现就有难度可选。 */
 try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff init failed', e); }
+/* 【主菜单生涯统计首次填充】打开页面就要显示真实的击杀数/撤离次数，
+   不能等打完一局才出现。P.stats 会被存档读回，所以这里直接渲染即可。 */
+try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);
 </script>

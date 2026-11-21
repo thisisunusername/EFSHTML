@@ -252,7 +252,11 @@ function autoSaveSnapshot(){
        花几千块买的瞄具凭空消失，打完的枪又变满耐久，
        等于「耐久」和「改枪」两个系统都变成摆设。 */
     gunDur: P.gunDur || {},
-    gunMods: P.gunMods || {}
+    gunMods: P.gunMods || {},
+    /* 【生涯统计】击杀数 / 撤离次数 / 阵亡数 / 出击数。
+       放进快照才会被 autoSave 和「导出存档」一起带走，
+       换设备导入后主菜单的数字才是对的。 */
+    stats: P.stats || {}
   };
 }
 
@@ -427,6 +431,18 @@ function autoSaveApply(o){
       P.gunMods=clean;
     } else if(typeof P.gunMods!=='object'){
       P.gunMods={};
+    }
+    /* 【生涯统计】读回来。旧存档没有这个字段，那就保持初始的 0。
+       每个值都做一次整数夹取，防止手改存档塞进 NaN/负数。 */
+    if(o.stats && typeof o.stats==='object'){
+      P.stats = P.stats || {};
+      const ks=['kills','exfils','deaths','raids'];
+      for(const k of ks){
+        const v=Number(o.stats[k]);
+        P.stats[k] = isFinite(v) ? Math.max(0, v|0) : (P.stats[k]|0);
+      }
+    } else if(!P.stats || typeof P.stats!=='object'){
+      P.stats={ kills:0, exfils:0, deaths:0, raids:0 };
     }
     return true;
   }catch(e){ return false; }

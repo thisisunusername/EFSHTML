@@ -155,6 +155,9 @@ if(window.__uiBound) return; window.__uiBound=true;
     /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
        注意 init() 必须保留 —— 它负责建场景、生成敌人和武器。 */
     window.__inGame=true;
+    /* 进游戏才强制横屏：主菜单保持用户当前朝向（竖着拿手机看菜单更舒服），
+       打枪时竖屏会看不清，才需要转过去。__orientEnter 会锁方向并亮遮罩。 */
+    if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(e){} }
     init();
     applyInputMode(inputMode, true);
   };
@@ -177,7 +180,16 @@ if(window.__uiBound) return; window.__uiBound=true;
   };
   const exportBtn=$('btnExport'); if(exportBtn) exportBtn.onclick=exportSave;
   const importBtn=$('btnImport'); if(importBtn) importBtn.onclick=importSave;
-  const resetBtn=$('btnReset'); if(resetBtn) resetBtn.onclick=()=>{ if(confirm('确认重置所有数据？')) location.reload(); };
+  /* 【重置数据】以前只做 location.reload() —— 现在有了本地自动存档，
+     重载后 autoSaveLoad() 会把旧档读回来，等于「重置完了还是原来的数据」。
+     所以必须先清档再重载。 */
+  const resetBtn=$('btnReset');
+  if(resetBtn) resetBtn.onclick=()=>{
+    if(!confirm('确认重置所有数据？')) return;
+    try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
+    try{ if(typeof localStorage!=='undefined') localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
+    location.reload();
+  };
   const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
 
   /* ===== 键盘映射（按用户指定）=====
@@ -604,6 +616,13 @@ const SLOTS=[
   { key:'melee',    get label(){ return T('副武器'); },  fb:'🔪', accept:['melee'] },
   { key:'chest',    get label(){ return T('胸挂'); },    fb:'🦺', accept:['chest'] },
   { key:'backpack', get label(){ return T('背包'); },    fb:'🎒', accept:['bag'] },
+  /* 【头盔/护甲】以前漏了这两个槽，导致：
+     · stashSlotOf('helm_light') 返回 null —— 因为没有任何槽 accept:['helmet']
+     · 仓库左栏看不到头甲，玩家在商店买了之后既看不见也换不下来
+       （buyItem 里有 cat==='helmet' 直接穿戴的分支，所以是「穿上但隐身」）
+     P.equip 和 settleDeath 里一直有这两个键，只有这个数组漏了。 */
+  { key:'helmet',   get label(){ return T('头盔'); },    fb:'⛑️', accept:['helmet'] },
+  { key:'armorVest',get label(){ return T('护甲'); },    fb:'🛡️', accept:['armor'] },
 ];
 
 const SHOP_ITEMS={
@@ -792,26 +811,29 @@ function equipTagOf(id){
 /* 购买逻辑：扣钱 → 装备类直接穿上 → 其余进「局外仓库」
    【关键】商店是局外功能，买的东西一律进 stash，不占局内背包格子。
    出击前要去仓库把物资装进背包，这才是搜打撤的整备流程。 */
+/* 自动存档打点：改动局外数据后调用。
+   内部用 queueMicrotask 合并同帧多次调用，所以随便打点都不会重复写盘。 */
+function saveTick(){ try{ if(typeof autoSaveTouch==='function') autoSaveTouch(); }catch(e){} }
 function buyItem(id){
-  const it=SHOP_ITEMS[id]; if(!it) return;
-  if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); return; }
+  const it=SHOP_ITEMS[id]; if(!it) saveTick(); return;
+  if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); saveTick(); return; }
 
   const cat=it.cat;
   /* 装备类：直接穿戴（等同买完立刻装备），也记一份进仓库 */
   if(cat==='helmet'){
     P.ammo.cash-=it.price;
     P.equip.helmet=id; P.helmetDur=it.dur;
-    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
   }
   if(cat==='armor'){
     P.ammo.cash-=it.price;
     P.equip.armorVest=id; P.vestDur=it.dur;
-    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
   }
   if(cat==='bag'){
     P.ammo.cash-=it.price;
     P.equip.backpack=id; P.bagCap=it.cap;
-    sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); saveTick(); return;
   }
   /* 【新加的四个装备槽】
      主武器/手枪/副武器/胸挂都直接穿上，因为它们只有在装备槽里才有意义。
@@ -822,10 +844,10 @@ function buyItem(id){
     const slot=stashSlotOf(id);
     if(slot && !P.equip[slot]){
       P.equip[slot]=id;
-      sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+      sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
     }
     stashAdd(id,1);
-    sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); saveTick(); return;
   }
 
   /* 【武器皮肤】买完立刻套到当前手持的主武器上。
@@ -841,7 +863,7 @@ function buyItem(id){
     if(!target && P.equip && P.equip.secondary) target=P.equip.secondary;
     if(!target){
       /* 一把枪都没有，不允许买，不然花了钱什么都看不到 */
-      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); return;
+      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); saveTick(); return;
     }
     P.ammo.cash-=it.price;
     stashAdd(id,1);
@@ -849,7 +871,7 @@ function buyItem(id){
     if(typeof _modelCache==='object') _modelCache.key=null;
     sfxBuy();
     toast('皮肤已应用 '+(SHOP_ITEMS[target]?SHOP_ITEMS[target].name:'')+' · '+it.name);
-    refreshHUD(); buildShop(); return;
+    refreshHUD(); buildShop(); saveTick(); return;
   }
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;
@@ -861,7 +883,7 @@ function buyItem(id){
   }else{
     sfxBuy(); toast('买下 '+it.name+' → 仓库');
   }
-  refreshHUD(); buildShop(); return;
+  refreshHUD(); buildShop(); saveTick(); return;
 }
 
 /* ============ 局外仓库 / 局内背包 ============
@@ -1038,6 +1060,7 @@ function buildStashNew(){
         P.equip[k]=null;
         if(k==='primary'||k==='secondary'||k==='melee') P.inv.gun=true;
         toast('已卸下');
+        saveTick();
         buildStashNew();
       }
     };
@@ -1060,6 +1083,7 @@ function buildStashNew(){
         /* 背包要重算容量 */
         if(slot==='backpack'){ P.bagCap=it.cap||24; }
         toast('已装备 '+(it.name||''));
+        saveTick();
         buildStashNew(); refreshHUD();
         return;
       }
@@ -1283,6 +1307,7 @@ function settleExfil(){
   }
   P.pouch={};
   /* 装备也一起"带回"，保留在 equip 里继续用 */
+  saveTick();   // 撤离是钱/仓库大变动，必须立刻落盘
   toast('撤离成功！带回 '+gained+' 件物品');
 }
 /* 阵亡：局内背包和装备全部丢失（搜打撤的风险） */
@@ -1298,6 +1323,7 @@ function settleDeath(){
   P.equip={ helmet:null, armorVest:null, backpack:null,
             primary:null, secondary:null, melee:null, chest:null };
   P.helmetDur=0; P.vestDur=0; P.bagCap=0;
+  saveTick();   // 阵亡清空装备，同样要落盘（否则刷新后装备回来了，风险机制失效）
   return lost;
 }
 

@@ -2424,6 +2424,193 @@ function importSave(){
     alert('解密失败：'+e.message);
   });
 }
+/* ============================================================
+   本地自动存档（localStorage + cookie 双写）
+
+   【为什么要做】以前 3D 版只有「加密导出/导入」这种手动路径：
+   关掉页面（或 WebView 被杀）之后，仓库、钱、皮肤、出击装备
+   全部归零。用户回一句「没有本地 cookie 保存吗」—— 确实没有。
+
+   【存什么】只存「局外」的东西：钱、仓库、出击装备、皮肤、护甲耐久。
+   局内的血量/位置不存 —— 搜打撤的意义就是带着风险进去、
+   死在里面就丢光，存档把它救回来就没意思了。
+   所以刷新后回到主菜单，仓库还在，人重新出发。
+
+   【localStorage 还是 cookie】
+   localStorage 容量大（5MB）、不会随请求发给服务器、没有 4KB 限制，
+   是 JSON 存档的首选。cookie 只能存 4KB、每次请求都带，
+   但它的存活范围更广（某些 WebView 清 localStorage 不清 cookie）。
+   所以两边都写一份：localStorage 为主，cookie 为兜底。
+   两者都没有时当作新存档，不报错。
+   ============================================================ */
+const AUTO_SAVE_KEY = 'efs_fps_save_v1';
+const AUTO_SAVE_COOKIE = 'efs_fps_save_v1';
+const AUTO_SAVE_VERSION = 1;
+const AUTO_SAVE_DAYS = 180;
+
+/* 只把局外字段扒出来。字段白名单而不是黑名单：
+   以后 P 里新增局内字段（子弹飞行、敌人状态）不会被误存进去。 */
+function autoSaveSnapshot(){
+  return {
+    v: AUTO_SAVE_VERSION,
+    t: Date.now(),
+    cash: P.ammo.cash|0,
+    ammo: { rifle:P.ammo.rifle|0, pistol:P.ammo.pistol|0,
+            sniper:P.ammo.sniper|0, shot:P.ammo.shot|0 },
+    stash: P.stash || {},
+    equip: P.equip || {},
+    skins: P.skins || {},
+    bagCap: P.bagCap|0,
+    helmetDur: P.helmetDur|0,
+    vestDur: P.vestDur|0
+  };
+}
+
+/* 写入 cookie。SameSite=Lax 避免跨站场景下被浏览器丢掉，
+   max-age 用秒；值里有分号/逗号会截断，所以一律 encodeURIComponent。 */
+function autoSaveCookie(str){
+  try{
+    const v = encodeURIComponent(str);
+    const maxAge = AUTO_SAVE_DAYS*24*60*60;
+    document.cookie = AUTO_SAVE_COOKIE + '=' + v
+      + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
+  }catch(e){}
+}
+function autoSaveReadCookie(){
+  try{
+    const all = document.cookie || '';
+    const parts = all.split(';');
+    for(let i=0;i<parts.length;i++){
+      const s = parts[i].trim();
+      const eq = s.indexOf('=');
+      if(eq<0) continue;
+      if(s.slice(0,eq) === AUTO_SAVE_COOKIE){
+        return decodeURIComponent(s.slice(eq+1));
+      }
+    }
+  }catch(e){}
+  return null;
+}
+
+/* 保存。两个后端都失败时只 console.warn，不弹出东西骚扰玩家。 */
+function autoSaveWrite(){
+  let json = '';
+  try{ json = JSON.stringify(autoSaveSnapshot()); }catch(e){ return false; }
+  let ok = false;
+  try{ localStorage.setItem(AUTO_SAVE_KEY, json); ok = true; }catch(e){}
+  autoSaveCookie(json);
+  return ok;
+}
+
+/* 读档：先 localStorage，拿不到或坏了再试 cookie。
+   解析失败一律返回 null（当作新档），绝不让坏数据把游戏卡死。 */
+function autoSaveRead(){
+  const tryParse = (raw)=>{
+    if(!raw) return null;
+    try{
+      const o = JSON.parse(raw);
+      if(!o || typeof o!=='object') return null;
+      return o;
+    }catch(e){ return null; }
+  };
+  let raw = null;
+  try{ raw = localStorage.getItem(AUTO_SAVE_KEY); }catch(e){}
+  let o = tryParse(raw);
+  if(!o) o = tryParse(autoSaveReadCookie());
+  return o;
+}
+
+/* 把存档套进 P。只覆盖认识的字段，缺什么就保留当前默认值。 */
+function autoSaveApply(o){
+  if(!o) return false;
+  try{
+    if(typeof o.cash==='number') P.ammo.cash = Math.max(0, o.cash|0);
+    if(o.ammo && typeof o.ammo==='object'){
+      ['rifle','pistol','sniper','shot'].forEach(k=>{
+        if(typeof o.ammo[k]==='number') P.ammo[k] = Math.max(0, o.ammo[k]|0);
+      });
+    }
+    if(o.stash && typeof o.stash==='object'){
+      /* 过滤掉已经不是合法物品的 key（以后删了某个物品，旧存档别带崩商店） */
+      const clean = {};
+      for(const id in o.stash){
+        if(!Object.prototype.hasOwnProperty.call(o.stash, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const n = o.stash[id]|0;
+        if(n>0) clean[id] = n;
+      }
+      P.stash = clean;
+    }
+    if(o.equip && typeof o.equip==='object'){
+      /* 装备栏逐个槽校验：物品存在且分类对得上才装回去，
+         否则宁可留空 —— 一个坏 id 会让 slotUsable 判断崩掉。 */
+      const slots=['primary','secondary','melee','helmet','armorVest','backpack','chest'];
+      for(const k of slots){
+        const id = o.equip[k];
+        if(id===undefined) continue;
+        if(id===null){ P.equip[k]=null; continue; }
+        if(typeof SHOP_ITEMS!=='undefined' && SHOP_ITEMS[id]) P.equip[k]=id;
+      }
+    }
+    if(o.skins && typeof o.skins==='object'){
+      const clean = {};
+      for(const id in o.skins){
+        if(!Object.prototype.hasOwnProperty.call(o.skins, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const sk = o.skins[id];
+        if(typeof SKINS!=='undefined' && !SKINS[sk]) continue;
+        clean[id] = sk;
+      }
+      P.skins = clean;
+    }
+    if(typeof o.bagCap==='number' && o.bagCap>0) P.bagCap = o.bagCap|0;
+    if(typeof o.helmetDur==='number') P.helmetDur = Math.max(0, o.helmetDur|0);
+    if(typeof o.vestDur==='number')   P.vestDur   = Math.max(0, o.vestDur|0);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* 启动时调用一次。放在 e_io 里、由 z_render 的启动段拉起。 */
+function autoSaveLoad(){
+  const o = autoSaveRead();
+  if(!o) return false;
+  return autoSaveApply(o);
+}
+
+/* 自动保存的调度：
+   - 改动后立即写一次（下面的 autoSaveTouch 会被各处调用）
+   - 页面隐藏/卸载时再写一次（防止最后一次改动没来得及落盘）
+   不用 setInterval 轮询 —— 存档只在「有变化」时才需要写，
+   轮询只会白耗电。 */
+let _autoSavePending = false;
+function autoSaveTouch(){
+  if(_autoSavePending) return;
+  _autoSavePending = true;
+  /* 合并同一帧内的多次改动：买东西会连改 stash/cash/equip，
+     一帧写三次 localStorage 纯属浪费。 */
+  const flush = ()=>{ _autoSavePending = false; autoSaveWrite(); };
+  if(typeof queueMicrotask==='function') queueMicrotask(flush);
+  else if(typeof setTimeout==='function') setTimeout(flush, 0);
+  else flush();
+}
+
+/* 清档（「重置数据」按钮要用） */
+function autoSaveClear(){
+  try{ localStorage.removeItem(AUTO_SAVE_KEY); }catch(e){}
+  try{
+    document.cookie = AUTO_SAVE_COOKIE + '=; path=/; max-age=0; SameSite=Lax';
+  }catch(e){}
+}
+
+/* 页面生命周期挂钩：切到后台、关掉前各写一次。
+   pagehide 比 beforeunload 可靠（移动端 WebView 经常不触发 beforeunload）。 */
+if(typeof window!=='undefined'){
+  window.addEventListener('pagehide', ()=>{ try{ autoSaveWrite(); }catch(e){} });
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='hidden'){ try{ autoSaveWrite(); }catch(e){} }
+  });
+}
+
 /* ============ f_ui.js：菜单/商店/HUD/输入/摇杆 ============ */
 let touchMoveX=0, touchMoveY=0;
 
@@ -2581,6 +2768,9 @@ if(window.__uiBound) return; window.__uiBound=true;
     /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
        注意 init() 必须保留 —— 它负责建场景、生成敌人和武器。 */
     window.__inGame=true;
+    /* 进游戏才强制横屏：主菜单保持用户当前朝向（竖着拿手机看菜单更舒服），
+       打枪时竖屏会看不清，才需要转过去。__orientEnter 会锁方向并亮遮罩。 */
+    if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(e){} }
     init();
     applyInputMode(inputMode, true);
   };
@@ -2603,7 +2793,16 @@ if(window.__uiBound) return; window.__uiBound=true;
   };
   const exportBtn=$('btnExport'); if(exportBtn) exportBtn.onclick=exportSave;
   const importBtn=$('btnImport'); if(importBtn) importBtn.onclick=importSave;
-  const resetBtn=$('btnReset'); if(resetBtn) resetBtn.onclick=()=>{ if(confirm('确认重置所有数据？')) location.reload(); };
+  /* 【重置数据】以前只做 location.reload() —— 现在有了本地自动存档，
+     重载后 autoSaveLoad() 会把旧档读回来，等于「重置完了还是原来的数据」。
+     所以必须先清档再重载。 */
+  const resetBtn=$('btnReset');
+  if(resetBtn) resetBtn.onclick=()=>{
+    if(!confirm('确认重置所有数据？')) return;
+    try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
+    try{ if(typeof localStorage!=='undefined') localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
+    location.reload();
+  };
   const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
 
   /* ===== 键盘映射（按用户指定）=====
@@ -3030,6 +3229,13 @@ const SLOTS=[
   { key:'melee',    get label(){ return T('副武器'); },  fb:'🔪', accept:['melee'] },
   { key:'chest',    get label(){ return T('胸挂'); },    fb:'🦺', accept:['chest'] },
   { key:'backpack', get label(){ return T('背包'); },    fb:'🎒', accept:['bag'] },
+  /* 【头盔/护甲】以前漏了这两个槽，导致：
+     · stashSlotOf('helm_light') 返回 null —— 因为没有任何槽 accept:['helmet']
+     · 仓库左栏看不到头甲，玩家在商店买了之后既看不见也换不下来
+       （buyItem 里有 cat==='helmet' 直接穿戴的分支，所以是「穿上但隐身」）
+     P.equip 和 settleDeath 里一直有这两个键，只有这个数组漏了。 */
+  { key:'helmet',   get label(){ return T('头盔'); },    fb:'⛑️', accept:['helmet'] },
+  { key:'armorVest',get label(){ return T('护甲'); },    fb:'🛡️', accept:['armor'] },
 ];
 
 const SHOP_ITEMS={
@@ -3218,26 +3424,29 @@ function equipTagOf(id){
 /* 购买逻辑：扣钱 → 装备类直接穿上 → 其余进「局外仓库」
    【关键】商店是局外功能，买的东西一律进 stash，不占局内背包格子。
    出击前要去仓库把物资装进背包，这才是搜打撤的整备流程。 */
+/* 自动存档打点：改动局外数据后调用。
+   内部用 queueMicrotask 合并同帧多次调用，所以随便打点都不会重复写盘。 */
+function saveTick(){ try{ if(typeof autoSaveTouch==='function') autoSaveTouch(); }catch(e){} }
 function buyItem(id){
-  const it=SHOP_ITEMS[id]; if(!it) return;
-  if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); return; }
+  const it=SHOP_ITEMS[id]; if(!it) saveTick(); return;
+  if(P.ammo.cash < it.price){ sfxDeny(); toast('货币不足'); saveTick(); return; }
 
   const cat=it.cat;
   /* 装备类：直接穿戴（等同买完立刻装备），也记一份进仓库 */
   if(cat==='helmet'){
     P.ammo.cash-=it.price;
     P.equip.helmet=id; P.helmetDur=it.dur;
-    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
   }
   if(cat==='armor'){
     P.ammo.cash-=it.price;
     P.equip.armorVest=id; P.vestDur=it.dur;
-    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
   }
   if(cat==='bag'){
     P.ammo.cash-=it.price;
     P.equip.backpack=id; P.bagCap=it.cap;
-    sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); saveTick(); return;
   }
   /* 【新加的四个装备槽】
      主武器/手枪/副武器/胸挂都直接穿上，因为它们只有在装备槽里才有意义。
@@ -3248,10 +3457,10 @@ function buyItem(id){
     const slot=stashSlotOf(id);
     if(slot && !P.equip[slot]){
       P.equip[slot]=id;
-      sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+      sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); saveTick(); return;
     }
     stashAdd(id,1);
-    sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); return;
+    sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); saveTick(); return;
   }
 
   /* 【武器皮肤】买完立刻套到当前手持的主武器上。
@@ -3267,7 +3476,7 @@ function buyItem(id){
     if(!target && P.equip && P.equip.secondary) target=P.equip.secondary;
     if(!target){
       /* 一把枪都没有，不允许买，不然花了钱什么都看不到 */
-      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); return;
+      toast('先买一把枪再买皮肤'); sfxDeny(); buildShop(); saveTick(); return;
     }
     P.ammo.cash-=it.price;
     stashAdd(id,1);
@@ -3275,7 +3484,7 @@ function buyItem(id){
     if(typeof _modelCache==='object') _modelCache.key=null;
     sfxBuy();
     toast('皮肤已应用 '+(SHOP_ITEMS[target]?SHOP_ITEMS[target].name:'')+' · '+it.name);
-    refreshHUD(); buildShop(); return;
+    refreshHUD(); buildShop(); saveTick(); return;
   }
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;
@@ -3287,7 +3496,7 @@ function buyItem(id){
   }else{
     sfxBuy(); toast('买下 '+it.name+' → 仓库');
   }
-  refreshHUD(); buildShop(); return;
+  refreshHUD(); buildShop(); saveTick(); return;
 }
 
 /* ============ 局外仓库 / 局内背包 ============
@@ -3464,6 +3673,7 @@ function buildStashNew(){
         P.equip[k]=null;
         if(k==='primary'||k==='secondary'||k==='melee') P.inv.gun=true;
         toast('已卸下');
+        saveTick();
         buildStashNew();
       }
     };
@@ -3486,6 +3696,7 @@ function buildStashNew(){
         /* 背包要重算容量 */
         if(slot==='backpack'){ P.bagCap=it.cap||24; }
         toast('已装备 '+(it.name||''));
+        saveTick();
         buildStashNew(); refreshHUD();
         return;
       }
@@ -3709,6 +3920,7 @@ function settleExfil(){
   }
   P.pouch={};
   /* 装备也一起"带回"，保留在 equip 里继续用 */
+  saveTick();   // 撤离是钱/仓库大变动，必须立刻落盘
   toast('撤离成功！带回 '+gained+' 件物品');
 }
 /* 阵亡：局内背包和装备全部丢失（搜打撤的风险） */
@@ -3724,6 +3936,7 @@ function settleDeath(){
   P.equip={ helmet:null, armorVest:null, backpack:null,
             primary:null, secondary:null, melee:null, chest:null };
   P.helmetDur=0; P.vestDur=0; P.bagCap=0;
+  saveTick();   // 阵亡清空装备，同样要落盘（否则刷新后装备回来了，风险机制失效）
   return lost;
 }
 
@@ -5412,9 +5625,16 @@ function updAudio(dt){
 
 /* 竖屏遮罩的 DOM id */
 const ORIENT_MASK_ID = 'orientMask';
-
 /* 当前是否处于「应该被遮住」的竖屏状态 */
 let orientBlocked = false;
+/* 【只在游戏内强制横屏】
+   主菜单竖着拿手机很自然（所有按钮都是竖排的卡片布局），
+   进去打枪才需要横屏。所以遮罩与方向锁定都加一个「游戏已开始」的前置条件：
+     __inGame 为 false 时，无论横竖都不遮、也不锁方向。
+   这个变量由 f_ui.js 的「开始」按钮置 true，回主菜单时置 false。 */
+function orientInGame(){
+  return !!(typeof window !== 'undefined' && window.__inGame);
+}
 
 /* 判定竖屏：用 innerWidth/innerHeight。
    注意不能用 screen.orientation.type，部分 WebView 里它是空的。 */
@@ -5508,9 +5728,16 @@ function orientPaintMask(){
 /* 核心：根据当前朝向决定遮罩显隐 */
 function orientRefresh(){
   if(typeof document === 'undefined' || !document.body) return;
-  const portrait = orientIsPortrait();
   const mask = orientBuildMask();
   if(!mask) return;
+  /* 做主菜单时完全不干预：不遮、不锁、也不改布局信号。
+     只把状态清干净，等真正进游戏那一刻再判断。 */
+  if(!orientInGame()){
+    orientBlocked = false;
+    mask.style.display = 'none';
+    return;
+  }
+  const portrait = orientIsPortrait();
   const wasBlocked = orientBlocked;
   orientBlocked = portrait;
   orientPaintMask();
@@ -5532,6 +5759,22 @@ function orientRefresh(){
     }catch(e){}
   }
 }
+/* 进出游戏的开关。由 f_ui.js 在「开始」时调 true，
+   回主菜单（或死亡回菜单）时调 false。
+   对外暴露成 window.__orientEnter / __orientExit 供 f_ui 调用，
+   这样 f_ui 不必知道遮罩的存在。 */
+function orientSetInGame(on){
+  if(typeof window === 'undefined') return;
+  window.__inGame = !!on;
+  /* 进游戏才尝试锁横屏；回主菜单解除锁定，让设备能自由转回竖屏 */
+  if(on) orientTryLock();
+  else orientUnlock();
+  orientRefresh();
+}
+if(typeof window !== 'undefined'){
+  window.__orientEnter = function(){ orientSetInGame(true); };
+  window.__orientExit  = function(){ orientSetInGame(false); };
+}
 
 /* 初始化：绑定事件 + 首次刷新。
    用 matchMedia('(orientation:portrait)') 精确监听，比 resize 稳，
@@ -5551,12 +5794,11 @@ function orientInit(){
   window.addEventListener('resize', function(){ orientRefresh(); });
   if(typeof document !== 'undefined' && document.addEventListener){
     document.addEventListener('fullscreenchange', function(){ orientRefresh(); });
-  }
-  /* 桌面端：宽屏不锁，避免影响多窗口使用 */
-  if(!orientIsPortrait()){
-    const w = window.innerWidth || 0;
-    if(w < 900) orientTryLock();
-  }
+}
+  /* 【不要在这里就锁横屏】
+     原实现在 init 里就 orientTryLock()，主菜单一打开就被强制转成横屏，
+     但主菜单是竖排卡片布局（标题 + 操作说明 + 三排按钮），横过来反而难用。
+     现在只在 __orientEnter()（点「开始」）时才锁，主菜单保持用户当前朝向。 */
 }
 
 /* ============================================================
@@ -5931,6 +6173,10 @@ try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('
    结果就是「连点 D 15 次面板也不出来，而且没有任何报错」。
    initGM 内部有 dataset.bound 幂等保护，重复调用无害。 */
 try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init failed', e); }
+/* 【本地自动存档】读档必须在所有 buildXXX 都已定义之后、渲染循环开始之前：
+   否则读到的钱和仓库不会显示在菜单上（菜单是读档前画的）。
+   autoSaveLoad 内部对每个字段都做了存在性校验，坏档一律当新档。 */
+try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.error('autosave load failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);
 </script>

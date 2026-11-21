@@ -132,5 +132,9 @@ try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('
    结果就是「连点 D 15 次面板也不出来，而且没有任何报错」。
    initGM 内部有 dataset.bound 幂等保护，重复调用无害。 */
 try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init failed', e); }
+/* 【本地自动存档】读档必须在所有 buildXXX 都已定义之后、渲染循环开始之前：
+   否则读到的钱和仓库不会显示在菜单上（菜单是读档前画的）。
+   autoSaveLoad 内部对每个字段都做了存在性校验，坏档一律当新档。 */
+try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.error('autosave load failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

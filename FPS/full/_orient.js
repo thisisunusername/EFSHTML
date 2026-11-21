@@ -17,9 +17,16 @@
 
 /* 竖屏遮罩的 DOM id */
 const ORIENT_MASK_ID = 'orientMask';
-
 /* 当前是否处于「应该被遮住」的竖屏状态 */
 let orientBlocked = false;
+/* 【只在游戏内强制横屏】
+   主菜单竖着拿手机很自然（所有按钮都是竖排的卡片布局），
+   进去打枪才需要横屏。所以遮罩与方向锁定都加一个「游戏已开始」的前置条件：
+     __inGame 为 false 时，无论横竖都不遮、也不锁方向。
+   这个变量由 f_ui.js 的「开始」按钮置 true，回主菜单时置 false。 */
+function orientInGame(){
+  return !!(typeof window !== 'undefined' && window.__inGame);
+}
 
 /* 判定竖屏：用 innerWidth/innerHeight。
    注意不能用 screen.orientation.type，部分 WebView 里它是空的。 */
@@ -113,9 +120,16 @@ function orientPaintMask(){
 /* 核心：根据当前朝向决定遮罩显隐 */
 function orientRefresh(){
   if(typeof document === 'undefined' || !document.body) return;
-  const portrait = orientIsPortrait();
   const mask = orientBuildMask();
   if(!mask) return;
+  /* 做主菜单时完全不干预：不遮、不锁、也不改布局信号。
+     只把状态清干净，等真正进游戏那一刻再判断。 */
+  if(!orientInGame()){
+    orientBlocked = false;
+    mask.style.display = 'none';
+    return;
+  }
+  const portrait = orientIsPortrait();
   const wasBlocked = orientBlocked;
   orientBlocked = portrait;
   orientPaintMask();
@@ -137,6 +151,22 @@ function orientRefresh(){
     }catch(e){}
   }
 }
+/* 进出游戏的开关。由 f_ui.js 在「开始」时调 true，
+   回主菜单（或死亡回菜单）时调 false。
+   对外暴露成 window.__orientEnter / __orientExit 供 f_ui 调用，
+   这样 f_ui 不必知道遮罩的存在。 */
+function orientSetInGame(on){
+  if(typeof window === 'undefined') return;
+  window.__inGame = !!on;
+  /* 进游戏才尝试锁横屏；回主菜单解除锁定，让设备能自由转回竖屏 */
+  if(on) orientTryLock();
+  else orientUnlock();
+  orientRefresh();
+}
+if(typeof window !== 'undefined'){
+  window.__orientEnter = function(){ orientSetInGame(true); };
+  window.__orientExit  = function(){ orientSetInGame(false); };
+}
 
 /* 初始化：绑定事件 + 首次刷新。
    用 matchMedia('(orientation:portrait)') 精确监听，比 resize 稳，
@@ -156,10 +186,9 @@ function orientInit(){
   window.addEventListener('resize', function(){ orientRefresh(); });
   if(typeof document !== 'undefined' && document.addEventListener){
     document.addEventListener('fullscreenchange', function(){ orientRefresh(); });
-  }
-  /* 桌面端：宽屏不锁，避免影响多窗口使用 */
-  if(!orientIsPortrait()){
-    const w = window.innerWidth || 0;
-    if(w < 900) orientTryLock();
-  }
+}
+  /* 【不要在这里就锁横屏】
+     原实现在 init 里就 orientTryLock()，主菜单一打开就被强制转成横屏，
+     但主菜单是竖排卡片布局（标题 + 操作说明 + 三排按钮），横过来反而难用。
+     现在只在 __orientEnter()（点「开始」）时才锁，主菜单保持用户当前朝向。 */
 }

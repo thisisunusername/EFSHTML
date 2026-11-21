@@ -989,6 +989,25 @@ let I18N_LANG = 'zh';
 /* 英文译文表：key 是中文原串，value 是英文。
    故意做成「平铺字典」而不是分组，因为查表最快也最好维护。 */
 const I18N_EN = {
+  /* ---------- 主题自定义面板（2D 设置里的颜色/字体/字号名） ----------
+     这些名字原来直接写在 f_theme.js 的数据表里，不过 T()，
+     所以切英文后颜色名/字体名仍然是中文。
+     现在渲染处包了 TF()，对应的译文补在这里。 */
+  '背景': 'Background',
+  '卡片底': 'Card',
+  '正文': 'Body text',
+  '标题': 'Heading',
+  '次要文字': 'Muted text',
+  '强调色': 'Accent',
+  '描边': 'Border',
+  '按钮底': 'Button bg',
+  '按钮字': 'Button text',
+  '已恢复默认主题': 'Default theme restored',
+  '我的主题': 'My theme',
+  '已恢复自定义主题默认值': 'Custom theme reset to defaults',
+  '配置已复制到剪贴板': 'Config copied to clipboard',
+  '配置已复制': 'Config copied',
+  '已生成配置，请手动长按文本框全选复制': 'Config generated — long-press the box and Select All to copy',
 
   /* ---------- 武器耐久 + 改枪台 ---------- */
   '改枪台': 'Gunsmith',
@@ -1567,6 +1586,107 @@ const I18N_EN = {
   '设定资金（当前 {0}）': 'Set balance (current {0})',
   '直接设定金额': 'Set exact amount',
   'GM 面板已解锁': 'GM panel unlocked',
+  /* ============================================================
+     3D 版：本轮新增（撤离倒计时 / 小地图 / 超时结算）
+     背景：这些 UI 是上一轮新加的，文案直接写死在代码里，
+     切到英文时依然显示中文。这里补齐。
+     ============================================================ */
+  /* ---- 撤离倒计时 ---- */
+  '撤离超时': 'Raid Timed Out',
+  '⏰ 撤离超时': '⏰ Raid Timed Out',
+  '你没在规定时间内到达撤离点 · 带进去的物资全部丢失':
+    'You did not reach the extraction point in time · everything you brought in is lost',
+  '⏰ 撤离超时 · 物资丢失': '⏰ Raid timed out · supplies lost',
+  /* ---- 小地图区域名 ---- */
+  '校园': 'Campus',
+  '主楼': 'Main Building',
+  '西楼': 'West Building',
+  '东楼': 'East Building',
+  '行政楼': 'Admin Building',
+  '校门口': 'School Gate',
+  '操场': 'Sports Field',
+  '北场地': 'North Field',
+  /* ---- 设置面板：外观 / 512 色 / 声音 / 调试日志 ---- */
+  '外观': 'Appearance',
+  '主题色': 'Accent color',
+  '声音': 'Sound',
+  '调试': 'Debug',
+  '暗夜（原版）': 'Night (original)',
+  'Material You': 'Material You',
+  '盐线暗调 · 对比强': 'Saltline dark · strong contrast',
+  '深色表面 · 大圆角 · 由种子色派生整套配色':
+    'Dark surfaces · large radii · full palette derived from one seed color',
+  '选择界面主题。Material You 与 2D 版一致：深色表面、大圆角，配色由种子色派生。':
+    'Pick an interface theme. Material You matches the 2D build: dark surfaces, large radii, palette derived from a seed color.',
+  '主色共 512 档：8 个色系 × 64 个深浅。点一格立即生效。':
+    '512 accent shades: 8 families × 64 steps. Tap one to apply instantly.',
+  '紫': 'Purple',
+  '蓝': 'Blue',
+  '青': 'Cyan',
+  '绿': 'Green',
+  '琥珀': 'Amber',
+  '橙': 'Orange',
+  '红': 'Red',
+  '粉': 'Pink',
+  '全局音量': 'Master volume',
+  '对所有音效整体缩放，不影响各音效的相对响度':
+    'Scales all sound effects together without changing their relative loudness',
+  '音效开关': 'Sound effects',
+  '完全静音，倍率保留': 'Mute everything, keep the volume level',
+  '调试日志': 'Debug log',
+  '记录警告与错误，方便排查问题': 'Records warnings and errors to help diagnose problems',
+  '（暂无日志）': '(no log entries yet)',
+  '刷新': 'Refresh',
+  '复制全部': 'Copy all',
+  '共 {0} 条 · 最多保留 300 条': '{0} entries · keeps the latest 300',
+  '日志已复制': 'Log copied',
+  '复制失败，请手动选择': 'Copy failed, please select manually',
+  '复制失败': 'Copy failed',
+  '调试日志已开启': 'Debug log enabled',
+  /* ---- 设置面板：字体页签（与 2D 版一致的九族三档）---- */
+  '字体': 'Font',
+  '字体族': 'Font family',
+  '字体族与字号均与 2D 版一致。含站酷、马善政楷、龙藏等字体，设备未安装时自动回退到系统字体。':
+    'Font families and sizes match the 2D build. Includes ZCOOL, Ma Shan Zheng, Long Cang and others; falls back to the system font when not installed.',
+  '当前：{0}': 'Current: {0}',
+  '标题字号': 'Title size',
+  '正文字号': 'Body size',
+  '按钮字号': 'Button size',
+  '范围 {0}–{1}px': 'Range {0}–{1}px',
+  '恢复默认字体': 'Reset font',
+  '系统默认': 'System default',
+  '等宽': 'Monospace',
+  '衬线': 'Serif',
+  '圆体': 'Rounded',
+  '手写': 'Handwriting',
+  '站酷小薇': 'ZCOOL XiaoWei',
+  '马善政楷': 'Ma Shan Zheng',
+  '站酷快乐': 'ZCOOL KuaiLe',
+  '龙藏体': 'Long Cang',
+  /* ---- 设置面板：语言页签 ----
+     这里原本挂在主菜单最后一个 .row 上，而那个 .row 就是导入导出行，
+     平时 display:none，所以按钮一直被藏着 —— 这就是「语言设置不见了」。 */
+  '界面语言。切换后所有界面立即重绘，不需要重开游戏。':
+    'Interface language. Every screen is repainted immediately, no restart needed.',
+  '简体中文界面': 'Simplified Chinese interface',
+  '英文界面': 'English interface',
+  '中文': 'Chinese',
+  /* ---- 局内暂停 ----
+     【语义要点】暂停时倒计时也一起冻结，不是「后台还在走」。
+     退出等于放弃本局，物资全丢，所以按钮文案必须写清楚后果。 */
+  '已暂停': 'Paused',
+  '继续游戏': 'Resume',
+  '声音：开': 'Sound: on',
+  '声音：关': 'Sound: off',
+  '退出（丢失所有）': 'Quit (lose everything)',
+  '暂停中 · 剩余 {0}': 'Paused · {0} left',
+  '游戏时间与撤离倒计时已冻结': 'Game time and extraction timer are frozen',
+  '剩余': 'Left',
+  '退出等于放弃本局：身上的装备、背包与胸挂里的物资全部丢失。':
+    'Quitting abandons this raid: gear, backpack and chest rig contents are all lost.',
+  /* ---- 仓库格子空状态 ---- */
+  '空（点击仓库物品放入）': 'Empty (tap a stash item to put it in)',
+  '空（局内放入医疗/弹药）': 'Empty (put meds/ammo in during a raid)',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */
@@ -5303,6 +5423,24 @@ function themeUiColors(){
    允许用户自定义主界面各项颜色，并可导出/导入/复制配置。
    配置结构：{ v:1, name:'', ui:{ bg, card, text, title, sub, accent, line, btn, btnText } }
 */
+/* 【TF : 字串透译助手】
+   f_theme.js 里的名字（颜色名、字体名、字号名）原来是直接写中文的，
+   切英文时这些全不变，看起来就是「一堆东西没有 English」。
+   这里不去改数据表本身（直接改表会让 key 丢失中文原串，
+   而 I18N_EN 就是用中文原串当 key 的），
+   而是在【渲染时】包一层 T()：
+     · T() 找不到译文就原样返回中文，不会变 undefined
+     · i18n_core.js 没加载时也不报错
+   为什么要单独写 TF 而不直接用 T：
+   2D 版的 T() 在 _i18n2d.js / i18n_core.js 里，加载顺序不一定在 f_theme 之前，
+   直接调 T() 可能 ReferenceError；TF 做了 typeof 保护。 */
+function TF(x){
+  try{
+    if(typeof x!=='string') return x;
+    if(typeof T==='function') return T(x);
+    return x;
+  }catch(e){ return x; }
+}
 var CUSTOM_KEY = 'efs_custom_theme_v1';
 var CUSTOM_THEME = null;
 var CUSTOM_FIELDS = [
@@ -5440,7 +5578,7 @@ function customApply(){
     root.style.setProperty('--cf-btnText', ui.btnText);
     var fo=customGet().font;
     root.style.setProperty('--cf-font', FONT_FAMILY[fo.family].css);
-    root.style.setProperty('--cf-fontName', FONT_FAMILY[fo.family].name);
+    root.style.setProperty('--cf-fontName', TF(FONT_FAMILY[fo.family].name));
     root.style.setProperty('--cf-titleSize', fo.title+'px');
     root.style.setProperty('--cf-bodySize',  fo.body+'px');
     root.style.setProperty('--cf-btnSize',   fo.btn+'px');
@@ -5562,7 +5700,7 @@ function customRenderUI(){
   for(var i=0;i<CUSTOM_FIELDS.length;i++){
     var f=CUSTOM_FIELDS[i];
     html+='<div class="custRow">'+
-      '<span class="custName">'+f.n+'</span>'+
+      '<span class="custName">'+TF(f.n)+'</span>'+
       '<input type="color" class="custPick" id="cust_'+f.k+'" value="'+o.ui[f.k]+'">'+
       '<input type="text" class="custHex" id="custHex_'+f.k+'" value="'+o.ui[f.k]+'" maxlength="7" spellcheck="false">'+
       '</div>';
@@ -5571,7 +5709,7 @@ function customRenderUI(){
   html+='<div class="custRow"><span class="custName">字体族</span><div class="custFonts">';
   for(var fi=0;fi<FONT_ORDER.length;fi++){
     var fk=FONT_ORDER[fi];
-    html+='<button type="button" data-cft='+fk+' class='+(o.font.family===fk?'on':'')+'>'+FONT_FAMILY[fk].name+'</button>';
+    html+='<button type="button" data-cft='+fk+' class='+(o.font.family===fk?'on':'')+'>'+TF(FONT_FAMILY[fk].name)+'</button>';
   }
   html+='</div></div>';
   var sizeKeys=['title','body','btn'];

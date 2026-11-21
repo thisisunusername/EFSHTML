@@ -21,6 +21,25 @@ let I18N_LANG = 'zh';
 /* 英文译文表：key 是中文原串，value 是英文。
    故意做成「平铺字典」而不是分组，因为查表最快也最好维护。 */
 const I18N_EN = {
+  /* ---------- 主题自定义面板（2D 设置里的颜色/字体/字号名） ----------
+     这些名字原来直接写在 f_theme.js 的数据表里，不过 T()，
+     所以切英文后颜色名/字体名仍然是中文。
+     现在渲染处包了 TF()，对应的译文补在这里。 */
+  '背景': 'Background',
+  '卡片底': 'Card',
+  '正文': 'Body text',
+  '标题': 'Heading',
+  '次要文字': 'Muted text',
+  '强调色': 'Accent',
+  '描边': 'Border',
+  '按钮底': 'Button bg',
+  '按钮字': 'Button text',
+  '已恢复默认主题': 'Default theme restored',
+  '我的主题': 'My theme',
+  '已恢复自定义主题默认值': 'Custom theme reset to defaults',
+  '配置已复制到剪贴板': 'Config copied to clipboard',
+  '配置已复制': 'Config copied',
+  '已生成配置，请手动长按文本框全选复制': 'Config generated — long-press the box and Select All to copy',
 
   /* ---------- 武器耐久 + 改枪台 ---------- */
   '改枪台': 'Gunsmith',

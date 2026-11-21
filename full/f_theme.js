@@ -423,6 +423,24 @@ function themeUiColors(){
    允许用户自定义主界面各项颜色，并可导出/导入/复制配置。
    配置结构：{ v:1, name:'', ui:{ bg, card, text, title, sub, accent, line, btn, btnText } }
 */
+/* 【TF : 字串透译助手】
+   f_theme.js 里的名字（颜色名、字体名、字号名）原来是直接写中文的，
+   切英文时这些全不变，看起来就是「一堆东西没有 English」。
+   这里不去改数据表本身（直接改表会让 key 丢失中文原串，
+   而 I18N_EN 就是用中文原串当 key 的），
+   而是在【渲染时】包一层 T()：
+     · T() 找不到译文就原样返回中文，不会变 undefined
+     · i18n_core.js 没加载时也不报错
+   为什么要单独写 TF 而不直接用 T：
+   2D 版的 T() 在 _i18n2d.js / i18n_core.js 里，加载顺序不一定在 f_theme 之前，
+   直接调 T() 可能 ReferenceError；TF 做了 typeof 保护。 */
+function TF(x){
+  try{
+    if(typeof x!=='string') return x;
+    if(typeof T==='function') return T(x);
+    return x;
+  }catch(e){ return x; }
+}
 var CUSTOM_KEY = 'efs_custom_theme_v1';
 var CUSTOM_THEME = null;
 var CUSTOM_FIELDS = [
@@ -560,7 +578,7 @@ function customApply(){
     root.style.setProperty('--cf-btnText', ui.btnText);
     var fo=customGet().font;
     root.style.setProperty('--cf-font', FONT_FAMILY[fo.family].css);
-    root.style.setProperty('--cf-fontName', FONT_FAMILY[fo.family].name);
+    root.style.setProperty('--cf-fontName', TF(FONT_FAMILY[fo.family].name));
     root.style.setProperty('--cf-titleSize', fo.title+'px');
     root.style.setProperty('--cf-bodySize',  fo.body+'px');
     root.style.setProperty('--cf-btnSize',   fo.btn+'px');
@@ -682,7 +700,7 @@ function customRenderUI(){
   for(var i=0;i<CUSTOM_FIELDS.length;i++){
     var f=CUSTOM_FIELDS[i];
     html+='<div class="custRow">'+
-      '<span class="custName">'+f.n+'</span>'+
+      '<span class="custName">'+TF(f.n)+'</span>'+
       '<input type="color" class="custPick" id="cust_'+f.k+'" value="'+o.ui[f.k]+'">'+
       '<input type="text" class="custHex" id="custHex_'+f.k+'" value="'+o.ui[f.k]+'" maxlength="7" spellcheck="false">'+
       '</div>';
@@ -691,7 +709,7 @@ function customRenderUI(){
   html+='<div class="custRow"><span class="custName">字体族</span><div class="custFonts">';
   for(var fi=0;fi<FONT_ORDER.length;fi++){
     var fk=FONT_ORDER[fi];
-    html+='<button type="button" data-cft='+fk+' class='+(o.font.family===fk?'on':'')+'>'+FONT_FAMILY[fk].name+'</button>';
+    html+='<button type="button" data-cft='+fk+' class='+(o.font.family===fk?'on':'')+'>'+TF(FONT_FAMILY[fk].name)+'</button>';
   }
   html+='</div></div>';
   var sizeKeys=['title','body','btn'];

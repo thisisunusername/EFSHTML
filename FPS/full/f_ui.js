@@ -62,8 +62,8 @@ function bindUI(){
      真实设备上 DOMContentLoaded 与直接调用、或某些 WebView 重复派发，
      都可能触发二次执行。
      用标志位保证只跑一次。 */
-  if(window.__uiBound) return;
-  window.__uiBound=true;
+if(window.__uiBound) return; window.__uiBound=true;
+  bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
 
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
 

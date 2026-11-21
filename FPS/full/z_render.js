@@ -76,6 +76,7 @@ function animate(){
   /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
      否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
   safeCall(updP,dt); safeCall(updE,dt); safeCall(updLoot,dt);
+  safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
   safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
 
   // 相机抖动叠加（基准位置由 updP 写入）

@@ -107,6 +107,14 @@ function init(){
   ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
   buildSchool();
+  /* 【场景扩展】先开门洞再建操场：
+     carve*Door 要把原来的整块外墙拆成两段，必须在 buildSchool 之后立刻执行，
+     否则后来者只会叠加出一面又一面墙。 */
+  carveMainDoor();
+  carveEastDoor();
+  carveWestDoor();
+  carveAdminDoor();
+  buildSportsZone();
   setupWorld();
   ready=true;
 }
@@ -123,10 +131,9 @@ function buildSchool(){
     box(2.6,2.6,.3,0x88ccee,x,9.5,-14.15,true);  // 窗（二层）
     box(2.6,2.6,.3,0x88ccee,x,12.5,-14.15,true); // 窗（三层）
   }
-  // 正门（中央 z=-14）
-  box(6,3.6,.5,0xcfbc9a,0,1.8,-14.0);
-  box(.7,3.6,.5,0xcfbc9a,-3.4,1.8,-14.0);
-  box(.7,3.6,.5,0xcfbc9a,3.4,1.8,-14.0);
+  /* 正门已交给 carveMainDoor() 建造真实可开的门，
+     这里不能再放一块 6x3.6 的装饰门板 —— 它正好把门洞堵死，
+     玩家开了门也进不去（这正是「只能在教学楼外活动」的真正原因）。 */
   box(1.8,.3,2.5,0x8a7a5a,0,4.0,-15.0);         // 门楣/雨棚
 
   /* ---- 东教学楼（x=-34） ---- */
@@ -143,42 +150,31 @@ function buildSchool(){
   box(34,11,15,0xcfbc9a,0,5.5,26);
   box(34,.7,15,0x6b5a45,0,11.35,26);
   for(let i=0;i<7;i++){ const x=-13+i*4.3; box(2.4,2.4,.3,0x88ccee,x,4.5,18.6,true); box(2.4,2.4,.3,0x88ccee,x,8,18.6,true); }
-  box(5,3.2,.5,0x8a6a45,0,1.6,18.5);             // 行政楼门
+  /* 行政楼门同理，交给 carveAdminDoor()，
+     这里不再放 5x3.2 的装饰门板堵住门洞。 */
 
   /* ---- 围墙（南墙留校门洞） ---- */
   const wallC=0x8a9aa8;
+  /* 【围墙外扩】原来北墙在 z=52，操场一扩就会被压到墙外。
+     现在北墙推到 z=68，东墙推到 x=78（体育馆在 x=58 附近，需要留出余量），
+     南/西不动，校门位置保持不变。 */
   box(120,2.6,.5,wallC,0,1.3,-46);                      // 南墙
-  box(.5,2.6,100,wallC,-60,1.3,4);                      // 西墙
-  box(.5,2.6,100,wallC,60,1.3,4);                       // 东墙
-  box(120,2.6,.5,wallC,0,1.3,52);                       // 北墙
+  box(.5,2.6,120,wallC,-60,1.3,10);                     // 西墙
+  box(.5,2.6,120,wallC,78,1.3,10);                      // 东墙
+  box(140,2.6,.5,wallC,9,1.3,68);                       // 北墙
   // 校门（南墙中央开口 + 门柱 + 牌坊）
   box(1.4,3.6,1,0x555555,-5,1.8,-46);
   box(1.4,3.6,1,0x555555,5,1.8,-46);
   box(12,.5,1.2,0x7a4a2a,-0+0,4.2,-46);               // 门额横梁
-  // 校门内石碑
-  box(3,1.8,.8,0xb0b8c0,0,.9,-40);
+  // 校门内石碑（原在 z=-40，正对主楼门前主干道；挪到路边免得挡人）
+  box(3,1.8,.8,0xb0b8c0,-9,.9,-40);
 
-  /* ---- 操场（东北角，标准 200m 跑道） ---- */
-  // 跑道外圈（深红环）
-  groundDeco(44,30,0x9a3b2f,20,30);
-  groundDeco(38,24,0x6c8f5e,20,30);                     // 跑道内圈（球场绿）
-  // 跑道白色标线
-  groundDeco(40,26,0xffffff,20,30,.7);
-  groundDeco(30,16,0xffffff,20,30,.35);
-  // 中间足球场中线/中圈
-  groundDeco(.3,16,0xffffff,20,30,.7);
-  groundDeco(4,4,0xffffff,20,30,.4);
+  /* ---- 旧操场已移除 ----
+     原来这里是 (20,30) 的 44x30 小跑道，紧贴行政楼北墙，
+     玩家在楼间只能沿一条窄道走，地图「只有教学楼外」的观感就来自这里。
+     现在整体搬到 buildSportsZone()（x_ext.js），做成 400m 场地。 */
 
-  /* ---- 篮球场（西北角） ---- */
-  groundDeco(16,29,0x4a5a6a,-28,-18);
-  groundDeco(.25,26,0xffffff,-28,-18,.85);             // 中线
-  groundDeco(16,.25,0xffffff,-28,-18,.85);             // 分区线
-  groundDeco(14,10,0xffffff,-28,-18,.4);               // 罚球区示意
-  // 两个篮球架
-  for(const bx of[-34,-22]){
-    cyl(.12,.12,3.2,0x888,-bx*-1?bx:bx,1.6,-30,true);
-    box(2.2,.12,1.1,0xffffff,bx+0,3.1,-30,true);       // 篮板
-  }
+  /* ---- 篮球场已移到操场西侧，见 buildSportsZone ---- */
 
   /* ---- 树木（围墙内侧一圈） ---- */
   function tree(x,z){
@@ -233,16 +229,18 @@ function setupWorld(){
   loots.forEach(l=>scene.remove(l.mesh));
   enemies.length=0; loots.length=0;
 
-  // 敌人分布在操场、篮球场、楼间、校门等真实点位
-  [[-18,2],[18,2],[-10,18],[15,18],[0,-8],[-30,-10],[25,-20],[8,22]].forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
-  // 物资散落在楼内、球场、树下
+  // 【敌人精简】原来 8 个挤在楼间小道上，走两步撞一个，没有「搜」的余地。
+  // 现在 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  NPC_POINTS.forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
+  // 物资散落到新场地里：操场看台、篮球场、体育馆、各楼内
   loots.push(
-    spawnLoot(-22,2,'ammo'),  spawnLoot(22,2,'ammo'),
-    spawnLoot(-12,12,'med'),   spawnLoot(12,12,'med'),
-    spawnLoot(-30,18,'cash'),  spawnLoot(30,18,'cash'),
-    spawnLoot(0,22,'gun'),     spawnLoot(-8,28,'cash'),
-    spawnLoot(8,28,'cash'),    spawnLoot(-30,-14,'ammo'),
-    spawnLoot(26,-16,'med'),   spawnLoot(0,-36,'cash')
+    spawnLoot(-10,10,'ammo'),  spawnLoot(10,10,'ammo'),
+    spawnLoot(-14,56,'med'),   spawnLoot(30,54,'med'),
+    spawnLoot(-30,10,'cash'),  spawnLoot(-30,26,'cash'),
+    spawnLoot(58,10,'gun'),    spawnLoot(58,28,'cash'),
+    spawnLoot(0,-22,'cash'),   spawnLoot(-34,2,'ammo'),
+    spawnLoot(34,2,'med'),     spawnLoot(0,26,'cash'),
+    spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）

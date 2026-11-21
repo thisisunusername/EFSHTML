@@ -15,6 +15,8 @@ OUT=index.html
   cat full/d_game.js;    printf '\n'
   cat full/e_io.js;      printf '\n'
   cat full/f_ui.js;      printf '\n'
+  # x_ext 提供门/新操场/交互入口，必须在 b_world 之后、z_render 之前
+  cat full/x_ext.js;     printf '\n'
   cat full/w_weapon.js;  printf '\n'
   cat full/y_audio.js;   printf '\n'
   cat full/z_render.js
@@ -81,4 +83,17 @@ if command -v node >/dev/null 2>&1 && [ -f touch_test.js ]; then
     exit 1
   fi
   echo "MULTITOUCH_OK: 摇杆与视角按 identifier 严格隔离，互不污染"
+fi
+
+# 场景与交互测试：真跑一遍建场 + 门开关
+# 防止「门是装饰、墙是实心」这类问题再回来（这曾经导致玩家只能在教学楼外活动）
+if command -v node >/dev/null 2>&1 && [ -f scene_test.js ]; then
+  SC=$(node scene_test.js 2>&1)
+  if echo "$SC" | grep -q 'SCENE_OK'; then
+    echo "SCENE_OK: 门可开关、门洞畅通、交互可用、NPC 已精简"
+  else
+    echo "$SC" | tail -20
+    echo "场景测试失败"
+    exit 1
+  fi
 fi

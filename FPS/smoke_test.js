@@ -116,7 +116,7 @@ global.setTimeout=setTimeout; global.clearTimeout=clearTimeout;
 global.__THREE_STUB__=true;
 
 /* ---- 按 build.sh 的顺序拼接分块并执行 ---- */
-const parts=['b_world.js','c_player.js','d_game.js','e_io.js','f_ui.js','w_weapon.js','y_audio.js','z_render.js'];
+const parts=['b_world.js','c_player.js','d_game.js','e_io.js','f_ui.js','x_ext.js','w_weapon.js','y_audio.js','z_render.js'];
 let code='';
 for(const p of parts){
   if(!fs.existsSync('full/'+p)) continue;

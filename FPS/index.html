@@ -34,6 +34,16 @@
   /* 游戏内常驻操作提示（手机端小字条） */
   #htip{ position:absolute; left:50%; transform:translateX(-50%); bottom:58px; max-width:94vw; padding:5px 10px; border-radius:8px; background:rgba(10,14,22,.72); border:1px solid rgba(124,92,255,.35); color:#c8d0e0; font-size:10.5px; line-height:1.5; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   #htip.hide{ opacity:0; }
+  /* 门交互提示：靠近门时出现在屏幕中央偏下，可点击 */
+  #doorHint{ display:none; position:absolute; left:50%; bottom:96px; transform:translateX(-50%);
+    padding:9px 16px; border-radius:10px; background:rgba(10,14,22,.86);
+    border:1px solid rgba(120,255,180,.55); color:#d8ffe8; font-size:14px; font-weight:600;
+    backdrop-filter:blur(6px); cursor:pointer; z-index:70; white-space:nowrap;
+    box-shadow:0 4px 18px rgba(0,0,0,.45); }
+  #doorHint b{ display:inline-block; min-width:20px; padding:1px 6px; margin-right:6px;
+    border-radius:5px; background:rgba(120,255,180,.22); border:1px solid rgba(120,255,180,.6);
+    color:#9effc4; font-size:12px; text-align:center; }
+  #doorHint:active{ background:rgba(120,255,180,.25); }
   #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px; }
   .pill{ background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; backdrop-filter:blur(6px); }
   .pill b{ color:var(--accent2); }
@@ -244,7 +254,8 @@
   <div id="msg"></div>
   <div id="prompt"></div>
 <div id="toast"></div>
-  <div id="htip">📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下</div>
+  <div id="htip">📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下 · 靠近门按 E 开门</div>
+  <div id="doorHint"></div>
 </div>
 
 <div id="grade"></div>
@@ -475,6 +486,14 @@ function init(){
   ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
   buildSchool();
+  /* 【场景扩展】先开门洞再建操场：
+     carve*Door 要把原来的整块外墙拆成两段，必须在 buildSchool 之后立刻执行，
+     否则后来者只会叠加出一面又一面墙。 */
+  carveMainDoor();
+  carveEastDoor();
+  carveWestDoor();
+  carveAdminDoor();
+  buildSportsZone();
   setupWorld();
   ready=true;
 }
@@ -491,10 +510,9 @@ function buildSchool(){
     box(2.6,2.6,.3,0x88ccee,x,9.5,-14.15,true);  // 窗（二层）
     box(2.6,2.6,.3,0x88ccee,x,12.5,-14.15,true); // 窗（三层）
   }
-  // 正门（中央 z=-14）
-  box(6,3.6,.5,0xcfbc9a,0,1.8,-14.0);
-  box(.7,3.6,.5,0xcfbc9a,-3.4,1.8,-14.0);
-  box(.7,3.6,.5,0xcfbc9a,3.4,1.8,-14.0);
+  /* 正门已交给 carveMainDoor() 建造真实可开的门，
+     这里不能再放一块 6x3.6 的装饰门板 —— 它正好把门洞堵死，
+     玩家开了门也进不去（这正是「只能在教学楼外活动」的真正原因）。 */
   box(1.8,.3,2.5,0x8a7a5a,0,4.0,-15.0);         // 门楣/雨棚
 
   /* ---- 东教学楼（x=-34） ---- */
@@ -511,42 +529,31 @@ function buildSchool(){
   box(34,11,15,0xcfbc9a,0,5.5,26);
   box(34,.7,15,0x6b5a45,0,11.35,26);
   for(let i=0;i<7;i++){ const x=-13+i*4.3; box(2.4,2.4,.3,0x88ccee,x,4.5,18.6,true); box(2.4,2.4,.3,0x88ccee,x,8,18.6,true); }
-  box(5,3.2,.5,0x8a6a45,0,1.6,18.5);             // 行政楼门
+  /* 行政楼门同理，交给 carveAdminDoor()，
+     这里不再放 5x3.2 的装饰门板堵住门洞。 */
 
   /* ---- 围墙（南墙留校门洞） ---- */
   const wallC=0x8a9aa8;
+  /* 【围墙外扩】原来北墙在 z=52，操场一扩就会被压到墙外。
+     现在北墙推到 z=68，东墙推到 x=78（体育馆在 x=58 附近，需要留出余量），
+     南/西不动，校门位置保持不变。 */
   box(120,2.6,.5,wallC,0,1.3,-46);                      // 南墙
-  box(.5,2.6,100,wallC,-60,1.3,4);                      // 西墙
-  box(.5,2.6,100,wallC,60,1.3,4);                       // 东墙
-  box(120,2.6,.5,wallC,0,1.3,52);                       // 北墙
+  box(.5,2.6,120,wallC,-60,1.3,10);                     // 西墙
+  box(.5,2.6,120,wallC,78,1.3,10);                      // 东墙
+  box(140,2.6,.5,wallC,9,1.3,68);                       // 北墙
   // 校门（南墙中央开口 + 门柱 + 牌坊）
   box(1.4,3.6,1,0x555555,-5,1.8,-46);
   box(1.4,3.6,1,0x555555,5,1.8,-46);
   box(12,.5,1.2,0x7a4a2a,-0+0,4.2,-46);               // 门额横梁
-  // 校门内石碑
-  box(3,1.8,.8,0xb0b8c0,0,.9,-40);
+  // 校门内石碑（原在 z=-40，正对主楼门前主干道；挪到路边免得挡人）
+  box(3,1.8,.8,0xb0b8c0,-9,.9,-40);
 
-  /* ---- 操场（东北角，标准 200m 跑道） ---- */
-  // 跑道外圈（深红环）
-  groundDeco(44,30,0x9a3b2f,20,30);
-  groundDeco(38,24,0x6c8f5e,20,30);                     // 跑道内圈（球场绿）
-  // 跑道白色标线
-  groundDeco(40,26,0xffffff,20,30,.7);
-  groundDeco(30,16,0xffffff,20,30,.35);
-  // 中间足球场中线/中圈
-  groundDeco(.3,16,0xffffff,20,30,.7);
-  groundDeco(4,4,0xffffff,20,30,.4);
+  /* ---- 旧操场已移除 ----
+     原来这里是 (20,30) 的 44x30 小跑道，紧贴行政楼北墙，
+     玩家在楼间只能沿一条窄道走，地图「只有教学楼外」的观感就来自这里。
+     现在整体搬到 buildSportsZone()（x_ext.js），做成 400m 场地。 */
 
-  /* ---- 篮球场（西北角） ---- */
-  groundDeco(16,29,0x4a5a6a,-28,-18);
-  groundDeco(.25,26,0xffffff,-28,-18,.85);             // 中线
-  groundDeco(16,.25,0xffffff,-28,-18,.85);             // 分区线
-  groundDeco(14,10,0xffffff,-28,-18,.4);               // 罚球区示意
-  // 两个篮球架
-  for(const bx of[-34,-22]){
-    cyl(.12,.12,3.2,0x888,-bx*-1?bx:bx,1.6,-30,true);
-    box(2.2,.12,1.1,0xffffff,bx+0,3.1,-30,true);       // 篮板
-  }
+  /* ---- 篮球场已移到操场西侧，见 buildSportsZone ---- */
 
   /* ---- 树木（围墙内侧一圈） ---- */
   function tree(x,z){
@@ -601,16 +608,18 @@ function setupWorld(){
   loots.forEach(l=>scene.remove(l.mesh));
   enemies.length=0; loots.length=0;
 
-  // 敌人分布在操场、篮球场、楼间、校门等真实点位
-  [[-18,2],[18,2],[-10,18],[15,18],[0,-8],[-30,-10],[25,-20],[8,22]].forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
-  // 物资散落在楼内、球场、树下
+  // 【敌人精简】原来 8 个挤在楼间小道上，走两步撞一个，没有「搜」的余地。
+  // 现在 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  NPC_POINTS.forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
+  // 物资散落到新场地里：操场看台、篮球场、体育馆、各楼内
   loots.push(
-    spawnLoot(-22,2,'ammo'),  spawnLoot(22,2,'ammo'),
-    spawnLoot(-12,12,'med'),   spawnLoot(12,12,'med'),
-    spawnLoot(-30,18,'cash'),  spawnLoot(30,18,'cash'),
-    spawnLoot(0,22,'gun'),     spawnLoot(-8,28,'cash'),
-    spawnLoot(8,28,'cash'),    spawnLoot(-30,-14,'ammo'),
-    spawnLoot(26,-16,'med'),   spawnLoot(0,-36,'cash')
+    spawnLoot(-10,10,'ammo'),  spawnLoot(10,10,'ammo'),
+    spawnLoot(-14,56,'med'),   spawnLoot(30,54,'med'),
+    spawnLoot(-30,10,'cash'),  spawnLoot(-30,26,'cash'),
+    spawnLoot(58,10,'gun'),    spawnLoot(58,28,'cash'),
+    spawnLoot(0,-22,'cash'),   spawnLoot(-34,2,'ammo'),
+    spawnLoot(34,2,'med'),     spawnLoot(0,26,'cash'),
+    spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）
@@ -1160,8 +1169,8 @@ function bindUI(){
      真实设备上 DOMContentLoaded 与直接调用、或某些 WebView 重复派发，
      都可能触发二次执行。
      用标志位保证只跑一次。 */
-  if(window.__uiBound) return;
-  window.__uiBound=true;
+if(window.__uiBound) return; window.__uiBound=true;
+  bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
 
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
 
@@ -1940,6 +1949,322 @@ function settleDeath(){
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindUI);
 else bindUI();
+/* ============ x_ext.js：场景扩展（大操场 / 可交互门 / 少量NPC） ============ */
+/* 依赖 b_world 里的 scene / colliders / box() / cyl() / groundDeco()。
+
+   这一块要解决三个问题：
+     1) 只能在教学楼外活动 —— 建筑原本都是实心 box，没有门洞，
+        玩家被整面墙挡在外面。现在给主教学楼/东西楼/行政楼都开了真门，
+        并且把遮挡门洞的那段墙体精确扣掉，人能真的走进去。
+     2) 交互 —— 靠近门显示「开门」，按 E 或点屏幕提示即可开关。
+     3) NPC 太多 —— 敌人从 8 个降到 4 个，并分散到更大的场地。 */
+
+/* ==================== 门系统 ==================== */
+/* 每扇门 = 一块门板（既是可见 mesh 也是碰撞体）。
+   开门时不重新算 AABB（成本高且容易抖），而是把门板
+   从 colliders 数组里摘出来，关门时再塞回去。 */
+const DOORS=[];
+let nearDoor=null;          // 当前可交互的门
+
+function mkDoor(x,z,w,h,color,axis){
+  const frameC=0xb9a888, t=0.35;
+  /* 门框：两侧立柱 + 上梁。只是装饰，不参与碰撞 */
+  if(axis==='x'){
+    box(t,h,t*2,frameC,x-w/2,h/2,z,true);
+    box(t,h,t*2,frameC,x+w/2,h/2,z,true);
+    box(w+t,h*0.14,t*2,frameC,x,h+h*0.07,z,true);
+  }else{
+    box(t*2,h,t,frameC,x,h/2,z-w/2,true);
+    box(t*2,h,t,frameC,x,h/2,z+w/2,true);
+    box(t*2,h*0.14,w+t,frameC,x,h+h*0.07,z,true);
+  }
+  const gw = (axis==='x') ? w : 0.18;
+  const gd = (axis==='x') ? 0.18 : w;
+  const panel=new THREE.Mesh(
+    new THREE.BoxGeometry(gw,h,gd),
+    new THREE.MeshStandardMaterial({color,roughness:.6,metalness:.05})
+  );
+  panel.position.set(x,h/2,z);
+  panel.castShadow=true; panel.receiveShadow=true;
+  scene.add(panel); colliders.push(panel);
+  const d={x,z,w,h,panel,axis,open:false,anim:0};
+  DOORS.push(d);
+  return d;
+}
+
+/* 开关门：把门板从 colliders 移入/移出，并做一点旋转动画 */
+function setDoor(d,open){
+  if(!d||d.open===open) return;
+  d.open=open;
+  const i=colliders.indexOf(d.panel);
+  if(open){ if(i>=0) colliders.splice(i,1); }
+  else { if(i<0) colliders.push(d.panel); }
+  sfxUI();
+}
+function toggleDoor(d){ setDoor(d,!d.open); }
+
+/* 找玩家附近最近的一扇门（2.6 米内） */
+function findNearDoor(){
+  let best=null, bd=2.6;
+  for(const d of DOORS){
+    const dist=Math.hypot(P.pos.x-d.x, P.pos.z-d.z);
+    if(dist<bd){ bd=dist; best=d; }
+  }
+  return best;
+}
+/* 每帧调用：更新高亮提示 + 门板开关动画 */
+function updDoors(dt){
+  const nd=findNearDoor();
+  if(nd!==nearDoor){
+    if(nearDoor) nearDoor.panel.material.emissive && nearDoor.panel.material.emissive.setHex(0x000000);
+    nearDoor=nd;
+    const el=$('doorHint');
+    if(el){
+      if(nd){ el.style.display='block'; }
+      else el.style.display='none';
+    }
+  }
+  if(nearDoor){
+    const el=$('doorHint');
+    if(el){
+      const txt=(nearDoor.open?'关门':'开门');
+      if(el.dataset.t!==txt){
+        el.dataset.t=txt;
+        el.innerHTML='<b>E</b> '+txt;
+      }
+    }
+    // 轻微发亮表示可交互
+    if(nearDoor.panel.material.emissive) nearDoor.panel.material.emissive.setHex(nearDoor.open?0x000000:0x223311);
+  }
+  /* 动画：门板绕自身一侧转开 95°。
+     注意 mesh 位置固定在门洞中心，靠旋转让门板「让开」，
+     视觉上足够，且不需要处理铰链几何。 */
+  for(const d of DOORS){
+    const want=d.open?1:0;
+    if(Math.abs(d.anim-want)>0.001){
+      d.anim += (want-d.anim)*Math.min(1,dt*8);
+      if(Math.abs(d.anim-want)<0.01) d.anim=want;
+      d.panel.rotation.y = d.anim * (Math.PI/2) * 0.94;
+    }
+  }
+}
+/* ==================== 给建筑开门洞 ==================== */
+/* 原来的教学楼是一整块实心 box，玩家只能绕着外墙走。
+   这里把「门窗那段墙」拆成两段，中间留出 4 米宽的门洞，
+   再加一扇可开关的门板。拆墙必须在 buildSchool() 之后就做，
+   所以这些补丁函数由 z_render 的 init 链在合适时机调用。 */
+
+/* 主教学楼正面（朝南，z 从 -14 到 -6，墙厚 16）开一个 4 米宽门洞 */
+/* 【关键】buildSchool 里已经有一整块 box(60,14,16) 的主楼体，
+   如果只是「再叠两段带缝的墙」，原来那整面墙照样挡人，门洞根本不存在。
+   所以这里必须拿到原 mesh 并把它从 colliders 里摘掉，再补两段新墙。 */
+function dropMainBody(){
+  /* 找主楼体：中心在 (0,7,-22)、尺寸 60x14x16 的那块 */
+  for(let i=colliders.length-1;i>=0;i--){
+    const m=colliders[i];
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const w=bb.max.x-bb.min.x, h=bb.max.y-bb.min.y, d=bb.max.z-bb.min.z;
+    if(Math.abs(w-60)<0.01 && Math.abs(h-14)<0.01 && Math.abs(d-16)<0.01
+       && Math.abs(m.position.x)<0.01 && Math.abs(m.position.z+22)<0.01){
+      scene.remove(m);
+      colliders.splice(i,1);
+      return true;
+    }
+  }
+  return false;
+}
+function carveMainDoor(){
+  dropMainBody();
+  const gx=0, w=4.4, h=3.6;
+  const segW=(60-w)/2;                    // 每段墙宽 27.8
+  /* 左段墙 */
+  box(segW,14,16,0xd9c6a3,-(w/2+segW/2),7,-22);
+  /* 右段墙 */
+  box(segW,14,16,0xd9c6a3, (w/2+segW/2),7,-22);
+  /* 门洞上方的过梁 */
+  box(w,14-h,16,0xd9c6a3,gx,(h+14)/2,-22);
+  /* 门洞两侧的内外门套 */
+  box(.4,h,.6,0xb9a888,-w/2,h/2,-14.2);
+  box(.4,h,.6,0xb9a888, w/2,h/2,-14.2);
+  box(.4,h,.6,0xb9a888,-w/2,h/2,-13.8);
+  box(.4,h,.6,0xb9a888, w/2,h/2,-13.8);
+  /* 可以开关的门板，装在靠南的墙面位置 */
+  mkDoor(gx,-14.05,w-0.5,h,0x9a7a52,'x');
+}
+
+/* 沿 z 轴开洞的通用实现：先摘掉原整块 body，再拼南北两段 */
+function dropBody(w,h,d,px,pz){
+  for(let i=colliders.length-1;i>=0;i--){
+    const m=colliders[i];
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const bw=bb.max.x-bb.min.x, bh=bb.max.y-bb.min.y, bd=bb.max.z-bb.min.z;
+    if(Math.abs(bw-w)<0.01 && Math.abs(bh-h)<0.01 && Math.abs(bd-d)<0.01
+       && Math.abs(m.position.x-px)<0.01 && Math.abs(m.position.z-pz)<0.01){
+      scene.remove(m);
+      colliders.splice(i,1);
+      return true;
+    }
+  }
+  return false;
+}
+
+/* 东教学楼（x=-34，宽 16，z 从 -20 到 24）东侧开门 */
+function carveEastDoor(){
+  const gz=2, w=4, h=3.4;
+  dropBody(16,14,44,-34,2);
+  const segD=(44-w)/2;                 // 每段 20
+  box(16,14,segD,0xd9c6a3,-34,7,-(w/2+segD/2)+gz);
+  box(16,14,segD,0xd9c6a3,-34,7, (w/2+segD/2)+gz);
+  box(16,14-h,w,0xd9c6a3,-34,(h+14)/2,gz);
+  mkDoor(-25.95,gz,w,h,0x9a7a52,'z');
+}
+
+/* 西教学楼（x=34）西侧开门，与东楼对称 */
+function carveWestDoor(){
+  const gz=2, w=4, h=3.4;
+  dropBody(16,14,44,34,2);
+  const segD=(44-w)/2;
+  box(16,14,segD,0xd9c6a3, 34,7,-(w/2+segD/2)+gz);
+  box(16,14,segD,0xd9c6a3, 34,7, (w/2+segD/2)+gz);
+  box(16,14-h,w,0xd9c6a3, 34,(h+14)/2,gz);
+  mkDoor(25.95,gz,w,h,0x9a7a52,'z');
+}
+
+/* 行政楼（z=26，深 15，从 18.5 到 33.5）南面开门 */
+/* 和主楼同理：先摘掉原来的整块 34x11x15，再拼两段。 */
+function dropAdminBody(){
+  for(let i=colliders.length-1;i>=0;i--){
+    const m=colliders[i];
+    if(!m.geometry) continue;
+    if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(!bb) continue;
+    const w=bb.max.x-bb.min.x, h=bb.max.y-bb.min.y, d=bb.max.z-bb.min.z;
+    if(Math.abs(w-34)<0.01 && Math.abs(h-11)<0.01 && Math.abs(d-15)<0.01
+       && Math.abs(m.position.x)<0.01 && Math.abs(m.position.z-26)<0.01){
+      scene.remove(m);
+      colliders.splice(i,1);
+      return true;
+    }
+  }
+  return false;
+}
+function carveAdminDoor(){
+  dropAdminBody();
+  const gx=0, w=4, h=3.2;
+  const segW=(34-w)/2;                    // 每段 15
+  box(segW,11,15,0xcfbc9a,-(w/2+segW/2),5.5,26);
+  box(segW,11,15,0xcfbc9a, (w/2+segW/2),5.5,26);
+  box(w,11-h,15,0xcfbc9a,gx,(h+11)/2,26);
+  mkDoor(gx,18.45,w,h,0x8a6a45,'x');
+}
+
+/* ==================== 操场扩容 ==================== */
+/* 原来操场在 (20,30)，跑道 44x30，紧贴行政楼北侧，几乎没有活动空间。
+   现在把整个操场搬到校园东北角的大空地上，做成 400m 标准场地，
+   并补上篮球场/沙坑/看台/体育馆，让地图从「楼间小过道」变成有层次的场地。 */
+function buildSportsZone(){
+  /* 真正的草地底面（比跑道大一圈） */
+  groundDeco(96,64,0x5f8a52,16,34);
+
+  /* ---- 400m 跑道：8 条道 ---- */
+  groundDeco(86,52,0xa83528,16,34);      // 红色跑道整体
+  groundDeco(76,42,0x5c8a4f,16,34);      // 场地绿
+  /* 分道线 */
+  for(let i=1;i<=6;i++){
+    groundDeco(76+i*1.6,42+i*1.6,0xffffff,16,34,.5);
+  }
+  /* 内场白边 */
+  groundDeco(58,26,0xffffff,16,34,.55);
+  groundDeco(56,24,0x4f7a45,16,34,1);
+  /* 中线与中圈 */
+  groundDeco(.3,24,0xffffff,16,34,.8);
+  groundDeco(7,7,0xffffff,16,34,.25);
+
+  /* ---- 足球门（两端） ---- */
+  for(const gz of [22,46]){
+    box(.25,2.4,.25,0xffffff,-12,1.2,gz,true);
+    box(.25,2.4,.25,0xffffff,44,1.2,gz,true);
+    box(56.25,.25,.25,0xffffff,16,2.4,gz,true);
+  }
+
+  /* ---- 看台（操场南侧，可走上去？不，用矮台阶即可） ---- */
+  for(let i=0;i<4;i++){
+    box(60,.7,1.6,0x9aa3ab,16,.35+i*0.7,60-i*1.7);
+  }
+  /* 看台遮阳棚支柱 */
+  for(const sx of [-12,40]){
+    cyl(.18,.18,7,0x888888,sx,3.5,58,true);
+  }
+
+  /* ---- 沙坑（跳远） ---- */
+  groundDeco(9,5,0xdcc89a,52,-4);
+
+  /* ---- 篮球场（操场西侧） ---- */
+  groundDeco(20,32,0x46545f,-30,18);
+  groundDeco(.3,30,0xffffff,-30,18,.85);
+  groundDeco(20,.3,0xffffff,-30,18,.85);
+  groundDeco(3.4,3.4,0xffffff,-30,18,.4);
+  for(const bz of [8,28]){
+    cyl(.14,.14,3.4,0x777777,-38,1.7,bz,true);
+    box(2.4,.14,1.2,0xffffff,-38,3.2,bz,true);
+  }
+
+  /* ---- 体育馆（操场东侧的一栋新建筑，有门可进） ---- */
+  /* 直接建成两段带门洞的样子，不要先造整块再拆 */
+  const gymW=26, gymD=34, gymH=10, gymDoor=4;
+  const gymSeg=(gymW-gymDoor)/2;      // 每段 11
+  box(gymSeg,gymH,gymD,0xc8cdd4,58-(gymDoor/2+gymSeg/2),gymH/2,18);
+  box(gymSeg,gymH,gymD,0xc8cdd4,58+(gymDoor/2+gymSeg/2),gymH/2,18);
+  box(gymDoor,gymH-3.6,gymD,0xc8cdd4,58,(3.6+gymH)/2,18);   // 门洞过梁
+  box(27,.6,35,0x6b7078,58,10.3,18);                        // 屋顶
+  mkDoor(58,0.95,gymDoor,3.6,0x8a7a5a,'x');
+
+  /* ---- 路灯（操场四角） ---- */
+  for(const lp of [[-28,-2],[60,-2],[-28,62],[60,62]]){
+    cyl(.12,.16,6,0x555555,lp[0],3,lp[1],true);
+    const la=new THREE.Mesh(new THREE.SphereGeometry(.4,8,8),
+      new THREE.MeshStandardMaterial({color:0xfff5d0,emissive:0xffeaa0,emissiveIntensity:.6}));
+    la.position.set(lp[0],6.2,lp[1]); scene.add(la);
+  }
+}
+
+/* ==================== NPC / 敌人布置 ==================== */
+/* 原来 8 个敌人挤在 60x80 的楼间区域，走三步一个，完全没有「搜」的空间。
+   现在砍到 4 个，并且分散到操场、篮球场、体育馆、教学楼一层内部，
+   每个点位都藏在不同场景里，玩家需要主动去找。 */
+const NPC_POINTS=[
+  [16,34],    // 操场中央，视野开阔
+  [-30,18],   // 篮球场
+  [58,18],    // 体育馆内部
+  [0,-22],    // 主教学楼一层内部
+];
+
+/* ==================== 统一交互入口 ==================== */
+/* f_ui 里 KeyE 和右下角的交互按钮都调用 interact()，
+   但之前这个函数根本没定义 —— 按 E 会直接 ReferenceError。
+   现在把「当前可交互对象」集中在一处判断：
+   门优先，其次才是拾取等其它交互。 */
+function interact(){
+  if(!P.alive) return;
+  const d=findNearDoor();
+  if(d){ toggleDoor(d); return true; }
+  return false;
+}
+
+/* 屏幕提示条点击也能开门（手机上没有键盘） */
+function bindDoorHint(){
+  const el=$('doorHint');
+  if(!el||el.__bound) return;
+  el.__bound=true;
+  const tap=(e)=>{ e.preventDefault(); e.stopPropagation(); interact(); };
+  el.addEventListener('touchstart',tap,{passive:false});
+  el.addEventListener('click',tap);
+}
+
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
 let weaponRoot=null, weaponPistol=null, weaponRifle=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
@@ -2337,6 +2662,7 @@ function animate(){
   /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
      否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
   safeCall(updP,dt); safeCall(updE,dt); safeCall(updLoot,dt);
+  safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
   safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
 
   // 相机抖动叠加（基准位置由 updP 写入）

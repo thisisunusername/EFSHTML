@@ -87,7 +87,18 @@
     border-radius:5px; background:rgba(120,255,180,.22); border:1px solid rgba(120,255,180,.6);
     color:#9effc4; font-size:12px; text-align:center; }
   #doorHint:active{ background:rgba(120,255,180,.25); }
-  #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px; }
+  /* 【顶栏必须盖住视角层 —— 这是「声音/背包/暂停点不动」的真正根因】
+     #viewLayer 是右半屏的转视角拖拽层：position:fixed; right:0; top:0;
+     bottom:0; width:50%; z-index:25。它从屏幕顶一直铺到底，
+     而 #topbar 在 #hud 里，继承的是 #hud 的 z-index:10。
+     于是顶栏右边那一串按钮（声音/背包/治疗/暂停）
+     全被 #viewLayer 压在下面 —— 手指按上去，事件被拖拽层吃掉，
+     按钮永远收不到 touchstart，表现就是「点了没反应」。
+     修法：把顶栏单独提到 30（高于 viewLayer 的 25、低于 actZone/joyZone 的 60）。
+     注意 #hud 整体仍然是 pointer-events:none，
+     只有 .pill 自己 pointer-events:auto，所以不会挡住转视角。 */
+  #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px;
+    z-index:30; pointer-events:none; }
   .pill{ background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; backdrop-filter:blur(6px); }
   .pill b{ color:var(--accent2); }
   /* 射击模式徽标：全自动/半自动/栓动/泵动。

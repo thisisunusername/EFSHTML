@@ -179,5 +179,71 @@ try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff
 /* 【主菜单生涯统计首次填充】打开页面就要显示真实的击杀数/撤离次数，
    不能等打完一局才出现。P.stats 会被存档读回，所以这里直接渲染即可。 */
 try{ if(typeof refreshMenuStats==='function') refreshMenuStats(); }catch(e){}
+/* ============ 屏幕诊断条（长按顶栏 2 秒触发）============
+   手机上看不到控制台，遇到「按钮点不动/人物悬空」这类问题时
+   只能靠猜。这里做一个最小诊断：按住顶栏 2 秒，弹出一个小面板，
+   把玩家坐标、帧率、楼层状态、HUD 层级、按钮是否绑上全打出来。
+   再点一下关掉。不占屏幕、不影响正常游玩。 */
+(function(){
+  let timer=null, box=null;
+  function kill(){ if(box&&box.parentNode){ box.parentNode.removeChild(box); } box=null; }
+  function showDiag(){
+    kill();
+    const get=(id)=>{ try{ return document.getElementById(id); }catch(e){ return null; } };
+    const cs=(el)=>{ try{ return el?getComputedStyle(el):null; }catch(e){ return null; } };
+    let txt='';
+    try{
+      const v3=(typeof P==='object'&&P&&P.pos)?P.pos:null;
+      txt+='P.pos = '+(v3? (v3.x.toFixed(2)+', '+v3.y.toFixed(2)+', '+v3.z.toFixed(2)) : '(无)')+'\n';
+      txt+='P.eyeH='+((P&&P.eyeH)||0).toFixed(2)+'  onGround='+(P&&P.onGround)+'\n';
+      txt+='vel.y = '+((P&&P.vel)?P.vel.y.toFixed(2):'?')+'\n';
+      txt+='frames='+(window.__frames||0)+'  fps='+(window.__fps||0)+'\n';
+      txt+='ready='+(typeof ready!=='undefined'?ready:'?')+'  inGame='+window.__inGame+'  paused='+(typeof paused!=='undefined'?paused:'?')+'\n';
+      txt+='updP='+(typeof updP)+'  moveAndCollide='+(typeof moveAndCollide)+'\n';
+      try{ txt+='curFloor='+curFloor+'  inBuilding='+inBuilding+'  floorY='+floorY(curFloor)+'\n'; }catch(e){ txt+='楼层: '+e.message+'\n'; }
+    }catch(e){ txt+='取值异常: '+e.message+'\n'; }
+    const tb=cs(get('topbar')), vl=cs(get('viewLayer')), hud=cs(get('hud'));
+    txt+='--- 层级 ---\n';
+    txt+='hud z='+(hud?hud.zIndex:'?')+' pe='+(hud?hud.pointerEvents:'?')+'\n';
+    txt+='topbar z='+(tb?tb.zIndex:'?')+' pe='+(tb?tb.pointerEvents:'?')+'\n';
+    txt+='viewLayer z='+(vl?vl.zIndex:'?')+' disp='+(vl?vl.display:'?')+'\n';
+    const ids=['bagBtn','sndBtn','pauseBtn','medBtn'];
+    txt+='--- 按钮 ---\n';
+    for(const id of ids){
+      const el=get(id);
+      if(!el){ txt+=id+': 不存在\n'; continue; }
+      const r=el.getBoundingClientRect();
+      txt+=id+': bound='+(el.__tapBound?'Y':'N')+' x='+Math.round(r.left)+'..'+Math.round(r.right)+' y='+Math.round(r.top)+'..'+Math.round(r.bottom)+'\n';
+    }
+    txt+='--- 命中测试 ---\n';
+    for(const id of ids){
+      const el=get(id); if(!el) continue;
+      const r=el.getBoundingClientRect();
+      const cx=Math.round((r.left+r.right)/2), cy=Math.round((r.top+r.bottom)/2);
+      try{
+        const hit=document.elementFromPoint(cx,cy);
+        txt+=id+' -> '+(hit? (hit.id||hit.className||hit.tagName) : 'null')+'\n';
+      }catch(e){ txt+=id+' 探测失败\n'; }
+    }
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;left:6px;top:6px;right:6px;max-height:80vh;overflow:auto;z-index:999999;'
+      +'background:rgba(0,0,0,.92);color:#7CFC9E;font:11px/1.5 ui-monospace,monospace;'
+      +'padding:10px;border-radius:10px;border:1px solid #4caf50;white-space:pre-wrap;';
+    d.textContent='📊 诊断（点一下关闭）\n'+txt;
+    d.onclick=kill;
+    (document.body||document.documentElement).appendChild(d);
+    box=d;
+  }
+  const tb=document.getElementById('topbar');
+  if(tb && !tb.__diagBound){
+    tb.__diagBound=true;
+    tb.addEventListener('touchstart', ()=>{ timer=setTimeout(showDiag, 2000); }, {passive:true});
+    const clr=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+    tb.addEventListener('touchend', clr, {passive:true});
+    tb.addEventListener('touchmove', clr, {passive:true});
+    tb.addEventListener('touchcancel', clr, {passive:true});
+  }
+})();
+
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

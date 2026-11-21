@@ -43,3 +43,21 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "OK: $OUT ($(wc -c < "$OUT") bytes)，未安装 node，跳过语法检查"
 fi
+
+# 冒烟测试：用假 THREE 在 Node 里真跑一遍 updP，
+# 验证「摇杆四个方向都能让玩家移动，且不抛异常」。
+# 以前只做语法检查（node --check），语法通过但运行时抛错的情况完全查不出来，
+# 比如「给 const 重新赋值」这类严格模式错误，就藏了好几个版本。
+if command -v node >/dev/null 2>&1 && [ -f smoke_test.js ]; then
+  SMOKE=$(node smoke_test.js 2>&1)
+  echo "$SMOKE" | grep -E '^  ' || true
+  if echo "$SMOKE" | grep -q '❌'; then
+    echo "冒烟测试失败：玩家无法移动，请检查 updP"
+    exit 1
+  fi
+  if ! echo "$SMOKE" | grep -q '全部方向异常总数 = 0'; then
+    echo "冒烟测试失败：updP 运行期抛异常"
+    exit 1
+  fi
+  echo "SMOKE_OK: 摇杆四方向均可移动，updP 无运行期异常"
+fi

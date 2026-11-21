@@ -502,7 +502,13 @@ function updP(dt){
     const jmax=48;
     let d=Math.hypot(dx,dy);
     if(d>jmax){ dx*=jmax/d; dy*=jmax/d; d=jmax; }
-    if(d>2){ mx=dx/jmax; mz=dy/jmax; }
+    /* 【符号约定 —— 这里踩过坑】
+       mx/mz 与键盘保持一致：mz 为负 = 前进，为正 = 后退。
+       屏幕坐标 y 向下为正，手指「往上推」时 dy<0。
+       但 updP 里前进方向是 mz<0 对应的 fwdZ=-cos(yaw)，
+       若直接把 dy 当 mz 用，dy<0 会乘出正数 → 玩家反而后退。
+       所以必须取反：屏幕往上推 → mz 为负 → 沿相机前方前进。 */
+    if(d>2){ mx=dx/jmax; mz=-dy/jmax; }
     /* 同步回 P，方便 HUD 和其它系统读取；不是输入源 */
     P.joyX=mx; P.joyY=mz;
   }else{
@@ -524,8 +530,18 @@ function updP(dt){
   // 前进方向：世界 -z 旋转 yaw
   const fwdX=-sin, fwdZ=-cos;
   const rightX=cos, rightZ=-sin;
-  const wx=fwdX*mz + rightX*mx;
-  const wz=fwdZ*mz + rightZ*mx;
+  /* 【致命 bug 所在地】
+     wx/wz 原来声明为 const，随后又写 wx/=len 归一化，
+     ES module 是严格模式，给 const 赋值直接抛
+     TypeError: Assignment to constant variable.
+     结果是：只要玩家有任何移动输入，updP 就在这一行中断，
+     后面的 moveAndCollide 永远执行不到 → 人永远站在原地。
+     而没有任何输入时 len=0 走 else 分支，不抛错，
+     所以「能转视角、能开镜、能开火，就是走不动」。
+     这也解释了为什么前面几轮全在修摇杆都没用：
+     摇杆值其实一直是好的，是下游把它消费掉的那一步炸了。 */
+  let wx=fwdX*mz + rightX*mx;
+  let wz=fwdZ*mz + rightZ*mx;
   const len=Math.hypot(wx,wz);
   if(len>0){
     wx/=len; wz/=len;

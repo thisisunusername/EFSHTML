@@ -111,7 +111,7 @@ function updP(dt){
   if(!window.__dbgEl){
     const d=document.createElement('div');
     d.id='__dbg';
-    d.style.cssText='position:fixed;left:6px;bottom:6px;z-index:9999;color:#9fe6ff;font:10px monospace;background:rgba(0,0,0,.55);padding:3px 6px;border-radius:4px;pointer-events:none;line-height:1.35;white-space:pre';
+    d.style.cssText='position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:99999;color:#00ff88;font:bold 12px monospace;background:rgba(0,0,0,.75);padding:5px 10px;border-radius:6px;pointer-events:none;line-height:1.45;white-space:pre;text-align:left';
     document.body.appendChild(d);
     window.__dbgEl=d;
   }

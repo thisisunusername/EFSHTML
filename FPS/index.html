@@ -550,7 +550,7 @@ function updP(dt){
   if(!window.__dbgEl){
     const d=document.createElement('div');
     d.id='__dbg';
-    d.style.cssText='position:fixed;left:6px;bottom:6px;z-index:9999;color:#9fe6ff;font:10px monospace;background:rgba(0,0,0,.55);padding:3px 6px;border-radius:4px;pointer-events:none;line-height:1.35;white-space:pre';
+    d.style.cssText='position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:99999;color:#00ff88;font:bold 12px monospace;background:rgba(0,0,0,.75);padding:5px 10px;border-radius:6px;pointer-events:none;line-height:1.45;white-space:pre;text-align:left';
     document.body.appendChild(d);
     window.__dbgEl=d;
   }
@@ -941,85 +941,74 @@ function bindUI(){
     const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
   });
 
-  // 触屏摇杆（Pointer Events，整块左半屏可拖）
+  /* 触屏摇杆：只用 touch 事件。
+     【为什么不用 pointer】pointerdown/pointermove 与 touchstart/touchmove
+     同时绑在同一个元素上时，两者会互相打架：
+     pointerdown 先跑并把 jId 赋值，接着 touchstart 看到 jId!==null 直接 return，
+     而 pointermove 又因为设备上 pointerId 配对异常被 if 挡掉，
+     结果两套事件都「启动了」，但没有任何一套真正更新 P.joyX，
+     表现就是摇杆能显示、能跟随手指，玩家却一动不动。
+     这里只保留 touch 事件，逻辑单一，不再有配对问题。 */
   const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   if(joyZone&&joyBase&&joyStick){
-    let jId=null, jx=0, jy=0, r0=null;
+    let activeId=null, sx=0, sy=0;
 
-    const startJoy=(t)=>{
-      r0=joyBase.getBoundingClientRect();
-      jx=t.clientX; jy=t.clientY;
-      /* 记录原始触点，供 updP 里的双保险读取（不依赖 pointerId 配对） */
-      window.__joyTouch={ active:true, sx:t.clientX, sy:t.clientY, cx:t.clientX, cy:t.clientY };
-      // 摇杆跟着手指出现在按下处
-      joyBase.style.left=(t.clientX-r0.width/2)+'px';
-      joyBase.style.top=(t.clientY-r0.height/2)+'px';
-      joyBase.style.bottom='auto';
+    const startJoy=(cx,cy)=>{
+      sx=cx; sy=cy;
+      activeId=1;
+      /* 摇杆固定出现在按下位置，用 translate(-50%,-50%) 精确居中 */
+      joyBase.style.left=cx+'px';
+      joyBase.style.top=cy+'px';
       joyBase.style.display='block';
       joyStick.style.transform='translate(-50%,-50%)';
-      jId=t.pointerId;
       P.joyX=0; P.joyY=0;
+      window.__joyTouch={ active:true, sx:cx, sy:cy, cx:cx, cy:cy };
     };
 
-    const moveJoy=(t)=>{
-      if(window.__joyTouch){ window.__joyTouch.cx=t.clientX; window.__joyTouch.cy=t.clientY; }
-      let dx=t.clientX-jx, dy=t.clientY-jy;
+    const moveJoy=(cx,cy)=>{
+      let dx=cx-sx, dy=cy-sy;
       const max=48, d=Math.hypot(dx,dy);
       if(d>max){ dx*=max/d; dy*=max/d; }
-      joyStick.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      joyStick.style.transform='translate(calc(-50% + '+dx+'px), calc(-50% + '+dy+'px))';
       P.joyX=dx/max; P.joyY=dy/max;
+      if(window.__joyTouch){ window.__joyTouch.cx=cx; window.__joyTouch.cy=cy; }
     };
 
     const endJoy=()=>{
-      jId=null; P.joyX=0; P.joyY=0;
+      activeId=null; P.joyX=0; P.joyY=0;
       if(window.__joyTouch) window.__joyTouch.active=false;
       joyStick.style.transform='translate(-50%,-50%)';
-      joyBase.style.left='24px'; joyBase.style.top='auto'; joyBase.style.bottom='24px';
+      joyBase.style.display='none';
     };
 
-    joyZone.addEventListener('pointerdown',e=>{
-      if(jId!==null) return;
-      startJoy(e);
-      try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
-      const t=$('htip');
-      if(t){ t.classList.remove('hide'); t.textContent='🎮 摇杆已激活 · 拖动移动'; }
-      e.preventDefault();
-    }, {passive:false});
-
-    joyZone.addEventListener('pointermove',e=>{
-      if(e.pointerId!==jId) return;
-      moveJoy(e);
-      e.preventDefault();
-    }, {passive:false});
-
-    // 只在真正抬起/取消时结束；不要用 pointerleave（会被 capture 干扰）
-    joyZone.addEventListener('pointerup',e=>{
-      if(e.pointerId===jId) endJoy();
-    });
-    joyZone.addEventListener('pointercancel',e=>{
-      if(e.pointerId===jId) endJoy();
-    });
-    // 兜底：所有指针抬起都清理
-    addEventListener('pointerup',e=>{ if(e.pointerId===jId) endJoy(); });
-    addEventListener('pointercancel',e=>{ if(e.pointerId===jId) endJoy(); });
-
-    /* 【最终兜底】touch 事件监听。
-       如果设备上 pointer 事件被别的层抢走或 pointerId 对不上，
-       这里直接用 touch 事件驱动移动——两套事件里哪套能用就走哪套。 */
     joyZone.addEventListener('touchstart',e=>{
-      if(jId!==null) return;
+      if(activeId!==null) return;
       const t=e.changedTouches[0]; if(!t) return;
-      startJoy({clientX:t.clientX, clientY:t.clientY, pointerId:t.identifier});
+      startJoy(t.clientX,t.clientY);
+      const tip=$('htip');
+      if(tip){ tip.classList.remove('hide'); tip.textContent='🎮 摇杆已激活 · 拖动移动'; }
       e.preventDefault();
     }, {passive:false});
+
     joyZone.addEventListener('touchmove',e=>{
+      if(activeId===null) return;
       const t=e.changedTouches[0]; if(!t) return;
-      moveJoy({clientX:t.clientX, clientY:t.clientY});
+      moveJoy(t.clientX,t.clientY);
       e.preventDefault();
     }, {passive:false});
-    const tEnd=e=>{ endJoy(); };
-    joyZone.addEventListener('touchend',tEnd,{passive:true});
-    joyZone.addEventListener('touchcancel',tEnd,{passive:true});
+
+    joyZone.addEventListener('touchend',e=>{ endJoy(); },{passive:true});
+    joyZone.addEventListener('touchcancel',e=>{ endJoy(); },{passive:true});
+
+    /* 桌面调试用：鼠标拖左半屏也能触发摇杆，方便在电脑上验证移动逻辑 */
+    joyZone.addEventListener('mousedown',e=>{
+      if(activeId!==null) return;
+      startJoy(e.clientX,e.clientY);
+      const mv=ev=>moveJoy(ev.clientX,ev.clientY);
+      const up=()=>{ endJoy(); removeEventListener('mousemove',mv); removeEventListener('mouseup',up); };
+      addEventListener('mousemove',mv); addEventListener('mouseup',up);
+      e.preventDefault();
+    });
   }
 
   // 移动端操作按钮

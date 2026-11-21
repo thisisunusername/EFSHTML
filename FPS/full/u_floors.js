@@ -317,8 +317,30 @@ function buildGridWalls(m, y, g, wallColor, doorAt){
    2D 原版就是每层自己铺满、各自居中的，所以这里保持 -(m.w)/2。
    换层时楼梯 x 会有位移，这是 2D 也有的正常现象（每层楼梯间位置本来就不同），
    玩家换层后人出现在目标层自己的楼梯间里。 */
-function gridOriginX(m){ return -(m.w)/2; }
-function gridToWorld(gx, gy, m){ return { x: gridOriginX(m) + gx, z: -29 + gy }; }
+function gridOriginX(m){ return -(m && typeof m.w === 'number' ? m.w : 32)/2; }
+/* 【为什么不传 m 也不会崩】
+   这个函数有二类调用点：
+     ① 明确知道要换算哪一层：gridToWorld(gx, gy, gm)
+     ② 在 buildFloorContent 里手写玩法物件坐标：gridToWorld(7.5, 13.5)
+   ②原来没传 m，而 gridOriginX(m) 会直读 m.w，于是
+   “Cannot read properties of undefined (reading 'w')” —— 整个 init 挂掉、画面全黑。
+   这里做容错：不传 m 时取「当前正在构建/所在的那一层」的地图。 */
+function gridToWorld(gx, gy, m){
+  let mm = m;
+  if(!mm){
+    /* 优先用模块内的 curFloor；构建期间 curFloor 可能还没就位，
+       再退化到 1F（地图一定存在）。 */
+    mm = (GRID_MAPS && GRID_MAPS[FLOORS[curFloor] ? FLOORS[curFloor].id : '1F'])
+      || (GRID_MAPS && GRID_MAPS['1F'])
+      || null;
+  }
+  if(!mm || typeof mm.w !== 'number'){
+    /* 最后的兜底：用 1F 的宽度（32）居中，返回一个合法坐标，绝不抛错 */
+    return { x: -(32)/2 + gx, z: -29 + gy };
+  }
+  return { x: gridOriginX(mm) + gx, z: -29 + gy };
+}
+/* gridOriginX 也加保护，防止别处直接传 undefined */
 
 /* 按房间 style 放家具。每个房间用自己的中心点，避免互相穿插。
    corridor / hall / stairs 不放家具，保证通行。 */
@@ -467,14 +489,14 @@ function buildFloorContent(fi, g){
   const OBJ_Y = y;    /* 本层地板高度 */
   if(f.id==='B1'){
     /* 校长的车：2D 里在 B1 车库 (7.5, 13.5) 格 */
-    const car = gridToWorld(7.5, 13.5);
+    const car = gridToWorld(7.5, 13.5, gm);
     box(2.0,.9,4.0, 0x2a3a5a, car.x, OBJ_Y+.55, car.z, false);   // 车身
     box(1.8,.7,2.0, 0x33456a, car.x, OBJ_Y+1.35, car.z, false);  // 车顶
     box(.25,.25,.25, 0xfff0cc, car.x-0.9, OBJ_Y+.9, car.z-1.6, true); // 车灯
   }
   if(f.id==='B3'){
     /* 通到校外的撤离出口：2D 里 stairWin 在 (21.5, 2.5) 格 */
-    const ex = gridToWorld(21.5, 2.5);
+    const ex = gridToWorld(21.5, 2.5, gm);
     box(2.0,1.2,2.0, 0x6a6a6a, ex.x, OBJ_Y+.6, ex.z, false);      // 出口台
     const exitLamp=new THREE.Mesh(new THREE.BoxGeometry(.8,.1,.8),
       new THREE.MeshStandardMaterial({color:0x33ff88,emissive:0x33ff88,emissiveIntensity:1.4}));
@@ -483,13 +505,23 @@ function buildFloorContent(fi, g){
   }
   /* 容器点位：放在走廊两端（走廊是通的，不会堵门） */
   if(gm){
-    const c1 = gridToWorld(2.5, 7.5);
+    const c1 = gridToWorld(2.5, 7.5, gm);
     box(1.0,1.6,.6, 0x6a7a8a, c1.x, OBJ_Y+.8, c1.z, false);
-    const c2 = gridToWorld(gm.w-3.5, 7.5);
+    const c2 = gridToWorld(gm.w-3.5, 7.5, gm);
     box(1.0,1.6,.6, 0x6a7a8a, c2.x, OBJ_Y+.8, c2.z, false);
   }
 }
 
+/* 【为什么声明要放在这么前面】
+   STAIR_SPOTS 是用 let 声明的。let/const 有“暂时性死区”：
+   在声明语句真正执行之前访问它，会直接抛
+   “Cannot access 'STAIR_SPOTS' before initialization”，
+   而不是像 var 那样给个 undefined。
+   而 buildFloors() 在初始化时就会调 rebuildStairSpots() 往里 push，
+   如果声明写在 buildFloors 后面，初始化阶段就会崩 ——
+   外面包着 try/catch 变成 “init failed”，表现就是整屏全黑。
+   所以这里提前声明，声明时不依赖任何外部值，安全。 */
+let STAIR_SPOTS = [];
 /* ---- 构建全部楼层（隐藏的层不加入场景渲染） ---- */
 function buildFloors(){
   /* 先清掉旧的分组（重开一局时会再调一次） */
@@ -567,7 +599,7 @@ function goFloor(idx, reason){
    里把所有 t:'stairs' 取出来，用 gridToWorld() 换算成世界坐标，
    目标层直接读 2D 数据里的 to 字段。这样楼梯的位置与去向
 自动与 2D 完全一致，改地图时这里不用跟着改。 */
-let STAIR_SPOTS = [];
+/* 声明已前移，原因见下方 buildFloorContent 之前的说明。 */
 function rebuildStairSpots(fi){
   STAIR_SPOTS = [];
   try{
@@ -578,7 +610,7 @@ function rebuildStairSpots(fi){
     if(!m || !m.objs) return;
     for(const o of m.objs){
       if(o.t !== 'stairs' || !o.to) continue;
-      const p = gridToWorld(o.x, o.y);
+      const p = gridToWorld(o.x, o.y, m);
       const tgt = FLOORS.findIndex(f=>f.id===o.to);
       if(tgt < 0) continue;
       STAIR_SPOTS.push({ x:p.x, z:p.z, kind:'stairs', to:tgt, label:o.to });

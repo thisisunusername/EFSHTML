@@ -907,6 +907,31 @@ background:rgba(90,220,255,.03); cursor:default; }
         +'· 浏览器版本过旧，不支持 importmap / module');
     }
   }, 5000);
+
+  /* 4. 【按钮自检】模块跑完之后，逐个检查主菜单按钮有没有真的绑上 onclick。
+     这一条专治「代码没报错、但某些按钮点不动」：
+     如果某个按钮没有 handler（既没有 onclick 也没进事件委托），
+     就把它的 id 列出来 —— 一眼就知道是谁没绑上。
+     只在模块确实执行过（__moduleRan）时才检查，否则会误报。 */
+  setTimeout(function(){
+    if(!window.__moduleRan) return;
+    try{
+      var ids=['btnPlay','btnShop','btnStash','btnGunsmith',
+               'btnExport','btnImport','btnReset','btnBack','btnPickSave'];
+      var miss=[];
+      for(var i=0;i<ids.length;i++){
+        var el=document.getElementById(ids[i]);
+        if(!el){ miss.push(ids[i]+'(DOM缺失)'); continue; }
+        var hasOnclick = !!el.onclick;
+        var hasBound   = !!el.__jsBound;
+        if(!hasOnclick && !hasBound) miss.push(ids[i]);
+      }
+      if(miss.length){
+        show('这些按钮没有绑定事件（点了不会有反应）：\n'+miss.join('\n')
+          +'\n\n（其它按钮正常）');
+      }
+    }catch(e){}
+  }, 2500);
 })();
 </script>
 <script type="module">

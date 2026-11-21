@@ -429,19 +429,56 @@ function buildKnife(kind, PAL){
 }
 /* 初始化武器（挂在相机上，跟随视角） */
 function initWeapon(){
-  if(weaponRoot) return;
-  weaponRoot=new THREE.Group();
-  // 位置：右下方，略微内收（腰射基准位姿，updWeapon 会每帧重算）
-  weaponRoot.position.set(0.19,-0.17,-0.38);
-  /* 【模型改为按需创建】
-     以前这里一次性预建 rifle/pistol/knife 三把模型常驻内存，
-     但它们既不支持皮肤也不支持多种刀型。
-     现在只建一个空引擎，真的模型交给 applyWeaponModel()
-     按「当前物品 id + 皮肤」生成，换枪时重建。 */
-  camera.add(weaponRoot);
-  if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
-  wsk={ activeModel:null, pumpGrip:null };
-  applyWeaponModel();
+  /* 【问题 1 修复：武器模型消失】
+     原来的第一句是：
+         if(weaponRoot) return;
+     这在「只初始化一次」的前提下是对的，但 init() 每次进游戏都会
+     重建 renderer / scene / camera（看 b_world.js 的 init()）。
+
+     于是会出现这种情况：
+       · 第一次进局：camera 是 C1，weaponRoot 被 camera.add() 到 C1
+       · 退回主菜单再进一次：init() 造了新 camera C2，
+         但 weaponRoot 仍然挂在旧的 C1 上
+       · C1 已经不在 scene 里 → 挂在它下面的整把枪都不会被渲染
+     表现就是：**进游戏之后手里没有枪、没有手**，
+     而且切枪、改皮肤都没用（模型确实在，只是挂错了相机）。
+
+     现在改成「按需重新挂到当前相机」：
+       · weaponRoot 不存在 → 建一个
+       · 已经存在但父节点不是当前 camera → 摘下来重新挂
+     这样无论 init() 重建多少次相机，武器都能跟着新相机走。 */
+  if(!camera){ console.warn('initWeapon: camera 尚未创建，跳过'); return; }
+
+  if(!weaponRoot){
+    weaponRoot=new THREE.Group();
+    // 位置：右下方，略微内收（腰射基准位姿，updWeapon 会每帧重算）
+    weaponRoot.position.set(0.19,-0.17,-0.38);
+    /* 【模型改为按需创建】
+       以前这里一次性预建 rifle/pistol/knife 三把模型常驻内存，
+       但它们既不支持皮肤也不支持多种刀型。
+       现在只建一个空引擎，真的模型交给 applyWeaponModel()
+       按「当前物品 id + 皮肤」生成，换枪时重建。 */
+    camera.add(weaponRoot);
+    if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
+    wsk={ activeModel:null, pumpGrip:null };
+    applyWeaponModel();
+    return;
+  }
+
+  /* ---- 已经建过：检查是否还挂在当前相机上 ---- */
+  if(weaponRoot.parent !== camera){
+    /* 防止「改了颜色就丢枪」：换相机的场景下需要重新挂载并重建模型 */
+    if(weaponRoot.parent) weaponRoot.parent.remove(weaponRoot);
+    camera.add(weaponRoot);
+    /* 相机换了，旧模型仍然可以复用；但如果 wsk 丢了就重建 */
+  }
+  if(!wsk) wsk={ activeModel:null, pumpGrip:null };
+  if(!scene.children.includes(camera)) scene.add(camera);
+  /* 确保手里有模型：activeModel 为空或已经不在 weaponRoot 下时重建 */
+  if(!wsk.activeModel || weaponRoot.children.indexOf(wsk.activeModel)<0){
+    _modelCache.key=null;
+    applyWeaponModel();
+  }
 }
 /* ===== 手持武器槽：切换与查询 =====
    三个可用槽位，优先级就是数组顺序：

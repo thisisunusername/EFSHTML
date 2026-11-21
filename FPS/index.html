@@ -907,6 +907,31 @@ background:rgba(90,220,255,.03); cursor:default; }
         +'· 浏览器版本过旧，不支持 importmap / module');
     }
   }, 5000);
+
+  /* 4. 【按钮自检】模块跑完之后，逐个检查主菜单按钮有没有真的绑上 onclick。
+     这一条专治「代码没报错、但某些按钮点不动」：
+     如果某个按钮没有 handler（既没有 onclick 也没进事件委托），
+     就把它的 id 列出来 —— 一眼就知道是谁没绑上。
+     只在模块确实执行过（__moduleRan）时才检查，否则会误报。 */
+  setTimeout(function(){
+    if(!window.__moduleRan) return;
+    try{
+      var ids=['btnPlay','btnShop','btnStash','btnGunsmith',
+               'btnExport','btnImport','btnReset','btnBack','btnPickSave'];
+      var miss=[];
+      for(var i=0;i<ids.length;i++){
+        var el=document.getElementById(ids[i]);
+        if(!el){ miss.push(ids[i]+'(DOM缺失)'); continue; }
+        var hasOnclick = !!el.onclick;
+        var hasBound   = !!el.__jsBound;
+        if(!hasOnclick && !hasBound) miss.push(ids[i]);
+      }
+      if(miss.length){
+        show('这些按钮没有绑定事件（点了不会有反应）：\n'+miss.join('\n')
+          +'\n\n（其它按钮正常）');
+      }
+    }catch(e){}
+  }, 2500);
 })();
 </script>
 <script type="module">
@@ -4130,64 +4155,101 @@ function bindUI(){
   /* 【主菜单按钮】这一整块用 try 包住 —— 之前如果这里前面有任何一处
      抛错，后面的按钮就全都不绑，表现正是「主界面所有按钮都点不动」。
      现在每类绑定各自兜底，一个坏掉不影响其它。 */
-  try{
-  const start=$('btnPlay'); if(start) start.onclick=()=>{
+
+  /* ---------------------------------------------------------------
+     【问题 2 修复：只有「开始」能点，其它按钮全都点不动】
+
+     现象：btnPlay 有反应，商店/仓库/改枪台/导出/导入/重置/返回全都没反应。
+
+     原因在这一整块的组织方式上：它们全在**同一个 try{} 里**。
+     只要其中任何一句抛错（比如 exportSave 在那一刻还不可用、
+     或者某个 $() 返回的元素在结构上不存在导致属性访问失败），
+     try 立刻跳到 catch —— 而 catch 只是 console.error，
+     接着整个菜单块就结束了。
+     于是**排在抛错点之后的按钮全部没绑上**。
+     btnPlay 排在最前面，所以它活着；
+     btnShop 在它后面，就死了。这完全符合「只有开始能点」的现象。
+
+     修法：改成「每个按钮一次独立的 safe 绑定」。
+     用一个局部函数 bindBtn(id, fn) 包住，单个失败只记一行日志，
+     绝不会影响后面的按钮。这样任何一个按钮的问题都被限制在它自己身上。
+     --------------------------------------------------------------- */
+  const bindBtn=(id, fn)=>{
+    try{
+      const el=document.getElementById(id);
+      if(!el) return false;
+      el.onclick=fn;
+      return true;
+    }catch(e){
+      console.error('bindBtn failed: '+id, e);
+      return false;
+    }
+  };
+
+  /* ---- 开始（进游戏）---- */
+  bindBtn('btnPlay', ()=>{
     /* 【开局前同步落盘一次】主菜单时期的所有改动（买东西、仓库整理、
        改枪、换皮肤）到这一刻必须已经写进 localStorage 了。
        进局之后 P 会被 init() 大改，再想存「出击前的配置」就晚了 ——
        而且玩家进局后直接被杀进程，主菜单的改动会全部丢失。 */
     try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(e){}
-    $('menu').style.display='none';
-    audioInit(); audioResume(); sfxUI();
+    const m=document.getElementById('menu'); if(m) m.style.display='none';
+    try{ audioInit(); audioResume(); sfxUI(); }catch(e){ console.error(e); }
     /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
        注意 init() 必须保留 —— 它负责建场景、生成敌人和武器。 */
     window.__inGame=true;
     /* 进游戏才强制横屏：主菜单保持用户当前朝向（竖着拿手机看菜单更舒服），
        打枪时竖屏会看不清，才需要转过去。__orientEnter 会锁方向并亮遮罩。 */
     if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(e){} }
-    init();
-    applyInputMode(inputMode, true);
-  };
-  const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
-  const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
-  const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
-  const stashBtn=$('btnStash'); if(stashBtn) stashBtn.onclick=()=>{ sfxUI(); toggleStash(); };
+    try{ init(); }catch(e){ console.error('init failed', e); }
+    try{ applyInputMode(inputMode, true); }catch(e){ console.error(e); }
+  });
+
+  /* ---- 死亡界面 / 复活 ---- */
+  bindBtn('btnRespawn', ()=>{ location.reload(); });
+  bindBtn('btnDeathMenu', ()=>{ location.reload(); });
+
+  /* ---- 商店 / 仓库 / 改枪台 ---- */
+  bindBtn('btnShop', ()=>{ try{ toggleShop(); }catch(e){ console.error('shop', e); } });
+  bindBtn('btnStash', ()=>{ try{ sfxUI(); }catch(e){} try{ toggleStash(); }catch(e){ console.error('stash', e); } });
   /* 【改枪台入口】面板是互斥的：开改枪台前先把商店/仓库收起来，
      否则三层全屏浮层叠在一起，点哪都是最上面那个。 */
-  const gsBtn=$('btnGunsmith');
-  if(gsBtn) gsBtn.onclick=()=>{
-    sfxUI();
-    closeShop();
-    try{ const st=$('stash'); if(st) st.style.display='none'; }catch(e){}
-    toggleGunsmith();
-  };
-  /* 【局内背包入口】HUD 右上角的「🎒 背包」可直接点开 */
-  const bagBtn=$('bagBtn');
+  bindBtn('btnGunsmith', ()=>{
+    try{ sfxUI(); }catch(e){}
+    try{ closeShop(); }catch(e){}
+    try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
+    try{ toggleGunsmith(); }catch(e){ console.error('gunsmith', e); }
+  });
+
+  /* ---- 局内背包 / 吃药 / 音效 ---- */
+  const bagBtn=document.getElementById('bagBtn');
   if(bagBtn) bagBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); toggleBag(); };
   /* 【HUD 治疗按钮】一键吃药，不用开背包。
      连点不会出错：medQuickUse 内部会重新判满血/无药。 */
-  const medBtn=$('medBtn');
+  const medBtn=document.getElementById('medBtn');
   if(medBtn) medBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); medQuickUse(); };
   // 音效开关
-  const sndBtn=$('sndBtn');
+  const sndBtn=document.getElementById('sndBtn');
   if(sndBtn) sndBtn.onclick=(ev)=>{
     ev.stopPropagation();
     sfxOn=!sfxOn;
     if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
-    $('sndTxt').textContent=sfxOn?'开':'关';
+    const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
     sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
     if(sfxOn) sfxUI();
   };
-  const exportBtn=$('btnExport'); if(exportBtn) exportBtn.onclick=exportSave;
+
+  /* ---- 导出 / 导入 / 选文件 / 重置 / 返回 ---- */
+  bindBtn('btnExport', ()=>{ try{ exportSave(); }catch(e){ console.error('export', e); } });
   /* 【导入按钮】点击流程改成：
        先亮出「📂 选择存档文件」那一行 —— 手机上从下载目录挑 json
        比复制粘贴一大段省事得多；
        如果设备根本弹不出文件选择器（老 WebView），再退回文本框粘贴。
      exportSave/importSave 全程不问密码：加密导出用内置密钥，
      导入先拿内置密钥试，解不开才问。 */
-  const importBtn=$('btnImport');
-  if(importBtn) importBtn.onclick=()=>{
-    const row=$('saveRow'), f=$('saveFile');
+  bindBtn('btnImport', ()=>{
+    const row=document.getElementById('saveRow');
+    const f=document.getElementById('saveFile');
     if(row) row.style.display='flex';
     if(f){
       f.value='';                 // 清掉上次选的文件，否则重新选同一个文件不会触发 change
@@ -4195,25 +4257,22 @@ function bindUI(){
          什么也不会发生，下面的文本框兜底依然是可用的。 */
       try{ f.click(); }catch(e){}
     }
-    importSave();
-  };
-  /* 手动挑文件的入口（有些 WebView 会拦截程序化 click，必须靠用户真点一下按钮） */
-  const pickBtn=$('btnPickSave');
-  if(pickBtn) pickBtn.onclick=()=>{ const f=$('saveFile'); if(f) f.click(); };
-  const saveFileEl=$('saveFile');
-  if(saveFileEl) saveFileEl.onchange=()=>{ importSave(); };
+    try{ importSave(); }catch(e){ console.error('import', e); }
+  });
+  /* 手动挑文件的入口（有些 WebView 会拦截程序化 click，必须靠用户真点一个按钮） */
+  bindBtn('btnPickSave', ()=>{ const f=document.getElementById('saveFile'); if(f) f.click(); });
+  const saveFileEl=document.getElementById('saveFile');
+  if(saveFileEl) saveFileEl.onchange=()=>{ try{ importSave(); }catch(e){ console.error(e); } };
   /* 【重置数据】以前只做 location.reload() —— 现在有了本地自动存档，
      重载后 autoSaveLoad() 会把旧档读回来，等于「重置完了还是原来的数据」。
      所以必须先清档再重载。 */
-  const resetBtn=$('btnReset');
-  if(resetBtn) resetBtn.onclick=()=>{
+  bindBtn('btnReset', ()=>{
     if(!confirm('确认重置所有数据？')) return;
     try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
     try{ if(typeof localStorage!=='undefined') localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
     location.reload();
-  };
-  const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
-  }catch(e){ console.error('bindUI.menuButtons failed', e); }
+  });
+  bindBtn('btnBack', ()=>{ location.href='../'; });
 
   /* ===== 键盘映射（按用户指定）=====
        W A S D    移动
@@ -5066,10 +5125,38 @@ function gunUnmount(gunId, slot){
   toast(T('已卸下配件'));
   saveTick(); gunRefreshModel(); buildGunsmith(); refreshHUD();
 }
-/* 改完配件要重建武器模型（瞄具会影响枪的贴图层次，握把/枪托影响视觉） */
+/* 改完配件要重建武器模型（瞄具会影响枪的贴图层次，握把/枪托影响视觉）
+   【问题 1 修复：武器模型消失】
+   原来的写法是「清掉 _modelCache.key → 调 initWeapon()」。
+   但 initWeapon() 第一句是：
+       if(weaponRoot) return;
+   也就是说，只要武器根节点已经建过（进过一次游戏之后必然已建），
+   这个函数立刻返回，**什么都不会做**。
+   于是这里唯一的效果是「把缓存 key 清空」，模型并没有重建。
+   下ー次 applyWeaponModel() 发现 key 不匹配 → 进去重建 →
+   先把旧模型 remove 掉，再用 buildWeaponFor(kind) 造新的。
+   如果这一路有任何一环出错（比如当前槽位为空、SHOP_ITEMS 里查不到
+   对应 id），结果就是：旧模型已经被移除、新模型没造出来 →
+   **手里彻底没枪了**。玩家看到的就是「武器模型没了」。
+
+   正确做法：不要在这里重建整个 weaponRoot，
+   只要让 applyWeaponModel() 的脏检查失效，交给每帧的 updWeapon()
+   去安全地重建即可 —— 它有完整的分支保护，
+   而且不会把「根节点」整个丢掉。
+
+   另外把 syncWeapon() 作为首选：它内部做的就是
+   「清缓存 + applyWeaponModel() + 切枪动画」，语义正好对应
+   「枪的外观变了，重新摆一次」。 */
 function gunRefreshModel(){
-  try{ if(typeof _modelCache==='object') _modelCache.key=null; }catch(e){}
-  try{ if(typeof initWeapon==='function') initWeapon(); }catch(e){}
+  try{
+    if(typeof _modelCache==='object') _modelCache.key=null;
+  }catch(e){}
+  /* 真正触发重建：优先 syncWeapon（它保证在 weaponRoot 存在时才动），
+     没有这个函数时退化为直接调 applyWeaponModel。 */
+  try{
+    if(typeof syncWeapon==='function') syncWeapon();
+    else if(typeof applyWeaponModel==='function') applyWeaponModel();
+  }catch(e){ console.error('gunRefreshModel failed', e); }
 }
 
 let gunsmithGun=null;   // 当前改的哪把枪
@@ -6362,21 +6449,81 @@ function initInputModeDetect(){
     onTouchSignal();
   }, {passive:true});
 
+  /* ============================================================
+     【问题 3 修复】手指点一下「按键之外」的地方就被判成键盘。
+
+     原因是这一句 mousedown：
+        if(e.pointerType==='touch') { onTouchSignal(); return; }
+        onKeyboardSignal();
+     触屏设备在手指抬起后，浏览器会**额外合成一次鼠标事件序列**
+     （mousedown/mouseup/click）用来兼容老网页 —— 这就是所谓的
+     「兼容性鼠标事件」。这串事件的 pointerType 是空字符串，
+     不是 'touch'，所以走进了 onKeyboardSignal()，
+     于是「手指点屏幕 → 被当成插了键盘 → 触摸按键全隐藏」。
+     又因为 applyInputMode 有 400ms 冷却、而触摸信号总是先到，
+     两者来回打架，表现就是点一下闪一下、最后停在键盘模式。
+
+     为什么不能简单地把 mousedown 删掉：
+     桌面用户（真插鼠标）还是希望隐藏触摸按键的。
+
+     正确做法：从源头上区分「真鼠标」和「触屏合成的假鼠标」。
+     浏览器给出的可靠判据：
+       · e.sourceCapabilities.firesTouchEvents === true  → 是触屏合成的
+       · e.pointerType === 'touch'                       → 触摸
+       · 最近 1 秒内刚有 touchstart                       → 肯定是触屏
+     另外鼠标真正「移动」过（mousemove 带位移）才是真鼠标 ——
+     触屏合成的 mousemove 位移恒为 0，靠这个也能区分。
+     ============================================================ */
+
+  /* 最近一次真实触摸的时间戳：用来判定「紧随其后的鼠标事件是不是合成的」 */
+  let lastRealTouchAt = 0;
+  addEventListener('touchstart', ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
+  addEventListener('touchmove',  ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
+
+  /* 这个鼠标事件是不是触屏合成的「假鼠标」 */
+  const isSyntheticMouse = (e)=>{
+    if(!e) return true;
+    if(e.pointerType==='touch') return true;
+    /* 标准判据：触屏会置 firesTouchEvents */
+    const sc=e.sourceCapabilities;
+    if(sc && sc.firesTouchEvents===true) return true;
+    /* 兜底：刚发生触摸，紧接着来的 mousedown 必然是合成的 */
+    if(Date.now()-lastRealTouchAt < 1200) return true;
+    /* 没有 pointerType 字段的老 WebView：如果有触摸能力，按合成分处理 */
+    if(e.pointerType===undefined && lastRealTouchAt>0) return true;
+    return false;
+  };
+
   addEventListener('mousedown', e=>{
-    /* 鼠标左键按下视为桌面用户 */
-    if(e.pointerType==='touch') { onTouchSignal(); return; }
+    /* 【只有真鼠标才切键盘模式】合成鼠标一律当作触摸 */
+    if(isSyntheticMouse(e)){ onTouchSignal(); return; }
     onKeyboardSignal();
+  }, {passive:true});
+
+  /* mousemove 才是「真的有鼠标」的最强证据：
+     触屏合成的 mousemove 坐标不变化（screenX/Y 都是上次的值）。
+     真鼠标挪动会带来非零位移，这时才允许切键盘模式。 */
+  let lastMx=null, lastMy=null;
+  addEventListener('mousemove', e=>{
+    if(isSyntheticMouse(e)) return;
+    const x=e.screenX, y=e.screenY;
+    const moved = (lastMx!==null) && (Math.abs(x-lastMx)>2 || Math.abs(y-lastMy)>2);
+    lastMx=x; lastMy=y;
+    if(moved) onKeyboardSignal();
   }, {passive:true});
 
   /* 初始判定：有精确指针（鼠标）且没有粗指针（触摸）就是纯桌面。
      用 try 包住是因为部分 WebView / 测试环境没有 matchMedia，
-     这种环境下一律按触摸处理（最保守，至少按钮能用）。 */
+     这种环境下一律按触摸处理（最保守，至少按钮能用）。
+     【额外收紧】只要设备报 maxTouchPoints>0，就默认当触摸设备 ——
+     手机上即使被识别成 hover:hover（个别外接屏/浏览器会这样报），
+     也不该默认藏起触摸按键，那会让手机玩家直接没法玩。 */
   try{
-    const maxTouch = (typeof navigator!=='undefined' && navigator.maxTouchPoints) || 0;
+const maxTouch = (typeof navigator!=='undefined' && navigator.maxTouchPoints) || 0;
     const coarse = (typeof matchMedia==='function') && matchMedia('(pointer:coarse)').matches;
     const hover  = (typeof matchMedia==='function') && matchMedia('(hover:hover)').matches;
     const isTouch = maxTouch>0 || coarse;
-    applyInputMode((!isTouch || hover) ? 'keyboard' : 'touch', true);
+    applyInputMode((!isTouch && hover) ? 'keyboard' : 'touch', true);
   }catch(e){
     try{ applyInputMode('touch', true); }catch(e2){ /* 极端环境下直接放弃检测 */ }
   }
@@ -7560,19 +7707,56 @@ function buildKnife(kind, PAL){
 }
 /* 初始化武器（挂在相机上，跟随视角） */
 function initWeapon(){
-  if(weaponRoot) return;
-  weaponRoot=new THREE.Group();
-  // 位置：右下方，略微内收（腰射基准位姿，updWeapon 会每帧重算）
-  weaponRoot.position.set(0.19,-0.17,-0.38);
-  /* 【模型改为按需创建】
-     以前这里一次性预建 rifle/pistol/knife 三把模型常驻内存，
-     但它们既不支持皮肤也不支持多种刀型。
-     现在只建一个空引擎，真的模型交给 applyWeaponModel()
-     按「当前物品 id + 皮肤」生成，换枪时重建。 */
-  camera.add(weaponRoot);
-  if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
-  wsk={ activeModel:null, pumpGrip:null };
-  applyWeaponModel();
+  /* 【问题 1 修复：武器模型消失】
+     原来的第一句是：
+         if(weaponRoot) return;
+     这在「只初始化一次」的前提下是对的，但 init() 每次进游戏都会
+     重建 renderer / scene / camera（看 b_world.js 的 init()）。
+
+     于是会出现这种情况：
+       · 第一次进局：camera 是 C1，weaponRoot 被 camera.add() 到 C1
+       · 退回主菜单再进一次：init() 造了新 camera C2，
+         但 weaponRoot 仍然挂在旧的 C1 上
+       · C1 已经不在 scene 里 → 挂在它下面的整把枪都不会被渲染
+     表现就是：**进游戏之后手里没有枪、没有手**，
+     而且切枪、改皮肤都没用（模型确实在，只是挂错了相机）。
+
+     现在改成「按需重新挂到当前相机」：
+       · weaponRoot 不存在 → 建一个
+       · 已经存在但父节点不是当前 camera → 摘下来重新挂
+     这样无论 init() 重建多少次相机，武器都能跟着新相机走。 */
+  if(!camera){ console.warn('initWeapon: camera 尚未创建，跳过'); return; }
+
+  if(!weaponRoot){
+    weaponRoot=new THREE.Group();
+    // 位置：右下方，略微内收（腰射基准位姿，updWeapon 会每帧重算）
+    weaponRoot.position.set(0.19,-0.17,-0.38);
+    /* 【模型改为按需创建】
+       以前这里一次性预建 rifle/pistol/knife 三把模型常驻内存，
+       但它们既不支持皮肤也不支持多种刀型。
+       现在只建一个空引擎，真的模型交给 applyWeaponModel()
+       按「当前物品 id + 皮肤」生成，换枪时重建。 */
+    camera.add(weaponRoot);
+    if(!scene.children.includes(camera)) scene.add(camera); // 相机必须在场景里才会渲染子物体
+    wsk={ activeModel:null, pumpGrip:null };
+    applyWeaponModel();
+    return;
+  }
+
+  /* ---- 已经建过：检查是否还挂在当前相机上 ---- */
+  if(weaponRoot.parent !== camera){
+    /* 防止「改了颜色就丢枪」：换相机的场景下需要重新挂载并重建模型 */
+    if(weaponRoot.parent) weaponRoot.parent.remove(weaponRoot);
+    camera.add(weaponRoot);
+    /* 相机换了，旧模型仍然可以复用；但如果 wsk 丢了就重建 */
+  }
+  if(!wsk) wsk={ activeModel:null, pumpGrip:null };
+  if(!scene.children.includes(camera)) scene.add(camera);
+  /* 确保手里有模型：activeModel 为空或已经不在 weaponRoot 下时重建 */
+  if(!wsk.activeModel || weaponRoot.children.indexOf(wsk.activeModel)<0){
+    _modelCache.key=null;
+    applyWeaponModel();
+  }
 }
 /* ===== 手持武器槽：切换与查询 =====
    三个可用槽位，优先级就是数组顺序：

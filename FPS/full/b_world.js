@@ -213,8 +213,14 @@ function init(){
   /* 室内：楼体是实心 box，但内部铺了地板/桌椅/灯之后才算「能进去的地方」。
      必须在 setupWorld() 之前调用 —— setupWorld 里会 buildContainers()，
      而室内容器的点位写在 CONTAINER_SPOTS 里，不依赖调用顺序，
-     但楼内地面得先铺好，否则玩家在门内会「站」在 14 米高的楼顶上。 */
+     但楼内地面得先铺好，否则玩家在门内会「站」在 14 米高的楼顶上。
+     【被多楼层取代】buildInterior() 只做一层（东西楼、行政楼、主楼一层），
+     它铺的地板在 y≈0。现在主楼改成 5 层（u_floors.js 的 buildFloors），
+     其中 B2 层的地板也在 y=0，两者会重叠、把 1F 的家具顶到眼前。
+     所以：主楼部分交给 buildFloors()，buildInterior 只保留东西楼与行政楼。 */
   if(typeof buildInterior==='function') buildInterior();
+  if(typeof buildFloors==='function') buildFloors();
+  if(typeof buildFloorTransports==='function') buildFloorTransports();
   setupWorld();
   ready=true;
 }
@@ -422,8 +428,28 @@ function setupWorld(){
   enemies.length=0; loots.length=0;
 
   // 【敌人精简】原来 8 个挤在楼间小道上，走两步撞一个，没有「搜」的余地。
-  // 现在 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  // 现在基础 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  /* 【难度：保安数量】2D 版是按难度给 guards 0/1/2/3，这里沿用同一个思路：
+     基础 4 个固定点位是「场景守卫」，难度再往上叠加保安，
+     叠出来的保安放在门口/要道，形成难度越高越难进楼的压迫感。 */
   NPC_POINTS.forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
+  try{
+    if(typeof diffGet==='function'){
+      const d=diffGet();
+      /* 保安补充点位：校门口、主楼门前、东西楼之间、操场入口。
+         数量按难度取前 d.guards 个（0~3）。 */
+      const GUARD_SPOTS=[[0,-44],[-10,-12],[10,-12],[0,20]];
+      const n=Math.max(0, Math.min(GUARD_SPOTS.length, d.guards|0));
+      for(let i=0;i<n;i++){
+        const p=GUARD_SPOTS[i];
+        const g=spawnEnemy(p[0],p[1]);
+        g.kind='guard';
+        g.speed=5.2*d.speedMul;
+        g.sight=d.sight;
+        enemies.push(g);
+      }
+    }
+  }catch(e){ console.error('difficulty spawn failed', e); }
   // 物资散落到新场地里：操场看台、篮球场、体育馆、各楼内
   /* 物资坐标全部经体检脚本验证不在建筑内。
      重点修了两个卡墙的：
@@ -439,6 +465,13 @@ function setupWorld(){
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
+  /* 【难度：撤离点数量】由 v_diff.js 的 exfilBuild() 按难度重建。
+     spawnExfil(0,-36) 保留作为「至少有一个」的保底 ——
+     exfilBuild 会把候选点重画一遍，这里的老绿圈会被它统一清理。 */
+  try{
+    if(typeof exfilBuild==='function') exfilBuild();
+    if(typeof diffApply==='function') diffApply();
+  }catch(e){ console.error('exfil/diff build failed', e); }
   /* 【每局重置计时】raidT 归零、超时标志清掉。
      这一步必须在 setupWorld 里做：它是每局的起点，
      少了它第二局一进来就「时间到」、直接弹阵亡结算。 */
@@ -448,6 +481,10 @@ function setupWorld(){
   }catch(e){}
   /* 【局内容器】每次开局重新生成一遍，战利品随机 */
   if(typeof buildContainers==='function') buildContainers();
+  /* 【多楼层：每局重置】难度可能被改过，黑钥匙刷新与否也按局算。 */
+  try{
+    if(typeof maybeSpawnBlackKey==='function') maybeSpawnBlackKey();
+  }catch(e){ console.error('blackkey spawn failed', e); }
   if(typeof bindContainerUI==='function') bindContainerUI();
   /* 【篮球：每局重置计数】投中上限、现金上限都按局算，
      否则上一局刷满 1500 之后，这一局投进也不给钱了。 */

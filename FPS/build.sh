@@ -21,6 +21,13 @@ OUT=index.html
   cat full/f_ui.js;      printf '\n'
   # x_ext 提供门/新操场/交互入口，必须在 b_world 之后、z_render 之前
   cat full/x_ext.js;     printf '\n'
+  # 难度系统：diffGet/diffApply/exfilBuild 被 b_world 的 setupWorld 调用，
+  # 而 setupWorld 是运行时调用（不是加载时），所以放这里足够早；
+  # 但 exfilNear 被 d_game 的 checkExfil 用，也必须在这个位置之前定义。
+  cat full/v_diff.js;    printf '\n'
+  # 多楼层：buildFloors/updFloors/floorInteract 被 b_world、x_ext、z_render 调用，
+  # 三者都是运行时调用，所以放在这里（x_ext 之后）足够。
+  cat full/u_floors.js;  printf '\n'
   cat full/w_weapon.js;  printf '\n'
   cat full/y_audio.js;   printf '\n'
   # 强制横屏：依赖 T()（遮罩文案），必须在 i18n_core 之后

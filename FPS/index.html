@@ -5,6 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Escape Form School</title>
 <style>
+  /* ============ Web 字体（3D 版原来完全没有，这就是「切字体没效果」的根因） ============
+     【问题是什么】s_theme.js 的 FONT_FAMILY 里写了 "ZCOOLXiaoWei"、"MaShanZheng"、
+     "LongCang"、"ZCOOLKuaiLe" 这些字体名，fontApply() 也确实把它们塞进了
+     --font-ui 变量。但整个 3D 版里**没有任何 @font-face**——
+     浏览器不认识这些名字，直接回退到后面的 "PingFang SC"，也就是系统字体。
+     所以不管在设置里点哪一项，屏幕上看起来都是同一个字体。
+     2D 版的 full/a_head.html 第 785-788 行是有这 4 条规则的，3D 版漏掉了。
+
+     【为什么本地文件优先】你是用 file:///storage/emulated/0/Download/fps_test/index.html
+     打开的，file:// 下大概率没有网络，Google Fonts 拉不下来。
+     仓库里其实已经带了 fonts/*.ttf（共 4 个，13MB），
+     所以第一条 src 用本地相对路径 fonts/xxx.ttf，后面再加 gstatic 的 woff2 兜底。
+     【路径说明】index.html 是构建到 FPS/ 根目录的，而字体在仓库根的 fonts/，
+     所以相对路径是 ../fonts/。部署时 ifps_test/ 目录下也要有 fonts/，
+     否则本地那条会 404、只能走网络那条（离线就还是没有效果）。
+     这一点我在部署步骤里一并复制过去。 */
+  @font-face{ font-family:'ZCOOLXiaoWei';
+    src:url('../fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/zcoolxiaowei/v15/i7dMIFFrTRywPpUVX9_RJyM1YFI.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'MaShanZheng';
+    src:url('../fonts/MaShanZheng.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'ZCOOLKuaiLe';
+    src:url('../fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'LongCang';
+    src:url('../fonts/LongCang.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2');
+    font-display:swap; }
   :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
     /* 【字体变量兜底】s_theme.js 的 fontApply() 会在 <html> 的 inline style
        上覆盖这三个；这里给的默认值必须和 FONT_BASE_3D 完全一致
@@ -416,6 +448,34 @@ html[data-lang="en"] #bagBtn span{
   h1{ font-size:var(--fs-title); margin-bottom:4px; font-family:var(--font-ui); } h1 span{ color:var(--accent2); }
   .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
   .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  /* ============ 难度选择（v_diff.js 渲染） ============
+     四格并排，宽度不够时自动换行（手机竖屏 / 横屏都能用）。
+     选中态用 accent 描边 + 轻微上浮，跟 .btn 的观感统一。
+     内层用 div 而不是 button 的默认样式，避免继承 .btn 的 padding。 */
+  #diffPicker{ display:block; width:100%; }
+  .diffhint{ font-size:12px; opacity:.7; margin-bottom:8px; }
+  .diffgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  @media (max-width:430px){ .diffgrid{ grid-template-columns:repeat(2,1fr); } }
+  .diffcell{
+    pointer-events:auto; display:block; width:100%; text-align:left;
+    background:rgba(255,255,255,.04); color:#e8e8f0;
+    border:1px solid rgba(255,255,255,.12); border-radius:12px;
+    padding:9px 10px; cursor:pointer; font-family:var(--font-ui);
+    transition:transform .12s, border-color .12s, background .12s;
+  }
+  .diffcell:active{ transform:scale(.97); }
+  .diffcell.on{
+    border-color:var(--accent); background:rgba(124,92,255,.16);
+    box-shadow:0 0 0 1px rgba(124,92,255,.5), 0 6px 16px rgba(124,92,255,.18);
+  }
+  .diffcell .dk{ font-size:15px; font-weight:800; letter-spacing:.5px; }
+  .diffcell .dt{ font-size:9.5px; opacity:.55; letter-spacing:1.2px; margin-top:1px; }
+  .diffcell .dn{ font-size:10px; opacity:.8; margin-top:6px; line-height:1.45; }
+  .diffdesc{
+    margin-top:9px; padding:8px 10px; font-size:11.5px; line-height:1.55;
+    background:rgba(255,255,255,.04); border-radius:8px;
+    border-left:3px solid var(--accent); opacity:.92;
+  }
   .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:var(--fs-btn); font-weight:700; cursor:pointer; font-family:var(--font-ui); }
   .btn:active{ filter:brightness(1.2); }
   .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
@@ -1250,6 +1310,11 @@ background:rgba(90,220,255,.03); cursor:default; }
       <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
       <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
       <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
+    </div>
+    <div class="row">
+      <!-- 【难度选择】对应 2D 版的难度系统，内容是 v_diff.js 动态渲染的。
+           放在「开始」按钮上方，因为它是玩家进局前最后一个决定。 -->
+      <div id="diffPicker"></div>
     </div>
     <div class="row">
       <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
@@ -3195,8 +3260,14 @@ function init(){
   /* 室内：楼体是实心 box，但内部铺了地板/桌椅/灯之后才算「能进去的地方」。
      必须在 setupWorld() 之前调用 —— setupWorld 里会 buildContainers()，
      而室内容器的点位写在 CONTAINER_SPOTS 里，不依赖调用顺序，
-     但楼内地面得先铺好，否则玩家在门内会「站」在 14 米高的楼顶上。 */
+     但楼内地面得先铺好，否则玩家在门内会「站」在 14 米高的楼顶上。
+     【被多楼层取代】buildInterior() 只做一层（东西楼、行政楼、主楼一层），
+     它铺的地板在 y≈0。现在主楼改成 5 层（u_floors.js 的 buildFloors），
+     其中 B2 层的地板也在 y=0，两者会重叠、把 1F 的家具顶到眼前。
+     所以：主楼部分交给 buildFloors()，buildInterior 只保留东西楼与行政楼。 */
   if(typeof buildInterior==='function') buildInterior();
+  if(typeof buildFloors==='function') buildFloors();
+  if(typeof buildFloorTransports==='function') buildFloorTransports();
   setupWorld();
   ready=true;
 }
@@ -3404,8 +3475,28 @@ function setupWorld(){
   enemies.length=0; loots.length=0;
 
   // 【敌人精简】原来 8 个挤在楼间小道上，走两步撞一个，没有「搜」的余地。
-  // 现在 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  // 现在基础 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
+  /* 【难度：保安数量】2D 版是按难度给 guards 0/1/2/3，这里沿用同一个思路：
+     基础 4 个固定点位是「场景守卫」，难度再往上叠加保安，
+     叠出来的保安放在门口/要道，形成难度越高越难进楼的压迫感。 */
   NPC_POINTS.forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
+  try{
+    if(typeof diffGet==='function'){
+      const d=diffGet();
+      /* 保安补充点位：校门口、主楼门前、东西楼之间、操场入口。
+         数量按难度取前 d.guards 个（0~3）。 */
+      const GUARD_SPOTS=[[0,-44],[-10,-12],[10,-12],[0,20]];
+      const n=Math.max(0, Math.min(GUARD_SPOTS.length, d.guards|0));
+      for(let i=0;i<n;i++){
+        const p=GUARD_SPOTS[i];
+        const g=spawnEnemy(p[0],p[1]);
+        g.kind='guard';
+        g.speed=5.2*d.speedMul;
+        g.sight=d.sight;
+        enemies.push(g);
+      }
+    }
+  }catch(e){ console.error('difficulty spawn failed', e); }
   // 物资散落到新场地里：操场看台、篮球场、体育馆、各楼内
   /* 物资坐标全部经体检脚本验证不在建筑内。
      重点修了两个卡墙的：
@@ -3421,6 +3512,13 @@ function setupWorld(){
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
+  /* 【难度：撤离点数量】由 v_diff.js 的 exfilBuild() 按难度重建。
+     spawnExfil(0,-36) 保留作为「至少有一个」的保底 ——
+     exfilBuild 会把候选点重画一遍，这里的老绿圈会被它统一清理。 */
+  try{
+    if(typeof exfilBuild==='function') exfilBuild();
+    if(typeof diffApply==='function') diffApply();
+  }catch(e){ console.error('exfil/diff build failed', e); }
   /* 【每局重置计时】raidT 归零、超时标志清掉。
      这一步必须在 setupWorld 里做：它是每局的起点，
      少了它第二局一进来就「时间到」、直接弹阵亡结算。 */
@@ -3430,6 +3528,10 @@ function setupWorld(){
   }catch(e){}
   /* 【局内容器】每次开局重新生成一遍，战利品随机 */
   if(typeof buildContainers==='function') buildContainers();
+  /* 【多楼层：每局重置】难度可能被改过，黑钥匙刷新与否也按局算。 */
+  try{
+    if(typeof maybeSpawnBlackKey==='function') maybeSpawnBlackKey();
+  }catch(e){ console.error('blackkey spawn failed', e); }
   if(typeof bindContainerUI==='function') bindContainerUI();
   /* 【篮球：每局重置计数】投中上限、现金上限都按局算，
      否则上一局刷满 1500 之后，这一局投进也不给钱了。 */
@@ -3759,8 +3861,19 @@ function moveAndCollide(dt){
       if(landTop>standY) standY=landTop;
     }
   }
-  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理） */
-  if(standY<eyeH) standY=eyeH;
+  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理）。
+     【多楼层修正】原来写死 standY=eyeH，等于「地面永远在 y=0」。
+     但主楼现在是 5 层，B2 地板在 y=0、B3 在 y=-4，
+     站在 B3 里会被这条兜底强行按回 y=1.6 ——
+     表现就是「一下到地下室就被弹回地面」。
+     所以兜底改成「当前楼层的地板高度」，楼层系统没接上时
+     （floorBaseY 取不到）仍然退回 0，保持原行为。 */
+  const floorBaseY=(typeof floorY==='function' && typeof curFloor==='number')
+    ? floorY(curFloor) : 0;
+  /* 楼内时，兜底地板就是本层楼板；楼外仍然是 y=0 的大地。
+     注意 floorBaseY 可能为负，所以用 max 而不是直接比较。 */
+  const minStand = eyeH + floorBaseY;
+  if(standY < minStand) standY = minStand;
 
   P.onGround=false;
   if(ny<standY){ ny=standY; P.vel.y=0; P.onGround=true; }
@@ -4232,7 +4345,11 @@ function updLoot(dt){
    你必须在规定时间内搜完、跑到撤离点，时间一到没走就等于死了。
    以前这一局可以无限耗下去，既没有紧张惑，也让「敢不敢多搜一个屋」
    这个核心决策完全不存在。现在 8 分钟一到强制结束，东西全丢。 */
-const RAID_LIMIT = 480;   // 单局时长（秒）8 分钟
+const RAID_LIMIT_DEFAULT = 480;   // 保底时长（秒），难度系统会覆盖它
+/* 【改成 let】原来这里是 const 480。难度系统（v_diff.js）要让
+   「普通 600 / 机密 480 / 绝密 420 / 超星 360」各不相同，
+   const 改不了，所以换成 let，并由 diffRaidTime() 在开局时写入。 */
+let RAID_LIMIT = RAID_LIMIT_DEFAULT;
 
 /* ============================================================
    【局内暂停系统】
@@ -4394,12 +4511,23 @@ function raidTimeout(){
 /* ---- 撤离判定 ---- */
 let exfiled=false;
 function checkExfil(){
-  if(!exfil||exfiled) return;
+  if(exfiled) return;
   if(window.__raidOver) return;   // 已经超时了，别再触发撤离
-  const d=Math.hypot(P.pos.x-exfil.x,P.pos.z-exfil.z);
-  if(d<3){
+  /* 【多撤离点】原来只认 exfil 这一个固定点（校门）。
+     难度系统会按难度开 1~3 个点（绝密只留校门、超星多一个地下室 EXIT），
+     所以这里改成走 exfilNear()：站在任一启用点 2 米内都算撤离。
+     兜底：exfilList 还没建起来（v_diff 没接上）时退回老的单点判定，
+     免得因为重构让「撤离点彻底不工作」。 */
+  let hit=null;
+  try{ if(typeof exfilNear==='function') hit=exfilNear(); }catch(e){}
+  if(!hit && exfil){
+    const d=Math.hypot(P.pos.x-exfil.x,P.pos.z-exfil.z);
+    if(d<3) hit={x:exfil.x, z:exfil.z, name:'校门'};
+  }
+  if(hit){
     exfiled=true;
     sfxExfil();
+    const spotName = hit.name || '撤离点';
     /* 【撤离结算】局内背包里的所有东西并回仓库，
        身上的头盔/护甲/背包继续保留可以用。 */
     const before={};
@@ -4410,10 +4538,10 @@ function checkExfil(){
       const it=(typeof SHOP_ITEMS==='object')?SHOP_ITEMS[k]:null;
       msg+=(it?it.icon+' '+it.name+' ×'+before[k]+'　':'');
     }
-    toast('✅ 成功撤离！');
+toast('✅ 成功撤离！');
     // 用死亡面板显示撤离结算
     const info=$('deathInfo');
-    if(info) info.textContent='✅ 撤离成功 · 现金 ¥'+P.ammo.cash
+    if(info) info.textContent='✅ 撤离成功（'+spotName+'） · 现金 ¥'+P.ammo.cash
       +(msg?' · 带回：'+msg:' · 背包是空的');
     const h=$('death'); if(h) h.style.display='flex';
     const h2=h&&h.querySelector('h2'); if(h2) h2.textContent='✅ 撤离成功';
@@ -5357,6 +5485,14 @@ function bindUI(){
 
   /* ---- 开始（进游戏）---- */
   bindBtn('btnPlay', ()=>{
+    /* 【难度落位】必须在 init() 之前把单局时长写进 RAID_LIMIT，
+       因为 init → setupWorld 里会用到它；敌人数量与撤离点
+       则在 setupWorld 里读 diffGet()，那时也已经是新难度了。 */
+    try{
+      if(typeof diffLoad==='function') diffLoad();
+      if(typeof diffRaidTime==='function') RAID_LIMIT = diffRaidTime();
+      if(typeof diffApply==='function') diffApply();
+    }catch(e){ console.error('diff apply failed', e); }
     /* 【开局前同步落盘一次】主菜单时期的所有改动（买东西、仓库整理、
        改枪、换皮肤）到这一刻必须已经写进 localStorage 了。
        进局之后 P 会被 init() 大改，再想存「出击前的配置」就晚了 ——
@@ -7929,6 +8065,14 @@ function __bindMenuFallback(){
     try{
       switch(id){
         case 'btnPlay': {
+          /* 【难度落位】与 bindBtn 版同步，必须放在 init() 之前。
+             两处都改，是因为 btnPlay 有两条绑定路径（直接绑 + 委托），
+             只改一条会让另一条绕过难度设置，出现「选了绝密却按普通刷敌人」。 */
+          try{
+            if(typeof diffLoad==='function') diffLoad();
+            if(typeof diffRaidTime==='function') RAID_LIMIT = diffRaidTime();
+            if(typeof diffApply==='function') diffApply();
+          }catch(x){ console.error('diff apply failed', x); }
           try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(x){}
           const m=$('menu'); if(m) m.style.display='none';
           try{ audioInit(); audioResume(); sfxUI(); }catch(x){}
@@ -8270,10 +8414,30 @@ function mkDoor(x,z,w,h,color,axis){
     new THREE.BoxGeometry(gw,h,gd),
     panelMat
   );
-  panel.position.set(x,h/2,z);
+  /* 【门板改绕铰链转动】
+     原来 mesh 定位在门洞中心 (x,z)，`panel.rotation.y` 绕的也是它自己的中心 ——
+     门板原地打转，转 85° 之后仍然横在门洞里，只是从「横着挡」变成
+     「斜着挡」。碰撞体被摘掉了，人照样能走过去，于是走过去就穿进门板里，
+     看起来就是「门后面能穿模」。
+
+     正确做法是把旋转中心挪到门框的一侧立柱（铰链），门板整体偏出去：
+       1) 建一个 pivot（空 Group）放在铰链位置，把门板作为子物体，
+          门板自身沿宽度方向偏移 w/2，使门板一端正好贴在铰链上；
+       2) 之后只转 pivot。门板就会像真门一样，以一侧为轴甩开门洞。
+     碰撞体仍然用「摘出/塞回 colliders」控制，不依赖旋转后的 AABB。 */
+  const hingeX = (axis==='x') ? (x - w/2) : x;
+  const hingeZ = (axis==='x') ? z : (z - w/2);
+  const pivot=new THREE.Group();
+  pivot.position.set(hingeX, 0, hingeZ);
+  scene.add(pivot);
+  /* 门板在 pivot 局部坐标里的偏移：宽度方向挪半个门宽 */
+  panel.position.set((axis==='x') ? w/2 : 0, h/2, (axis==='x') ? 0 : w/2);
+  pivot.add(panel);
+  /* panel 不再直接挂在 scene 下，从 scene 移除避免双份 */
+  if(panel.parent && panel.parent!==pivot) panel.parent.remove(panel);
   panel.castShadow=true; panel.receiveShadow=true;
-  scene.add(panel); colliders.push(panel);
-  const d={x,z,w,h,panel,axis,open:false,anim:0};
+  colliders.push(panel);
+  const d={x,z,w,h,panel,pivot,hingeX,hingeZ,axis,open:false,anim:0};
   DOORS.push(d);
   return d;
 }
@@ -8333,15 +8497,22 @@ function updDoors(dt){
     // 轻微发亮表示可交互
     if(nearDoor.panel.material.emissive) nearDoor.panel.material.emissive.setHex(nearDoor.open?0x000000:0x223311);
   }
-  /* 动画：门板绕自身一侧转开 95°。
-     注意 mesh 位置固定在门洞中心，靠旋转让门板「让开」，
-     视觉上足够，且不需要处理铰链几何。 */
+  /* 动画：绕铰链把门板甩开 95°（见 mkDoor 里的 pivot 说明）。
+     门板在 pivot 局部已经偏出半个门宽，所以这里转的是 pivot，
+     门板会像真门一样从门洞一侧让开，而不是原地打转。 */
   for(const d of DOORS){
     const want=d.open?1:0;
     if(Math.abs(d.anim-want)>0.001){
       d.anim += (want-d.anim)*Math.min(1,dt*8);
       if(Math.abs(d.anim-want)<0.01) d.anim=want;
-      d.panel.rotation.y = d.anim * (Math.PI/2) * 0.94;
+      const tgt=d.pivot||d.panel;
+      tgt.rotation.y = d.anim * (Math.PI/2) * 0.94;
+      /* 门板一直留在 pivot 里，不参与碰撞判定（已从 colliders 摘出）。
+         但关门时要保证它回到原位，避免动画残影。 */
+      if(!d.open && Math.abs(d.anim)<0.001){
+        if(d.panel && d.panel.material && d.panel.material.emissive)
+          d.panel.material.emissive.setHex(0x000000);
+      }
     }
   }
 }
@@ -8778,6 +8949,15 @@ function nearBasketball(){
    人才会正常站在楼里。这一步不做，室内哪怕摆了桌椅也全是空中楼阁。
 */
 function buildInterior(){
+  /* 【主楼已交给 u_floors.js 的多楼层系统】
+     原来这个函数把主楼一层的地板铺在 y≈0，摆课桌/讲台/黑板。
+     现在主楼改成 5 层（2F/1F/-1F/-2F/地下室），由 buildFloors() 统一生成，
+     这里再铺一层 y=0 的地板会和 B2 层重叠 —— 表现是「一进门就看着
+     一堆桌椅浮在半空」。所以主楼部分直接跳过，只保留东西楼与行政楼。
+     想恢复单层主楼，把下面的 return 删掉即可。 */
+  return buildSideBuildings();
+}
+function buildSideBuildings(){
   /* ---- 主教学楼一层（x:-30..30，z:-30..-14） ----
      门洞在 x=0、z=-14，所以正对门的中轴要留出通道。
      两侧各摆 2 排课桌，中间当走廊。 */
@@ -8947,6 +9127,11 @@ function interact(){
   if(typeof nearBasketball==='function' && nearBasketball()){
     if(typeof shootBall==='function' && shootBall()) return true;
   }
+  /* 【楼层：楼梯 / 电梯】放在门之前。
+     理由：楼梯和电梯都在楼内深处，附近不会有门；
+     但玩家站在楼梯口按 E 显然是想上下楼，
+     如果先判门，有可能把这次交互吃掉（门洞就在几米外）。 */
+  if(typeof floorInteract==='function' && floorInteract()) return true;
   const d=findNearDoor();
   if(d){ toggleDoor(d); return true; }
   return false;
@@ -9378,6 +9563,564 @@ function gmCountHit(){
   }
 }
 
+/* ==================== v_diff.js：难度系统 ====================
+   需求：「主页选难度，普通、机密、绝密、超星，对应 2D 的简单、普通、困难、地狱，
+   然后 2D 是加保安和限制结局，这个也限制撤离点和室内结局和老师刷新量」。
+
+   【对应关系】2D 版 b_world.js 的 DIFF 表是：
+     easy   {guards:0, tspeed:0.45, sight:5.0, see:5.0, lives:2}
+     normal {guards:1, tspeed:0.62, sight:5.6, see:3.0, lives:2}
+     hard   {guards:2, tspeed:0.78, sight:6.2, see:1.0, lives:2}
+     hell   {guards:3, tspeed:0.95, sight:6.8, see:0,   lives:1, instant:true}
+   3D 版这边名字换成塔科夫风格：
+     普通 = easy / 机密 = normal / 绝密 = hard / 超星 = hell
+   参数一一平移，只是 3D 是实时射击，速度那几项要按米/秒重新标定。
+
+   【为什么 3D 不能用 2D 的 tspeed/gspeed】2D 是格子回合制，速度是
+   「每回合走几格」；3D 是连续时间，必须换成米/秒。换算基准：
+   玩家走路 5.2 m/s（c_player 里的 P.spd），所以「老师巡逻速度」
+   按玩家速度的百分比给，手感才对得上：
+     easy 45% / normal 62% / hard 78% / hell 95%
+
+   【为什么难度要限制「撤离点数量」】2D 版的难度是「限制结局」——
+   地狱才能开地下室电话结局。3D 版这边把同样的思路落到最直接的
+   风险收益上：难度越高，可用撤离点越少、越偏、越贵。
+   这样高难度的「多搜一个屋」的赌注才真的成立。 */
+
+/* ---- 难度表 ---- */
+const DIFFS = {
+  pu: {
+    id:'pu', name:'普通', tag:'EASY',
+    /* 对应 2D easy */
+    guards:0,                  // 保安数量（2D guards:0）
+    teachers:2,                // 老师/班主任数量（室内巡逻）
+    speedMul:0.45,             // 敌人移动速度倍率
+    sight:5.0,                 // 视野距离（米）
+    seeTime:5.0,               // 被看见多久才触发（2D see:5.0）
+    lives:2,                   // 命数
+    raidTime:600,              // 单局时长（秒）普通给宽裕些
+    exfils:3,                  // 可用撤离点数量
+    blackKey:false,            // 黑钥匙是否可出现（限制结局）
+    basementEnd:false,         // 地下室结局（对应 2D 地狱限定电话结局）
+    lootRich:1.0,              // 物资刷新密度倍率
+    color:'#22c55e',
+    desc:'保安不巡逻，老师慢。三个撤离点全开，适合熟悉地图。'
+  },
+  ji: {
+    id:'ji', name:'机密', tag:'NORMAL',
+    guards:1, teachers:3, speedMul:0.62, sight:5.6, seeTime:3.0, lives:2,
+    raidTime:480, exfils:2, blackKey:true, basementEnd:false, lootRich:1.0,
+    color:'#3b82f6',
+    desc:'1 名保安巡逻。两个撤离点，其中一个在楼内。'
+  },
+  jue: {
+    id:'jue', name:'绝密', tag:'HARD',
+    guards:2, teachers:5, speedMul:0.78, sight:6.2, seeTime:1.0, lives:2,
+    raidTime:420, exfils:1, blackKey:true, basementEnd:false, lootRich:1.15,
+    color:'#f59e0b',
+    desc:'2 名保安 + 5 名老师。只剩校门一个撤离点，物资更肥。'
+  },
+  chao: {
+    id:'chao', name:'超星', tag:'HELL',
+    guards:3, teachers:7, speedMul:0.95, sight:6.8, seeTime:0, lives:1,
+    /* 2D hell 的 see:0 意味着「看见的瞬间就算被发现」，
+       这里用 seeTime:0 + instant:true 表达同一件事。 */
+    instant:true,
+    raidTime:360, exfils:1, blackKey:true, basementEnd:true, lootRich:1.35,
+    color:'#ef4444',
+    desc:'保安 3 人、老师 7 人，被看见即死，只有一条命。地下室结局解锁。'
+  }
+};
+const DIFF_ORDER = ['pu','ji','jue','chao'];
+
+/* 当前难度。localStorage 记住上次选择，菜单默认高亮它。 */
+const DIFF_KEY = 'efs_fps_diff_v1';
+let curDiff = 'pu';
+
+function diffLoad(){
+  try{
+    const v = localStorage.getItem(DIFF_KEY);
+    if(v && DIFFS[v]) curDiff = v;
+  }catch(e){}
+  return DIFFS[curDiff];
+}
+function diffSave(){
+  try{ localStorage.setItem(DIFF_KEY, curDiff); }catch(e){}
+}
+function diffGet(){
+  return DIFFS[curDiff] || DIFFS.pu;
+}
+function diffSet(id){
+  if(!DIFFS[id]) return diffGet();
+  curDiff = id;
+  diffSave();
+  renderDiffPicker();
+  return DIFFS[id];
+}
+
+/* 把难度参数应用到本局。
+   【为什么要单独一个 apply 函数】难度不只影响数值，还影响
+   「生成几个敌人」「开几个撤离点」，这些必须在 setupWorld 之后执行，
+   否则会被 setupWorld 里的固定数量覆盖掉。 */
+function diffApply(){
+  const d = diffGet();
+  try{
+    if(typeof P === 'object'){
+      P.livesMax = d.lives;
+      if(typeof P.lives !== 'number' || P.lives > d.lives) P.lives = d.lives;
+    }
+  }catch(e){}
+  /* 敌人速度：spawnEnemy 里写死 speed:2.5，这里按倍率改写。
+     用 5.2（玩家步速）当基准，乘倍率就是敌人的实际米/秒。 */
+  try{
+    if(typeof enemies !== 'undefined' && enemies.forEach){
+      for(const e of enemies){
+        if(e && 'speed' in e) e.speed = 5.2 * d.speedMul;
+        if(e && 'sight' in e) e.sight = d.sight;
+        /* seeT 用来累加「被同一个敌人持续看见」的时间，
+           累计超过 seeTime 才算被发现。超星 seeTime=0 直接判定。 */
+        if(e){ e.seeT = 0; e.needSee = d.seeTime; e.instant = !!d.instant; }
+      }
+    }
+  }catch(e){}
+  return d;
+}
+
+/* ---- 撤离点：按难度决定开哪几个 ---- */
+/* 候选点。索引 0 永远可用（校门，2D 版里 1F 的大门厅也是这个定位）。
+   难度越高，越靠后的点被关掉 —— 也就是越「难走」的撤离点才留给高难度，
+   这跟 2D「限制结局」的用意一致：给的东西越少，越要逼玩家走险路。 */
+const EXFIL_SPOTS = [
+  { x:0,   z:-36, name:'校门',       indoor:false },
+  { x:52,  z:20,  name:'体育馆侧门', indoor:true  },
+  { x:-46, z:-6,  name:'西楼后门',   indoor:false }
+];
+const exfilList = [];       // 本局实际启用的撤离点
+
+function exfilBuild(){
+  const d = diffGet();
+  exfilList.length = 0;
+  /* diff.exfils = 1 时只留索引 0；=2 时留 0,1；=3 时全留。
+     但「只有一个撤离点」在高难度下太单调，所以超星额外开一个
+     地下室出口（对应 2D 地狱的 EXIT），由 basementEnd 控制。 */
+  const n = Math.max(1, Math.min(EXFIL_SPOTS.length, d.exfils));
+  for(let i=0;i<n;i++) exfilList.push(Object.assign({}, EXFIL_SPOTS[i]));
+  if(d.basementEnd){
+    exfilList.push({ x:2.5, z:-22, name:'地下室 EXIT', indoor:true, basement:true });
+  }
+  /* 每局重建光环：旧的先拆掉，避免叠出一堆绿圈 */
+  try{
+    if(typeof scene !== 'undefined' && scene){
+      if(window.__exfilMeshes){
+        for(const m of window.__exfilMeshes) scene.remove(m);
+      }
+      window.__exfilMeshes = [];
+      for(const s of exfilList){
+        const r = new THREE.Mesh(new THREE.RingGeometry(1.4,1.9,28),
+          new THREE.MeshStandardMaterial({color: s.basement?0xa855f7:0x33ff88,
+            emissive: s.basement?0xa855f7:0x33ff88, emissiveIntensity:.7,
+            side:THREE.DoubleSide}));
+        r.rotation.x = -Math.PI/2; r.position.set(s.x, .07, s.z);
+        scene.add(r); window.__exfilMeshes.push(r);
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,8,16,1,true),
+          new THREE.MeshStandardMaterial({color: s.basement?0xa855f7:0x33ff88,
+            emissive: s.basement?0xa855f7:0x33ff88, emissiveIntensity:.45,
+            transparent:true, opacity:.22, side:THREE.DoubleSide}));
+        b.position.set(s.x, 4, s.z);
+        scene.add(b); window.__exfilMeshes.push(b);
+      }
+    }
+  }catch(e){}
+  /* 兼容旧逻辑：exfil 是 d_game.js 里 checkExfil 用的单点。
+     现在有多个点，checkExfil 改走 exfilNear()，但保留 exfil
+     指向第一个，避免任何还在读它的地方报错。 */
+  try{ if(typeof exfil === 'object') exfil = {x:exfilList[0].x, z:exfilList[0].z}; }catch(e){}
+  return exfilList;
+}
+/* 玩家是否站在任一撤离点范围内 */
+function exfilNear(){
+  try{
+    if(typeof P !== 'object' || !P.pos) return null;
+    for(const s of exfilList){
+      const dd = Math.hypot(P.pos.x-s.x, P.pos.z-s.z);
+      if(dd < 2.0) return s;
+    }
+  }catch(e){}
+  return null;
+}
+
+/* ---- 菜单里的难度选择 UI ---- */
+function renderDiffPicker(){
+  const host = document.getElementById('diffPicker');
+  if(!host) return;
+  const cur = diffGet();
+  let h = '<div class="diffhint">选择难度（本局生效，可在撤离后更换）</div><div class="diffgrid">';
+  for(const id of DIFF_ORDER){
+    const d = DIFFS[id];
+    const on = (id===curDiff);
+    h += '<button class="diffcell'+(on?' on':'')+'" data-diff="'+id+'">'
+      +  '<div class="dk" style="color:'+d.color+'">'+d.name+'</div>'
+      +  '<div class="dt">'+d.tag+'</div>'
+      +  '<div class="dn">保安 '+d.guards+' · 老师 '+d.teachers+' · 撤离点 '+d.exfils+' · '+'命 '+d.lives+'</div>'
+      + '</button>';
+  }
+  h += '</div>';
+  h += '<div class="diffdesc" style="border-left-color:'+cur.color+'">'
+     +   '<b style="color:'+cur.color+'">'+cur.name+'</b> · '+cur.desc
+     + '</div>';
+  host.innerHTML = h;
+  host.querySelectorAll('[data-diff]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      diffSet(btn.getAttribute('data-diff'));
+      try{ sfxUI(); }catch(e){}
+    });
+  });
+}
+
+/* 单局时长：d_game.js 的 RAID_LIMIT 现在是 let，由这里按难度改写 */
+function diffRaidTime(){
+  return diffGet().raidTime;
+}
+
+/* 初始化（在菜单构建之后调用一次） */
+function diffInit(){
+  diffLoad();
+  renderDiffPicker();
+}
+
+/* ==================== u_floors.js：多楼层系统 ====================
+   需求：「室内要 5 个楼层（对应 2D 的 2F、1F、-1F、-2F、地下室），
+   有电梯和楼梯，遵守 2D 的玩法，比如保安、老师、黑钥匙，室内相当于 2D 的 3D」。
+
+   【2D 版的实际楼层链】../full/b_world.js 第 57 行：
+     var FLOOR_CHAIN = ['2F','1F','B1','B2','B3'];
+   对应关系（用户说的名字 ↔ 2D 的代号）：
+     2F  = 2F         教室层
+     1F  = 1F         小卖部层
+     -1F = B1         地下车库层
+     -2F = B2         工具房层
+     地下室 = B3      最深一层，有通到校外的楼梯
+   五层一栋，跟 2D 完全一致。
+
+   【每层内容（照 2D 的 b_world.js 复制意图）】
+     2F  教室 / 老师办公室 / 厕所 / 电闸室
+     1F  小卖部 / 校长办公室 / 厕所×2
+     B1  地下车库 / 电闸 / 校长的车 / 厕所 / 保安室
+     B2  工具房 / 厕所×2 / 制作室 / 主任办公室 / 电闸
+     B3  地下室两段楼梯（一段回 B2，一段通校外 = 地下室撤离点）
+
+   【3D 的实现方式 —— 关键设计】
+   不能真的把 5 层都堆在同一个世界坐标里（会互相穿插，且相机看不见别的楼
+   层还照样渲染，直接掉帧）。做法是「同一栋楼、按楼层切换场景内容」：
+     · 整个校园只保留一栋主楼的位置，一层的家具摆在世界坐标上；
+     · 进楼/上下楼时，把当前层的家具整组显示、其他层隐藏；
+     · 玩家在楼里时，y 坐标被限制在「这一层的地板到天花板」之间；
+     · 每层的地板 y 按层号错开 4 米，切换楼层时把玩家平移到对应高度。
+   这样既有 5 层，又不增加渲染负担，而且不需要真实的多层建筑几何。
+
+   【为什么不直接建 5 层实体】主楼已经是 60×14×16 的实心 box，
+   真拆成 5 层就是 5 套楼板 + 5 套内墙 + 电梯井，
+   碰撞体和 draw call 都会翻几倍，手机上必掉帧。
+   现在的做法把开销控制在一层，视觉与玩法都到位。
+
+   【楼梯 & 电梯】
+   两者都是「交互点」：靠近按 E。楼梯是走上去的（相邻层），
+   电梯可以选层（跳层）。这一点跟 2D 一样 ——
+   2D 里楼梯只能一层一层走，电梯（电子门）在 B1。 */
+
+/* ---- 楼层定义 ---- */
+const FLOORS = [
+  { id:'2F',  name:'2F 教室层',   y: 12, order:0, desc:'教室 / 老师办公室 / 厕所 / 电闸室' },
+  { id:'1F',  name:'1F 小卖部层', y:  8, order:1, desc:'小卖部 / 校长办公室 / 厕所' },
+  { id:'B1',  name:'-1F 车库层',  y:  4, order:2, desc:'地下车库 / 校长的车 / 保安室' },
+  { id:'B2',  name:'-2F 工具层',  y:  0, order:3, desc:'工具房 / 制作室 / 主任办公室' },
+  { id:'B3',  name:'地下室',      y: -4, order:4, desc:'通到校外的楼梯（撤离点）' }
+];
+/* 每层层高（米）。地板到天花板 3.4，留 0.6 给楼板厚度感。 */
+const FLOOR_H = 3.4;
+
+let curFloor = 1;              // 当前楼层索引（默认 1F = 1）
+let floorGroups = [];          // 每层的 THREE.Group，切换时显隐
+let inBuilding = false;        // 玩家是否在楼里
+
+function floorByOrder(o){ return FLOORS[Math.max(0,Math.min(FLOORS.length-1,o))]; }
+function floorGet(){ return FLOORS[curFloor] || FLOORS[1]; }
+function floorY(i){ return (FLOORS[i]||FLOORS[1]).y; }
+
+/* ---- 建一层的内部：把 buildInterior 的内容按层参数化 ---- */
+/* 【复用主楼一层的布局】主楼原有一层的课桌/讲台/黑板/柜子布局是
+   buildInterior() 里写的。这里不重复一份，而是用不同的「风格」
+   在同一块地面区域上生成不同家具，做到 5 层可区分。 */
+function buildFloorContent(fi, g){
+  const f = FLOORS[fi];
+  const y = f.y;
+  /* 内部可用范围：与主楼一层一致（x -29..29，z -29..-15） */
+  const X0=-29, X1=29, Z0=-29, Z1=-15;
+  /* 地板 & 天花板：每层都铺，颜色随深度变暗 ——
+     越往地下越暗，这是玩家判断「我现在多深」最直接的视觉线索。 */
+  const depth = fi;                      // 0=2F, 4=B3
+  const floorC = [0xc8c2b4, 0xb9b3a6, 0xa8a296, 0x93907f, 0x7d7a6b][depth] || 0xb9b3a6;
+  const ceilC  = [0xe0dacc, 0xd6d0c2, 0xc4bdb0, 0xaea89b, 0x96907f][depth] || 0xd6d0c2;
+  const bx = (w,h,d,c,px,py,pz,col)=>box(w,h,d,c,px,y+py,pz,col===undefined?true:col);
+
+  bx(X1-X0, .1, Z1-Z0, floorC, (X0+X1)/2, -0.05, (Z0+Z1)/2, true);
+  bx(X1-X0, .12, Z1-Z0, ceilC, (X0+X1)/2, FLOOR_H, (Z0+Z1)/2, true);
+
+  /* 顶灯：2F 亮、越往下越少（地下层的压迫感） */
+  const lampN = [4,4,3,2,1][depth] || 2;
+  for(let i=0;i<lampN;i++){
+    const lx = -21 + i*(42/Math.max(1,lampN-1));
+    const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.6,.08,.4),
+      new THREE.MeshStandardMaterial({color:0xffffff,
+        emissive: depth>=3?0xffd9a0:0xfff4d6,
+        emissiveIntensity: depth>=3?0.7:1.1}));
+    lamp.position.set(lx, y+FLOOR_H-0.12, -22);
+    g.add(lamp);
+    /* 地下层加一盏真的点光源，否则进去全黑 */
+    if(depth>=2 && i===Math.floor(lampN/2)){
+      const pl=new THREE.PointLight(depth>=3?0xffd9a0:0xfff0cc, 1.2, 20, 2);
+      pl.position.set(lx, y+FLOOR_H-0.3, -22);
+      g.add(pl);
+    }
+  }
+
+  /* ---- 按层生成家具 ---- */
+  if(f.id==='2F'){
+    /* 2F 教室层：三排课桌 + 讲台 + 黑板（与 2D 的 2F 一致） */
+    const deskC=0x9a7b52, chairC=0x7a6a52;
+    for(let r=0;r<3;r++){
+      const dz=-27+r*4.2;
+      for(const dx of [-24,-18,-12,-7,7,12,18,24]){
+        bx(1.5,.08,1.0,deskC, dx, .78, dz, true);
+        bx(.1,.75,.1,0x8a6a45, dx-.65,.38,dz-.42,true);
+        bx(.1,.75,.1,0x8a6a45, dx+.65,.38,dz-.42,true);
+        bx(.1,.75,.1,0x8a6a45, dx-.65,.38,dz+.42,true);
+        bx(.1,.75,.1,0x8a6a45, dx+.65,.38,dz+.42,true);
+        bx(.5,.06,.5,chairC, dx, .45, dz+0.85, true);
+      }
+    }
+    bx(3.2,.5,1.2,0x8a6a45, 0, .25, -28.6, true);         // 讲台
+    bx(9,3.0,.12,0x2f4a3a, 0, 1.9, -29.4, true);           // 黑板
+    bx(9.2,3.2,.06,0xb08a5a, 0, 1.9, -29.46, true);        // 黑板框
+  }
+  else if(f.id==='1F'){
+    /* 1F 小卖部层：货架 + 柜台 + 校长室门牌 */
+    for(let i=0;i<4;i++){
+      bx(1.2,2.0,.6,0x7a6a8a, -24+i*2.6, 1.0, -27, true);    // 货架
+    }
+    bx(6,.9,1.2,0x9a7b52, -18, .45, -16.5, true);            // 柜台
+    bx(2.4,2.2,.15,0x5a4a3a, 14, 1.1, -28.9, true);          // 校长室门
+    bx(1.6,.5,.08,0xd8b45a, 14, 2.5, -28.8, true);           // 门牌
+  }
+  else if(f.id==='B1'){
+    /* B1 地下车库：车位线 + 一辆车 + 保安室 */
+    for(let i=0;i<5;i++){
+      bx(.12,.02,6,0xe8e8e8, -24+i*5, .02, -24, true);        // 车位线
+    }
+    /* 校长的车（2D 里 B1 有校长的车，砸车有成就） */
+    bx(2.0,.9,4.4,0x2a3a5a, -12, .55, -24, true);             // 车身
+    bx(1.8,.7,2.2,0x33456a, -12, 1.35, -24.4, true);          // 车顶
+    bx(.3,.3,.3,0xfff0cc, -13.1, .9, -22.2, false);           // 车灯
+    bx(3.0,2.6,3.0,0x8a8a8a, 18, 1.3, -26, true);             // 保安室
+  }
+  else if(f.id==='B2'){
+    /* B2 工具层：工具台 + 制作台 + 主任办公室 */
+    bx(4.0,.9,1.4,0x8a6a45, -20, .45, -26, true);              // 工具台
+    for(let i=0;i<6;i++){
+      bx(.12,.12,.9,0x9fb3c8, -21.6+i*0.7, 1.0, -26, false);   // 工具挂
+    }
+    bx(3.0,1.0,1.2,0x6a7a8a, 6, .5, -26, true);                // 制作台
+    bx(2.4,2.2,.15,0x5a4a3a, 20, 1.1, -28.9, true);            // 主任办公室门
+  }
+  else {
+    /* B3 地下室：只有两段楼梯 + 一个通校外的出口（撤离点） */
+    bx(2.0,1.4,2.0,0x6a6a6a, -20, .7, -24, true);              // 上行楼梯台
+    bx(2.0,1.4,2.0,0x6a6a6a, 20, .7, -24, true);               // 通校外出口台
+    const exitLamp=new THREE.Mesh(new THREE.BoxGeometry(.8,.1,.8),
+      new THREE.MeshStandardMaterial({color:0x33ff88,emissive:0x33ff88,emissiveIntensity:1.4}));
+    exitLamp.position.set(20, y+FLOOR_H-0.5, -24);
+    g.add(exitLamp);
+  }
+
+  /* 每层两侧各留一个容器点位（配合 CONTAINER_SPOTS 的室内点位） */
+  bx(1.2,2.0,.6,0x6a7a8a, -27.5, 1.0, -20, true);
+  bx(1.2,2.0,.6,0x6a7a8a, 27.5, 1.0, -20, true);
+}
+
+/* ---- 构建全部楼层（隐藏的层不加入场景渲染） ---- */
+function buildFloors(){
+  /* 先清掉旧的分组（重开一局时会再调一次） */
+  if(floorGroups && floorGroups.length){
+    for(const g of floorGroups){ try{ scene.remove(g); }catch(e){} }
+  }
+  floorGroups = [];
+  for(let i=0;i<FLOORS.length;i++){
+    const g = new THREE.Group();
+    g.visible = false;
+    buildFloorContent(i, g);
+    scene.add(g);
+    floorGroups.push(g);
+  }
+  curFloor = 1;                 // 默认从 1F 进门
+  inBuilding = false;
+  setFloorVisible();
+}
+
+function setFloorVisible(){
+  for(let i=0;i<floorGroups.length;i++){
+    if(floorGroups[i]) floorGroups[i].visible = (i===curFloor);
+  }
+}
+
+/* 切换楼层：把玩家放到该层地板上，并清速度避免穿层 */
+function goFloor(idx, reason){
+  const nb = Math.max(0, Math.min(FLOORS.length-1, idx|0));
+  const f = nb===curFloor ? '' : FLOORS[nb].name;
+  /* 楼板之间的家具切换是瞬间的，所以必须先摆好可见性再移动玩家，
+     否则玩家会先看到旧层一秒。 */
+  const oldY = floorY(curFloor);
+  curFloor = nb;
+  setFloorVisible();
+  try{
+    if(typeof P === 'object' && P.pos){
+      /* 保持水平位置不变（楼梯/电梯都在同一处），只改高度 */
+      P.pos.y = floorY(nb) + (typeof P.eyeH === 'number' ? P.eyeH : 1.7);
+      P.vel.y = 0;
+      P.onGround = true;
+    }
+  }catch(e){}
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  if(f){
+    try{ toast('🏢 到达 '+f); }catch(e){}
+  } else if(reason){
+    try{ toast(reason); }catch(e){}
+  }
+  return FLOORS[nb];
+}
+
+/* ---- 楼梯 / 电梯 交互点 ---- */
+/* 楼梯：2F↔1F↔B1↔B2↔B3 一层一层走，位置在主楼东西两端。
+   电梯：放在主楼正中偏东，可以跳层（代价是声音大，会引敌人）。 */
+const STAIR_SPOTS = [
+  { x:-24, z:-22, kind:'stairs', up:true  },   // 西侧楼梯上行
+  { x: 24, z:-22, kind:'stairs', up:false }    // 东侧楼梯下行
+];
+const ELEV = { x:10, z:-22, w:2.4, d:2.4 };
+
+let nearFloorThing = null;      // {kind:'stairs'|'elev', dir}
+
+function buildFloorTransports(){
+  /* 楼梯：两级台阶 + 扶手，纯视觉 */
+  for(const s of STAIR_SPOTS){
+    for(let i=0;i<4;i++){
+      box(2.0,.18,0.6, 0x8a8a8a, s.x, 0.09+i*0.18, s.z + (s.up?i*0.6:-i*0.6), true);
+    }
+    box(.1,.9,.1, 0xa0a0a0, s.x-0.95, 0.45, s.z, false);
+    box(.1,.9,.1, 0xa0a0a0, s.x+0.95, 0.45, s.z, false);
+  }
+  /* 电梯：一个金属方舱 + 门缝 */
+  box(ELEV.w, 2.6, ELEV.d, 0x9aa4b0, ELEV.x, 1.3, ELEV.z, true);
+  box(.06, 2.2, ELEV.d*0.8, 0x6a7480, ELEV.x, 1.1, ELEV.z, false);
+  const led=new THREE.Mesh(new THREE.BoxGeometry(.5,.3,.1),
+    new THREE.MeshStandardMaterial({color:0x33ff88,emissive:0x33ff88,emissiveIntensity:1.0}));
+  led.position.set(ELEV.x, 2.9, ELEV.z-1.25);
+  scene.add(led);
+}
+
+/* ---- 每帧：检测玩家是否在楼里、是否靠近楼梯/电梯 ---- */
+function updFloors(dt){
+  if(!floorGroups.length) return;
+  let inB=false, nd=null, bd=2.2;
+  try{
+    if(typeof P === 'object' && P.pos){
+      const px=P.pos.x, pz=P.pos.z;
+      /* 主楼内部范围（x -29..29，z -29..-15） */
+      inB = (px>-29 && px<29 && pz>-29 && pz>-15);
+      if(inB){
+        for(const s of STAIR_SPOTS){
+          const dd=Math.hypot(px-s.x, pz-s.z);
+          if(dd<bd){ bd=dd; nd={kind:'stairs', dir:s.up?'up':'down', spot:s}; }
+        }
+        const de=Math.hypot(px-ELEV.x, pz-ELEV.z);
+        if(de<bd){ bd=de; nd={kind:'elev'}; }
+      }
+    }
+  }catch(e){}
+  inBuilding = inB;
+  nearFloorThing = inB ? nd : null;
+
+  /* 楼内时把玩家的 y 锁在本层地板附近，防止从楼板缝隙掉下去。
+     只在「脚底明显低于本层地板」时拉回，避免干扰正常跳跃。 */
+  try{
+    if(inB && typeof P === 'object' && P.pos){
+      const base = floorY(curFloor) + (typeof P.eyeH==='number'?P.eyeH:1.7);
+      if(P.pos.y < base - 2.5){ P.pos.y = base; P.vel.y = 0; }
+    }
+  }catch(e){}
+
+  /* 提示：靠近楼梯/电梯时显示 */
+  try{
+    const el = document.getElementById('doorHint');
+    if(el && nearFloorThing){
+      el.style.display='block';
+      if(nearFloorThing.kind==='elev'){
+        el.innerHTML='<b>E</b> 电梯（'+floorGet().name+'）';
+      } else {
+        const tgt = nearFloorThing.dir==='up' ? (curFloor-1) : (curFloor+1);
+        const t = tgt>=0 && tgt<FLOORS.length ? FLOORS[tgt].name : '（无）';
+        el.innerHTML='<b>E</b> 楼梯 → '+t;
+      }
+    }
+  }catch(e){}
+}
+
+/* 交互入口：由 x_ext 的 interact() 调用。
+   返回 true 表示这次交互被楼层系统吃掉了。 */
+function floorInteract(){
+  if(!nearFloorThing) return false;
+  if(nearFloorThing.kind==='elev'){
+    /* 电梯：跳到「下一层」，到底了回到 2F（环形）。
+       为什么不弹选层面板：手机上一个弹窗会打断节奏，
+       而且 5 层环形其实就是「按 E 往下走一层」，够用。 */
+    let nxt = curFloor + 1;
+    if(nxt >= FLOORS.length) nxt = 0;
+    goFloor(nxt, '电梯');
+    return true;
+  }
+  if(nearFloorThing.kind==='stairs'){
+    const tgt = nearFloorThing.dir==='up' ? curFloor-1 : curFloor+1;
+    if(tgt<0 || tgt>=FLOORS.length){
+      try{ toast('这里没有楼梯可走了'); }catch(e){}
+      return true;
+    }
+    goFloor(tgt);
+    return true;
+  }
+  return false;
+}
+
+/* ---- 黑钥匙（2D 里黑钥匙是开「电子门」的，绝密/超星才刷新） ---- */
+/* 2D 版：blackkey 由蓝图 + 木头 + 锤子制作；3D 版没有制作系统，
+   改为「难度允许时，室内容器有概率搜到」。
+   对应需求「黑钥匙」与「限制结局」：普通难度根本不给黑钥匙。 */
+const BLACKKEY_ID = 'blackkey';
+function maybeSpawnBlackKey(){
+  let d = null;
+  try{ d = (typeof diffGet==='function') ? diffGet() : null; }catch(e){}
+  if(!d || !d.blackKey) return false;
+  /* 挂到「本局的容器战利品表」上：拿到 blackkey 的容器必须真的产出。
+     做法是给 CONTAINER_SPOTS 里某个室内点位打标记，openContainer 时
+     会额外塞一把黑钥匙。 */
+  try{
+    if(typeof CONTAINER_SPOTS==='array' || Array.isArray(CONTAINER_SPOTS)){
+      const indoor = CONTAINER_SPOTS.filter(s=>s.x>-29 && s.x<29 && s.z>-29 && s.z>-15);
+      if(indoor.length){
+        indoor[Math.floor(Math.random()*indoor.length)].hasBlackKey = true;
+      }
+    }
+  }catch(e){}
+  return true;
+}
 /* ============ w_weapon.js：第一人称武器模型（枪 + 双手） ============ */
 let weaponRoot=null, weaponPistol=null, weaponRifle=null, weaponKnife=null, weaponShotgun=null, wsk=null;
 let wBobT=0, wRecoil=0, wKick=0;
@@ -11967,6 +12710,9 @@ function animate(){
     /* 光影：太阳缓动 + 天/雾冷暖 + 点光源傍晚提亮。
        纯 uniform 更新，不掉帧，所以放在主循环每帧调用。 */
     safeCall(updLighting,dt);
+    /* 多楼层：判断玩家在不在楼里、靠近哪段楼梯/电梯，并显示提示。
+       放在门之后：门提示也写 #doorHint，楼层提示优先级更高（后写覆盖）。 */
+    safeCall(updFloors,dt);
     safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
     /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
        这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
@@ -12045,6 +12791,10 @@ try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.err
    顺序也重要 —— themeApply 先清 MATERIAL_VARS，accentApply 再把玩家
    选的颜色写回去，反过来的话玩家自定义色会被主题默认值覆盖。 */
 try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('theme init failed', e); }
+/* 【难度选择渲染】菜单里的四格难度由 v_diff.js 生成。
+   必须在 DOM 就绪后跑，但不必等 init()（init 是点「开始」才执行的）。
+   放在启动之前，这样主菜单一出现就有难度可选。 */
+try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);
 </script>

@@ -36,10 +36,30 @@ function mkDoor(x,z,w,h,color,axis){
     new THREE.BoxGeometry(gw,h,gd),
     panelMat
   );
-  panel.position.set(x,h/2,z);
+  /* 【门板改绕铰链转动】
+     原来 mesh 定位在门洞中心 (x,z)，`panel.rotation.y` 绕的也是它自己的中心 ——
+     门板原地打转，转 85° 之后仍然横在门洞里，只是从「横着挡」变成
+     「斜着挡」。碰撞体被摘掉了，人照样能走过去，于是走过去就穿进门板里，
+     看起来就是「门后面能穿模」。
+
+     正确做法是把旋转中心挪到门框的一侧立柱（铰链），门板整体偏出去：
+       1) 建一个 pivot（空 Group）放在铰链位置，把门板作为子物体，
+          门板自身沿宽度方向偏移 w/2，使门板一端正好贴在铰链上；
+       2) 之后只转 pivot。门板就会像真门一样，以一侧为轴甩开门洞。
+     碰撞体仍然用「摘出/塞回 colliders」控制，不依赖旋转后的 AABB。 */
+  const hingeX = (axis==='x') ? (x - w/2) : x;
+  const hingeZ = (axis==='x') ? z : (z - w/2);
+  const pivot=new THREE.Group();
+  pivot.position.set(hingeX, 0, hingeZ);
+  scene.add(pivot);
+  /* 门板在 pivot 局部坐标里的偏移：宽度方向挪半个门宽 */
+  panel.position.set((axis==='x') ? w/2 : 0, h/2, (axis==='x') ? 0 : w/2);
+  pivot.add(panel);
+  /* panel 不再直接挂在 scene 下，从 scene 移除避免双份 */
+  if(panel.parent && panel.parent!==pivot) panel.parent.remove(panel);
   panel.castShadow=true; panel.receiveShadow=true;
-  scene.add(panel); colliders.push(panel);
-  const d={x,z,w,h,panel,axis,open:false,anim:0};
+  colliders.push(panel);
+  const d={x,z,w,h,panel,pivot,hingeX,hingeZ,axis,open:false,anim:0};
   DOORS.push(d);
   return d;
 }
@@ -99,15 +119,22 @@ function updDoors(dt){
     // 轻微发亮表示可交互
     if(nearDoor.panel.material.emissive) nearDoor.panel.material.emissive.setHex(nearDoor.open?0x000000:0x223311);
   }
-  /* 动画：门板绕自身一侧转开 95°。
-     注意 mesh 位置固定在门洞中心，靠旋转让门板「让开」，
-     视觉上足够，且不需要处理铰链几何。 */
+  /* 动画：绕铰链把门板甩开 95°（见 mkDoor 里的 pivot 说明）。
+     门板在 pivot 局部已经偏出半个门宽，所以这里转的是 pivot，
+     门板会像真门一样从门洞一侧让开，而不是原地打转。 */
   for(const d of DOORS){
     const want=d.open?1:0;
     if(Math.abs(d.anim-want)>0.001){
       d.anim += (want-d.anim)*Math.min(1,dt*8);
       if(Math.abs(d.anim-want)<0.01) d.anim=want;
-      d.panel.rotation.y = d.anim * (Math.PI/2) * 0.94;
+      const tgt=d.pivot||d.panel;
+      tgt.rotation.y = d.anim * (Math.PI/2) * 0.94;
+      /* 门板一直留在 pivot 里，不参与碰撞判定（已从 colliders 摘出）。
+         但关门时要保证它回到原位，避免动画残影。 */
+      if(!d.open && Math.abs(d.anim)<0.001){
+        if(d.panel && d.panel.material && d.panel.material.emissive)
+          d.panel.material.emissive.setHex(0x000000);
+      }
     }
   }
 }
@@ -544,6 +571,15 @@ function nearBasketball(){
    人才会正常站在楼里。这一步不做，室内哪怕摆了桌椅也全是空中楼阁。
 */
 function buildInterior(){
+  /* 【主楼已交给 u_floors.js 的多楼层系统】
+     原来这个函数把主楼一层的地板铺在 y≈0，摆课桌/讲台/黑板。
+     现在主楼改成 5 层（2F/1F/-1F/-2F/地下室），由 buildFloors() 统一生成，
+     这里再铺一层 y=0 的地板会和 B2 层重叠 —— 表现是「一进门就看着
+     一堆桌椅浮在半空」。所以主楼部分直接跳过，只保留东西楼与行政楼。
+     想恢复单层主楼，把下面的 return 删掉即可。 */
+  return buildSideBuildings();
+}
+function buildSideBuildings(){
   /* ---- 主教学楼一层（x:-30..30，z:-30..-14） ----
      门洞在 x=0、z=-14，所以正对门的中轴要留出通道。
      两侧各摆 2 排课桌，中间当走廊。 */
@@ -713,6 +749,11 @@ function interact(){
   if(typeof nearBasketball==='function' && nearBasketball()){
     if(typeof shootBall==='function' && shootBall()) return true;
   }
+  /* 【楼层：楼梯 / 电梯】放在门之前。
+     理由：楼梯和电梯都在楼内深处，附近不会有门；
+     但玩家站在楼梯口按 E 显然是想上下楼，
+     如果先判门，有可能把这次交互吃掉（门洞就在几米外）。 */
+  if(typeof floorInteract==='function' && floorInteract()) return true;
   const d=findNearDoor();
   if(d){ toggleDoor(d); return true; }
   return false;

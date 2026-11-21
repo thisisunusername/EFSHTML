@@ -5,6 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Escape Form School</title>
 <style>
+  /* ============ Web 字体（3D 版原来完全没有，这就是「切字体没效果」的根因） ============
+     【问题是什么】s_theme.js 的 FONT_FAMILY 里写了 "ZCOOLXiaoWei"、"MaShanZheng"、
+     "LongCang"、"ZCOOLKuaiLe" 这些字体名，fontApply() 也确实把它们塞进了
+     --font-ui 变量。但整个 3D 版里**没有任何 @font-face**——
+     浏览器不认识这些名字，直接回退到后面的 "PingFang SC"，也就是系统字体。
+     所以不管在设置里点哪一项，屏幕上看起来都是同一个字体。
+     2D 版的 full/a_head.html 第 785-788 行是有这 4 条规则的，3D 版漏掉了。
+
+     【为什么本地文件优先】你是用 file:///storage/emulated/0/Download/fps_test/index.html
+     打开的，file:// 下大概率没有网络，Google Fonts 拉不下来。
+     仓库里其实已经带了 fonts/*.ttf（共 4 个，13MB），
+     所以第一条 src 用本地相对路径 fonts/xxx.ttf，后面再加 gstatic 的 woff2 兜底。
+     【路径说明】index.html 是构建到 FPS/ 根目录的，而字体在仓库根的 fonts/，
+     所以相对路径是 ../fonts/。部署时 ifps_test/ 目录下也要有 fonts/，
+     否则本地那条会 404、只能走网络那条（离线就还是没有效果）。
+     这一点我在部署步骤里一并复制过去。 */
+  @font-face{ font-family:'ZCOOLXiaoWei';
+    src:url('../fonts/ZCOOL_XiaoWei.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/zcoolxiaowei/v15/i7dMIFFrTRywPpUVX9_RJyM1YFI.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'MaShanZheng';
+    src:url('../fonts/MaShanZheng.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'ZCOOLKuaiLe';
+    src:url('../fonts/ZCOOL_KuaiLe.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2');
+    font-display:swap; }
+  @font-face{ font-family:'LongCang';
+    src:url('../fonts/LongCang.ttf') format('truetype'),
+        url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2');
+    font-display:swap; }
   :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
     /* 【字体变量兜底】s_theme.js 的 fontApply() 会在 <html> 的 inline style
        上覆盖这三个；这里给的默认值必须和 FONT_BASE_3D 完全一致
@@ -416,6 +448,34 @@ html[data-lang="en"] #bagBtn span{
   h1{ font-size:var(--fs-title); margin-bottom:4px; font-family:var(--font-ui); } h1 span{ color:var(--accent2); }
   .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
   .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  /* ============ 难度选择（v_diff.js 渲染） ============
+     四格并排，宽度不够时自动换行（手机竖屏 / 横屏都能用）。
+     选中态用 accent 描边 + 轻微上浮，跟 .btn 的观感统一。
+     内层用 div 而不是 button 的默认样式，避免继承 .btn 的 padding。 */
+  #diffPicker{ display:block; width:100%; }
+  .diffhint{ font-size:12px; opacity:.7; margin-bottom:8px; }
+  .diffgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  @media (max-width:430px){ .diffgrid{ grid-template-columns:repeat(2,1fr); } }
+  .diffcell{
+    pointer-events:auto; display:block; width:100%; text-align:left;
+    background:rgba(255,255,255,.04); color:#e8e8f0;
+    border:1px solid rgba(255,255,255,.12); border-radius:12px;
+    padding:9px 10px; cursor:pointer; font-family:var(--font-ui);
+    transition:transform .12s, border-color .12s, background .12s;
+  }
+  .diffcell:active{ transform:scale(.97); }
+  .diffcell.on{
+    border-color:var(--accent); background:rgba(124,92,255,.16);
+    box-shadow:0 0 0 1px rgba(124,92,255,.5), 0 6px 16px rgba(124,92,255,.18);
+  }
+  .diffcell .dk{ font-size:15px; font-weight:800; letter-spacing:.5px; }
+  .diffcell .dt{ font-size:9.5px; opacity:.55; letter-spacing:1.2px; margin-top:1px; }
+  .diffcell .dn{ font-size:10px; opacity:.8; margin-top:6px; line-height:1.45; }
+  .diffdesc{
+    margin-top:9px; padding:8px 10px; font-size:11.5px; line-height:1.55;
+    background:rgba(255,255,255,.04); border-radius:8px;
+    border-left:3px solid var(--accent); opacity:.92;
+  }
   .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:var(--fs-btn); font-weight:700; cursor:pointer; font-family:var(--font-ui); }
   .btn:active{ filter:brightness(1.2); }
   .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
@@ -1250,6 +1310,11 @@ background:rgba(90,220,255,.03); cursor:default; }
       <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
       <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
       <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
+    </div>
+    <div class="row">
+      <!-- 【难度选择】对应 2D 版的难度系统，内容是 v_diff.js 动态渲染的。
+           放在「开始」按钮上方，因为它是玩家进局前最后一个决定。 -->
+      <div id="diffPicker"></div>
     </div>
     <div class="row">
       <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>

@@ -399,7 +399,11 @@ function updLoot(dt){
    你必须在规定时间内搜完、跑到撤离点，时间一到没走就等于死了。
    以前这一局可以无限耗下去，既没有紧张惑，也让「敢不敢多搜一个屋」
    这个核心决策完全不存在。现在 8 分钟一到强制结束，东西全丢。 */
-const RAID_LIMIT = 480;   // 单局时长（秒）8 分钟
+const RAID_LIMIT_DEFAULT = 480;   // 保底时长（秒），难度系统会覆盖它
+/* 【改成 let】原来这里是 const 480。难度系统（v_diff.js）要让
+   「普通 600 / 机密 480 / 绝密 420 / 超星 360」各不相同，
+   const 改不了，所以换成 let，并由 diffRaidTime() 在开局时写入。 */
+let RAID_LIMIT = RAID_LIMIT_DEFAULT;
 
 /* ============================================================
    【局内暂停系统】
@@ -561,12 +565,23 @@ function raidTimeout(){
 /* ---- 撤离判定 ---- */
 let exfiled=false;
 function checkExfil(){
-  if(!exfil||exfiled) return;
+  if(exfiled) return;
   if(window.__raidOver) return;   // 已经超时了，别再触发撤离
-  const d=Math.hypot(P.pos.x-exfil.x,P.pos.z-exfil.z);
-  if(d<3){
+  /* 【多撤离点】原来只认 exfil 这一个固定点（校门）。
+     难度系统会按难度开 1~3 个点（绝密只留校门、超星多一个地下室 EXIT），
+     所以这里改成走 exfilNear()：站在任一启用点 2 米内都算撤离。
+     兜底：exfilList 还没建起来（v_diff 没接上）时退回老的单点判定，
+     免得因为重构让「撤离点彻底不工作」。 */
+  let hit=null;
+  try{ if(typeof exfilNear==='function') hit=exfilNear(); }catch(e){}
+  if(!hit && exfil){
+    const d=Math.hypot(P.pos.x-exfil.x,P.pos.z-exfil.z);
+    if(d<3) hit={x:exfil.x, z:exfil.z, name:'校门'};
+  }
+  if(hit){
     exfiled=true;
     sfxExfil();
+    const spotName = hit.name || '撤离点';
     /* 【撤离结算】局内背包里的所有东西并回仓库，
        身上的头盔/护甲/背包继续保留可以用。 */
     const before={};
@@ -577,10 +592,10 @@ function checkExfil(){
       const it=(typeof SHOP_ITEMS==='object')?SHOP_ITEMS[k]:null;
       msg+=(it?it.icon+' '+it.name+' ×'+before[k]+'　':'');
     }
-    toast('✅ 成功撤离！');
+toast('✅ 成功撤离！');
     // 用死亡面板显示撤离结算
     const info=$('deathInfo');
-    if(info) info.textContent='✅ 撤离成功 · 现金 ¥'+P.ammo.cash
+    if(info) info.textContent='✅ 撤离成功（'+spotName+'） · 现金 ¥'+P.ammo.cash
       +(msg?' · 带回：'+msg:' · 背包是空的');
     const h=$('death'); if(h) h.style.display='flex';
     const h2=h&&h.querySelector('h2'); if(h2) h2.textContent='✅ 撤离成功';

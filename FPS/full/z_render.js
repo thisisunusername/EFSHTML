@@ -91,6 +91,9 @@ function animate(){
     /* 光影：太阳缓动 + 天/雾冷暖 + 点光源傍晚提亮。
        纯 uniform 更新，不掉帧，所以放在主循环每帧调用。 */
     safeCall(updLighting,dt);
+    /* 多楼层：判断玩家在不在楼里、靠近哪段楼梯/电梯，并显示提示。
+       放在门之后：门提示也写 #doorHint，楼层提示优先级更高（后写覆盖）。 */
+    safeCall(updFloors,dt);
     safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
     /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
        这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
@@ -169,5 +172,9 @@ try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.err
    顺序也重要 —— themeApply 先清 MATERIAL_VARS，accentApply 再把玩家
    选的颜色写回去，反过来的话玩家自定义色会被主题默认值覆盖。 */
 try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('theme init failed', e); }
+/* 【难度选择渲染】菜单里的四格难度由 v_diff.js 生成。
+   必须在 DOM 就绪后跑，但不必等 init()（init 是点「开始」才执行的）。
+   放在启动之前，这样主菜单一出现就有难度可选。 */
+try{ if(typeof diffInit==='function') diffInit(); }catch(e){ console.error('diff init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

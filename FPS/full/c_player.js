@@ -306,8 +306,19 @@ function moveAndCollide(dt){
       if(landTop>standY) standY=landTop;
     }
   }
-  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理） */
-  if(standY<eyeH) standY=eyeH;
+  /* 地面兜底（y=0 那块大平面没有碰撞体，单独处理）。
+     【多楼层修正】原来写死 standY=eyeH，等于「地面永远在 y=0」。
+     但主楼现在是 5 层，B2 地板在 y=0、B3 在 y=-4，
+     站在 B3 里会被这条兜底强行按回 y=1.6 ——
+     表现就是「一下到地下室就被弹回地面」。
+     所以兜底改成「当前楼层的地板高度」，楼层系统没接上时
+     （floorBaseY 取不到）仍然退回 0，保持原行为。 */
+  const floorBaseY=(typeof floorY==='function' && typeof curFloor==='number')
+    ? floorY(curFloor) : 0;
+  /* 楼内时，兜底地板就是本层楼板；楼外仍然是 y=0 的大地。
+     注意 floorBaseY 可能为负，所以用 max 而不是直接比较。 */
+  const minStand = eyeH + floorBaseY;
+  if(standY < minStand) standY = minStand;
 
   P.onGround=false;
   if(ny<standY){ ny=standY; P.vel.y=0; P.onGround=true; }

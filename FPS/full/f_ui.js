@@ -430,6 +430,14 @@ function bindUI(){
 
   /* ---- 开始（进游戏）---- */
   bindBtn('btnPlay', ()=>{
+    /* 【难度落位】必须在 init() 之前把单局时长写进 RAID_LIMIT，
+       因为 init → setupWorld 里会用到它；敌人数量与撤离点
+       则在 setupWorld 里读 diffGet()，那时也已经是新难度了。 */
+    try{
+      if(typeof diffLoad==='function') diffLoad();
+      if(typeof diffRaidTime==='function') RAID_LIMIT = diffRaidTime();
+      if(typeof diffApply==='function') diffApply();
+    }catch(e){ console.error('diff apply failed', e); }
     /* 【开局前同步落盘一次】主菜单时期的所有改动（买东西、仓库整理、
        改枪、换皮肤）到这一刻必须已经写进 localStorage 了。
        进局之后 P 会被 init() 大改，再想存「出击前的配置」就晚了 ——
@@ -3002,6 +3010,14 @@ function __bindMenuFallback(){
     try{
       switch(id){
         case 'btnPlay': {
+          /* 【难度落位】与 bindBtn 版同步，必须放在 init() 之前。
+             两处都改，是因为 btnPlay 有两条绑定路径（直接绑 + 委托），
+             只改一条会让另一条绕过难度设置，出现「选了绝密却按普通刷敌人」。 */
+          try{
+            if(typeof diffLoad==='function') diffLoad();
+            if(typeof diffRaidTime==='function') RAID_LIMIT = diffRaidTime();
+            if(typeof diffApply==='function') diffApply();
+          }catch(x){ console.error('diff apply failed', x); }
           try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(x){}
           const m=$('menu'); if(m) m.style.display='none';
           try{ audioInit(); audioResume(); sfxUI(); }catch(x){}

@@ -394,10 +394,55 @@ function updLoot(dt){
   }
 }
 
+/* ---- 撤离倒计时 ----
+   【为什么要有这个】搜打撤（塔科夫/暗区）的核心压力来自「时间有限」：
+   你必须在规定时间内搜完、跑到撤离点，时间一到没走就等于死了。
+   以前这一局可以无限耗下去，既没有紧张惑，也让「敢不敢多搜一个屋」
+   这个核心决策完全不存在。现在 8 分钟一到强制结束，东西全丢。 */
+const RAID_LIMIT = 480;   // 单局时长（秒）8 分钟
+
+/* 每帧推进计时。返回剩余秒数（用于 HUD 显示）。 */
+function updRaidTimer(dt){
+  if(!window.__inGame) return RAID_LIMIT;
+  if(typeof P.raidT!=='number') P.raidT=0;
+  P.raidT += dt;
+  const left = RAID_LIMIT - P.raidT;
+  /* 【超时惩罚】时间到：直接算阵亡，不带任何东西出去。
+     用 window.__raidOver 做一次性保护，避免每帧都弹一次结算。 */
+  if(left<=0 && !window.__raidOver && !exfiled){
+    window.__raidOver = true;
+    try{ if(typeof raidTimeout==='function') raidTimeout(); }
+    catch(e){ console.error('raidTimeout failed', e); }
+  }
+  return Math.max(0, left);
+}
+
+/* 超时结算：与阵亡同效，但文案不同（提示玩家「是时间到了」） */
+function raidTimeout(){
+  try{ P.firing=false; }catch(e){}
+  try{ if(typeof sfxDeny==='function') sfxDeny(); }catch(e){}
+  window.__inGame = false;
+  const d=$('death');
+  if(d){
+    const h2=d.querySelector('h2'); if(h2) h2.textContent='⏰ 撤离超时';
+    const info=$('deathInfo');
+    if(info) info.textContent='你没在规定时间内到达撤离点 · 带进去的物资全部丢失';
+    d.style.display='flex';
+  }
+  /* 【处理局内资产】超时 = 阵亡：背包、胸挂、身上装备全部丢失。
+     这是搜打撤的标准规则，时间压力才有意义。 */
+  /* 直接复用阵亡结算：背包/胸挂清空、搜来记录作废、九个槽位全掉。
+     超时的惩罚与阵亡完全一致 —— 搜打撤里「没撤走」就是死。 */
+  try{ if(typeof settleDeath==='function') settleDeath(); }catch(e){ console.error('settleDeath failed', e); }
+  try{ if(typeof saveTick==='function') saveTick(); }catch(e){}
+  try{ toast('⏰ 撤离超时 · 物资丢失'); }catch(e){}
+}
+
 /* ---- 撤离判定 ---- */
 let exfiled=false;
 function checkExfil(){
   if(!exfil||exfiled) return;
+  if(window.__raidOver) return;   // 已经超时了，别再触发撤离
   const d=Math.hypot(P.pos.x-exfil.x,P.pos.z-exfil.z);
   if(d<3){
     exfiled=true;

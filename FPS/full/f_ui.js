@@ -1,7 +1,79 @@
 /* ============ f_ui.js：菜单/商店/HUD/输入/摇杆 ============ */
 let touchMoveX=0, touchMoveY=0;
 
+/* ================= 事件沙箱：判断这次点击是不是落在 UI 上 =================
+   【为什么要它】全局 mousedown 只管「开火」，但它挂在 window 上，
+   分不清「玩家想射击」和「玩家在按 HUD 按钮」。
+   凡是命中了下面这些元素的点击，一律不当成开火：
+     · 任何 button / .pill（音量、背包、治疗、金币……）
+     · 右下角操作按钮群 #actZone（那里有自己的 touchstart 处理）
+     · 摇杆 #joyZone / 视角层 #viewLayer
+     · 任何打开的浮层面板（商店/背包/仓库/改枪台/死亡/菜单/搜刮箱）
+     · 武器切换条 #wpnBar
+   用 closest 向上找，所以点在图标/文字上（svg、span）也算命中父按钮。 */
+const UI_SELECTOR=[
+  '#topbar','#actZone','#joyZone','#viewLayer','#wpnBar',
+  '#menu','#shop','#bag','#stash','#gunsmith','#death','#lootBox',
+  '#gmPanel','#orientMask','#saveRow','#__bootdiag','button'
+].join(',');
+function isUIEvent(e){
+  if(!e) return false;
+  const t=e.target;
+  if(!t) return false;
+  /* tagName 存在才说明是真 DOM 元素（排除 canvas 和桩对象） */
+  if(!t.tagName) return false;
+  if(t.tagName==='CANVAS'){
+    /* canvas 只有主画布 #c 算「游戏区域」，小地图是 UI */
+    return t.id==='mmCanvas';
+  }
+  if(t.closest){
+    try{ if(t.closest(UI_SELECTOR)) return true; }catch(err){}
+  }
+  return false;
+}
+
+/* ================= 「假鼠标」识别（前置共享实现）=================
+   【为什么要前置】全局开火监听在 bindUI 里（约 460 行），必须先能调
+   isSyntheticMouse；而完整识别逻辑原本写在 2700 多行的输入检测里，
+   形式是 const 箭头函数 —— 不提升，提前调用直接 ReferenceError。
+   现在把判据集中成这一份前置实现，输入检测那边直接复用。
+   判据（从可靠到兜底）：
+     · pointerType === 'touch'                  → 触摸
+     · sourceCapabilities.firesTouchEvents      → 触屏合成的兼容事件
+     · 最近 1.2 秒内有真实 touchstart/touchmove → 必然是合成的
+     · 老 WebView 无 pointerType 字段且有过触摸 → 当合成处理 */
+let lastRealTouchAt = 0;
+addEventListener('touchstart', ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
+addEventListener('touchmove',  ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
+function isSyntheticMouse(e){
+  if(!e) return true;
+  if(e.pointerType==='touch') return true;
+  const sc=e.sourceCapabilities;
+  if(sc && sc.firesTouchEvents===true) return true;
+  if(Date.now()-lastRealTouchAt < 1200) return true;
+  if(e.pointerType===undefined && lastRealTouchAt>0) return true;
+  return false;
+}
+
 function refreshHUD(){
+  /* 【撤离倒计时 HUD】
+     原来 #timer 这个 pill 是个摆设：整个代码库搜 'timer' 没有任何写入，
+     永远是 HTML 里写死的 00:00。现在它真正显示本局剩余时间，
+     低于 60 秒变红并闪烁，给玩家最后的机会往撤离点跑。 */
+  const tm=$('timer');
+  if(tm){
+    const left = (typeof RAID_LIMIT==='number') ? (RAID_LIMIT - (P.raidT||0)) : 0;
+    const l = Math.max(0, Math.ceil(left));
+    const mm = Math.floor(l/60), ss = l%60;
+    const txt = mm+':'+(ss<10?'0':'')+ss;
+    if(tm.textContent!==txt) tm.textContent=txt;
+    const low = l<=60;
+    tm.style.color = low ? '#ff5a4a' : '';
+    tm.style.fontWeight = low ? '800' : '';
+    /* 最后一分钟闪烁：用 CSS 类而不是逐帧改样式，避免每帧重排 */
+    const pill=tm.parentElement;
+    if(pill && pill.classList){ pill.classList.toggle('lowtime', low); }
+  }
   const hp=$('hpNum'); if(hp) hp.textContent=Math.round(P.hp);
   const hf=$('hpfill'); if(hf){ hf.style.width=Math.max(0,P.hp)+'%'; hf.classList.toggle('low',P.hp<30); }
   /* 【弹药 HUD】按当前手持槽取数：
@@ -277,23 +349,48 @@ function bindUI(){
     try{ toggleGunsmith(); }catch(e){ console.error('gunsmith', e); }
   });
 
-  /* ---- 局内背包 / 吃药 / 音效 ---- */
+  /* ---- 局内背包 / 吃药 / 音效 ----
+     【为什么不用 onclick】这套 UI 在手机上走的是触摸：
+     #viewLayer / #actZone 的 touchstart 都会 preventDefault，
+     而浏览器**只有在 touchstart 未被取消时才会合成 click**。
+     结果就是这些按钮的 onclick 在真机上时灵时不灵。
+     现在统一用 tapBtn()：touchstart 直接执行（不等 300ms 也不依赖
+     合成 click），同时保留 onclick 给鼠标/桌面，两者用时间戳去重，
+     保证一次点击只执行一次。 */
+  const tapBtn=(el, fn)=>{
+    if(!el || el.__tapBound) return;
+    el.__tapBound=true;
+    let last=0;
+    const run=(ev)=>{
+      /* 去重：touchstart 之后浏览器如果还是补了一次 click，这里把它挡掉 */
+      const now=Date.now();
+      if(now-last<400) return;
+      last=now;
+      if(ev){
+        if(ev.stopPropagation) ev.stopPropagation();
+        if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+      }
+      try{ fn(ev); }catch(e){ console.error('tap failed', e); }
+    };
+    el.addEventListener('touchstart', run, {passive:false});
+    el.addEventListener('click', run);
+  };
+
   const bagBtn=document.getElementById('bagBtn');
-  if(bagBtn) bagBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); toggleBag(); };
+  tapBtn(bagBtn, ()=>{ try{ sfxUI(); }catch(e){} toggleBag(); });
   /* 【HUD 治疗按钮】一键吃药，不用开背包。
      连点不会出错：medQuickUse 内部会重新判满血/无药。 */
   const medBtn=document.getElementById('medBtn');
-  if(medBtn) medBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); medQuickUse(); };
+  tapBtn(medBtn, ()=>{ try{ sfxUI(); }catch(e){} medQuickUse(); });
   // 音效开关
   const sndBtn=document.getElementById('sndBtn');
-  if(sndBtn) sndBtn.onclick=(ev)=>{
-    ev.stopPropagation();
+  tapBtn(sndBtn, ()=>{
     sfxOn=!sfxOn;
     if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
     const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
-    sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
-    if(sfxOn) sfxUI();
-  };
+    if(sndBtn.firstChild) sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
+    if(sfxOn){ try{ sfxUI(); }catch(e){} }
+  });
 
   /* ---- 导出 / 导入 / 选文件 / 重置 / 返回 ---- */
   bindBtn('btnExport', ()=>{ try{ exportSave(); }catch(e){ console.error('export', e); } });
@@ -404,9 +501,22 @@ function bindUI(){
      半自动/栓动/泵动虽然也会把 P.firing 置真，
      但 updFireHold 会直接 return（curIsAuto() 为假），
      所以它们仍然只能靠重新点击开火。 */
+  /* 【单点会射击的根因】
+     这个监听挂在 window 上，不区分点在哪。于是：
+       · 手指点一下屏幕想转视角  -> 开一枪
+       · 点音量/背包这些 HUD 按钮 -> 先开一枪再处理按钮
+       · 触屏抬指后浏览器合成的兼容鼠标事件 -> 又开一枪
+     手机上根本没有「鼠标左键」这个东西，这个监听只会带来误触。
+     现在只接受【真鼠标】且【不落在任何 UI 元素上】的左键。 */
   addEventListener('mousedown',e=>{
     if(e.button!==0) return;
     if(!ready) return;
+    /* 触屏合成的兼容鼠标事件：一律不开火（否则点哪都走火） */
+    if(isSyntheticMouse(e)) return;
+    /* 点在交互元素上：那是按钮/面板，不是开火 */
+    if(isUIEvent(e)) return;
+    /* 键盘模式下对局界面才认鼠标左键；触摸模式一律不开火 */
+    if(inputMode!=='keyboard') return;
     P.firing=true;
     fire();                          // 按下立刻先打一发，不能等下一帧
   });
@@ -2231,6 +2341,169 @@ function useItem(id, src){
   toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
 
+/* ================= 小地图 =================
+   【为什么要有】校园主体约 138×114 米、六栋楼加操场看台，
+   光靠第一人称走一定会迷路，更别说最后要在一分钟内跑到撤离点。
+   世界坐标 -> 地图像素是纯线性映射，不做旋转（北永远朝上），
+   这样玩家才能把「地图上的楼」和「眼前的楼」对应起来。
+
+   世界范围（取自 b_world.js 的围墙）：
+     西墙 x=-60、东墙 x=78、南墙 z=-46、北墙 z=68
+   往外留 4 米边距，免得撤离点/门柱贴边被裁掉。 */
+const MM_X0=-64, MM_X1=82, MM_Z0=-52, MM_Z1=74;
+/* 校园里几块主要建筑，直接用矩形近似（和 b_world.js 的 box 尺寸一致）。
+   x,z 是盒子中心，w,d 是宽/深，n 是名字。 */
+const MM_BUILDINGS=[
+  {x:0,   z:-22, w:60, d:16, n:'主楼'},      // box(60,14,16, 0,-22)
+  {x:-34, z:2,   w:16, d:32, n:'西楼'},      // box(16,14,32, -34,2)
+  {x:34,  z:2,   w:16, d:32, n:'东楼'},      // box(16,14,32, 34,2)
+  {x:0,   z:26,  w:34, d:15, n:'行政楼'},    // box(34,11,15, 0,26)
+  {x:16,  z:34,  w:86, d:52, n:'操场'},      // groundDeco(86,52, 16,34)
+  {x:58,  z:18,  w:26, d:22, n:'体育馆'}     // 体育馆在操场东侧
+];
+let mmCtx=null, mmLast=0;
+
+function mmProject(x,z,w,h){
+  const px = (x-MM_X0)/(MM_X1-MM_X0)*w;
+  const pz = (z-MM_Z0)/(MM_Z1-MM_Z0)*h;
+  return [px,pz];
+}
+
+/* 主入口：每帧画一次。10fps 足够，省电且不抖。 */
+function drawMiniMap(now){
+  const cv=$('mmCanvas');
+  if(!cv) return;
+  if(now-mmLast < 100) return;
+  mmLast=now;
+  if(!mmCtx) mmCtx=cv.getContext('2d');
+  const g=mmCtx; if(!g) return;
+  const W=cv.width, H=cv.height;
+  g.clearRect(0,0,W,H);
+
+  /* 底：深色地面 */
+  g.fillStyle='rgba(18,26,20,.72)';
+  g.fillRect(0,0,W,H);
+
+  /* 操场：绿色块 + 跑道橙红描边，一眼能认出方位 */
+  g.save();
+  const [sx,sz]=mmProject(16-43, 34-26, W,H);
+  const [sw,sh]=[86/(MM_X1-MM_X0)*W, 52/(MM_Z1-MM_Z0)*H];
+  g.fillStyle='rgba(52,104,60,.72)';
+  g.fillRect(sx,sz,sw,sh);
+  g.strokeStyle='rgba(168,53,40,.85)';
+  g.lineWidth=1.6;
+  g.strokeRect(sx+1,sz+1,sw-2,sh-2);
+  g.restore();
+
+  /* 建筑：灰米色矩形 + 描边 */
+  for(let i=0;i<MM_BUILDINGS.length;i++){
+    const b=MM_BUILDINGS[i];
+    if(b.n==='操场') continue;   // 上面已经画过
+    const [bx,bz]=mmProject(b.x-b.w/2, b.z-b.d/2, W,H);
+    const bw=b.w/(MM_X1-MM_X0)*W, bh=b.d/(MM_Z1-MM_Z0)*H;
+    g.fillStyle='rgba(196,184,158,.82)';
+    g.fillRect(bx,bz,bw,bh);
+    g.strokeStyle='rgba(90,82,68,.9)';
+    g.lineWidth=1;
+    g.strokeRect(bx+.5,bz+.5,bw-1,bh-1);
+  }
+
+  /* 围墙：虚线表示校园边界 */
+  g.save();
+  g.setLineDash([3,3]);
+  g.strokeStyle='rgba(160,180,200,.45)';
+  g.lineWidth=1;
+  const [wx0,wz0]=mmProject(-60,-46,W,H);
+  const [wx1,wz1]=mmProject(78,68,W,H);
+  g.strokeRect(wx0,wz0,wx1-wx0,wz1-wz0);
+  g.restore();
+
+  /* 校门：南墙中间留个缺口，画成亮色 */
+  g.save();
+  const [gx,gz]=mmProject(-5,-46,W,H);
+  g.strokeStyle='rgba(255,213,74,.9)';
+  g.lineWidth=2.5;
+  g.beginPath(); g.moveTo(gx,gz); g.lineTo(gx+10/(MM_X1-MM_X0)*W,gz); g.stroke();
+  g.restore();
+
+  /* 撤离点：绿色呼吸光圈 + 固定十字标记。
+     呼吸用时间正弦，不占帧预算，但比静态点醒目得多。 */
+  if(exfil){
+    const [ex,ez]=mmProject(exfil.x,exfil.z,W,H);
+    const ph=(Math.sin(now/300)+1)/2;          // 0..1
+    const r=4+ph*4;
+    g.beginPath();
+    g.arc(ex,ez,r,0,Math.PI*2);
+    g.strokeStyle='rgba(51,255,136,'+(0.35+ph*0.5).toFixed(2)+')';
+    g.lineWidth=1.8; g.stroke();
+    g.beginPath();
+    g.arc(ex,ez,2.2,0,Math.PI*2);
+    g.fillStyle='#33ff88'; g.fill();
+    /* 小标：撤离两个字太大，用一个 E 字母 + 短引线 */
+    g.font='bold 7px system-ui,sans-serif';
+    g.fillStyle='#33ff88';
+    g.textAlign='center'; g.textBaseline='bottom';
+    g.fillText('E',ex,ez-7);
+  }
+
+  /* 玩家：三角形箭头，指向当前朝向。
+     世界前方向是 (-sin(yaw), -cos(yaw))（见 c_player.js 的 updP），
+     映射到地图像素后，屏幕上的「上」对应世界 -z。 */
+  if(P && P.pos){
+    const [px,pz]=mmProject(P.pos.x,P.pos.z,W,H);
+    /* 【角度推导】世界前方向 fwd=(-sin(yaw), -cos(yaw))，见 c_player.js。
+       地图像素坐标 x 向右 = 世界 +x，y 向下 = 世界 +z。
+       所以地图空间里的前方向量就是 (fwdX, fwdZ)。
+       canvas 的「上」是 -y，而箭头模型的尖端画在 (0,-5.5)（即上），
+       因此要让尖端指向 (fwdX,fwdZ)，旋转角应为
+         a = atan2(fwdX, -fwdZ)。
+       【之前错在哪】写成了 atan2(-sin, -cos)，正好等价于 atan2(fwdX, fwdZ)，
+       等于把「向下为正」当成了「向上为正」，箭头永远差一个镜像，
+       而且 yaw=±90° 附近还会退化到 π，看起来像箭头乱跳。 */
+    const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+    const a = Math.atan2(fx, -fz);
+    g.save();
+    g.translate(px,pz);
+    g.rotate(a);
+    g.beginPath();
+    g.moveTo(0,-5.5);
+    g.lineTo(4,4.5);
+    g.lineTo(0,2);
+    g.lineTo(-4,4.5);
+    g.closePath();
+    g.fillStyle='#7c5cff';
+    g.strokeStyle='#fff';
+    g.lineWidth=1;
+    g.fill(); g.stroke();
+    g.restore();
+  }
+
+  /* 底部小字：根据玩家位置提示当前所在区域，顺便当方位参考 */
+  const lb=$('mmLabel');
+  if(lb){
+    let zone='校园';
+    if(P && P.pos){
+      const x=P.pos.x, z=P.pos.z;
+      /* 【判定顺序】必须从小到大、从具体到笼统。
+         操场是 86×52 的大矩形，以前用「到中心距离<50」当判据，
+         半径 50 的圆几乎盖住了整个校园，导致站在西楼、体育馆、
+         甚至校门口都被标成「操场」。现在全部改成矩形包含判断，
+         并且把建筑排在操场前面 —— 站在楼里就该显示楼名。 */
+      const inRect=(cx,cz,w,d)=>Math.abs(x-cx)<=w/2 && Math.abs(z-cz)<=d/2;
+      if(inRect(0,-22,60,16))        zone='主楼';
+      else if(inRect(-34,2,16,32))   zone='西楼';
+      else if(inRect(34,2,16,32))    zone='东楼';
+      else if(inRect(0,26,34,15))    zone='行政楼';
+      else if(inRect(58,18,26,22))   zone='体育馆';
+      else if(z<-40)                 zone='校门口';
+      else if(inRect(16,34,86,52))   zone='操场';
+      else if(z>44)                  zone='北场地';
+    }
+    const t='🗺 '+zone;
+    if(lb.textContent!==t) lb.textContent=t;
+  }
+}
+
 /* ---- 撤离 / 阵亡 结算 ---- */
 /* 撤离成功：局内背包 + 胸挂 + 身上装备全部并回仓库 */
 function settleExfil(){
@@ -2547,6 +2820,18 @@ function initInputModeDetect(){
   addEventListener('touchstart', ()=>{
     onTouchSignal();
   }, {passive:true});
+  /* 【音量/背包/治疗按钮的触摸不要外传】
+     这三个 pill 自己已经用 touchstart 处理了点击，但如果同一次触摸
+     继续冒泡到 window，会被下面的逻辑当成「游戏区域点击」
+     （开火/转视角/切输入模式），表现为「点了背包还能听到枪响」。
+     在捕获阶段就截住，并且只截这三个 + 顶部货币条。 */
+  addEventListener('touchstart', e=>{
+    const t=e.target;
+    if(!t || !t.closest) return;
+    let hit=null;
+    try{ hit=t.closest('#topbar'); }catch(err){}
+    if(hit && e.cancelable){ e.stopPropagation(); }
+  }, {passive:false, capture:true});
 
   /* ============================================================
      【问题 3 修复】手指点一下「按键之外」的地方就被判成键盘。
@@ -2574,24 +2859,9 @@ function initInputModeDetect(){
      触屏合成的 mousemove 位移恒为 0，靠这个也能区分。
      ============================================================ */
 
-  /* 最近一次真实触摸的时间戳：用来判定「紧随其后的鼠标事件是不是合成的」 */
-  let lastRealTouchAt = 0;
-  addEventListener('touchstart', ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
-  addEventListener('touchmove',  ()=>{ lastRealTouchAt=Date.now(); }, {passive:true, capture:true});
-
-  /* 这个鼠标事件是不是触屏合成的「假鼠标」 */
-  const isSyntheticMouse = (e)=>{
-    if(!e) return true;
-    if(e.pointerType==='touch') return true;
-    /* 标准判据：触屏会置 firesTouchEvents */
-    const sc=e.sourceCapabilities;
-    if(sc && sc.firesTouchEvents===true) return true;
-    /* 兜底：刚发生触摸，紧接着来的 mousedown 必然是合成的 */
-    if(Date.now()-lastRealTouchAt < 1200) return true;
-    /* 没有 pointerType 字段的老 WebView：如果有触摸能力，按合成分处理 */
-    if(e.pointerType===undefined && lastRealTouchAt>0) return true;
-    return false;
-  };
+  /* 【已上移】lastRealTouchAt / isSyntheticMouse 现在定义在 refreshHUD 之前，
+     因为 bindUI 里的全局开火监听也要用它们。这里是唯一实现，
+     不再重复声明（ES module 严格模式下重复声明会编译失败）。 */
 
   addEventListener('mousedown', e=>{
     /* 【只有真鼠标才切键盘模式】合成鼠标一律当作触摸 */

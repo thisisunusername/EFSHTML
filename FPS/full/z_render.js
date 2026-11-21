@@ -78,6 +78,11 @@ function animate(){
   safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
   safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
   safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
+  /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
+     这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
+  safeCall(updRaidTimer,dt);
+  /* 小地图：内部自限 10fps，每帧调用无害。 */
+  safeCall(drawMiniMap, performance.now());
 
   // 相机抖动叠加（基准位置由 updP 写入）
   const sh=safeShake(dt);

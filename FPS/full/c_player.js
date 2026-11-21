@@ -1,6 +1,11 @@
 /* ============ c_player.js：玩家对象 + 移动/碰撞/视角 ============ */
 const P={
   pos:new THREE.Vector3(0,1.6,5),
+  /* 【局内计时】raidT 是本局已进行的秒数，由 z_render 的 animate 累加。
+     RAID_LIMIT 是总时长：到点强制结束（阵亡结算），超过就带不走东西。
+     放在 P 里是因为它在 init() 重置玩家状态时要一并归零 ——
+     否则第二局开局就只剩几秒，而且结算面板会莫名其妙弹出来。 */
+  raidT:0,
   vel:new THREE.Vector3(),
   yaw:0, pitch:0,
   firing:false,            // 扳机是否按住（全自动连发靠它）

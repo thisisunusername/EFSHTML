@@ -62,6 +62,54 @@
   #hpbar{ height:8px; background:rgba(255,255,255,.12); border-radius:6px; overflow:hidden; margin-top:5px; }
   #hpfill{ height:100%; width:100%; background:linear-gradient(90deg,#48c774,#8ce6a0); border-radius:6px; transition:width .2s; }
   #hpfill.low{ background:linear-gradient(90deg,#e6533c,#ff8a70); }
+  /* ================= 小地图 =================
+     放在左上角，压在 #topbar 下面（topbar 高度约 40px）。
+     #hud 是 pointer-events:none，这里也不接管事件，保持 none。 */
+  #mmWrap{
+    position:absolute; left:12px; top:60px;
+    width:132px; height:132px; border-radius:12px;
+    background:rgba(6,9,14,.62);
+    border:1px solid rgba(124,92,255,.45);
+    box-shadow:0 6px 20px rgba(0,0,0,.45);
+    backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    overflow:hidden; pointer-events:none;
+  }
+  #mmCanvas{ display:block; width:100%; height:100%; }
+  /* ================= HUD 里能点的 pill：音量 / 背包 / 治疗 =================
+     【为什么单写一条】#hud 整体是 pointer-events:none（不然会挡住
+     全屏的视角拖拽），单个 pill 必须自己把事件收回。
+     以前 .pill 没有 pointer-events:auto，#bagBtn/#sndBtn/#medBtn
+     的 onclick 绑得再好也收不到触摸 —— 事件直接穿透到下面的
+     #viewLayer / 画布，表现为「按了没反应」。 */
+  #topbar .pill{ pointer-events:auto; cursor:pointer; }
+  #topbar .pill:active{ background:rgba(124,92,255,.28); }
+  /* 触摸设备上给足点击区域：手指比鼠标粗得多，
+     现在这些按钮也参与实战操作（开背包、切音效、吃药），
+     11px 的小胶囊很容易点偏。 */
+  #sndBtn, #bagBtn, #medBtn{ min-height:36px; display:flex; align-items:center;
+    gap:5px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  /* 点按反馈：不用 :hover（触屏没有 hover），用 :active 的缩放 +
+     背景变化给个明确的视觉回声，否则玩家依然会怀疑「到底点到了没」。 */
+  #sndBtn:active, #bagBtn:active, #medBtn:active{ transform:scale(.94); }
+  @media (max-width:520px){
+    #sndBtn, #bagBtn, #medBtn{ padding:6px 9px; font-size:12px; min-height:32px; }
+  }
+
+  #mmLabel{
+    position:absolute; left:0; right:0; bottom:0;
+    font-size:9.5px; line-height:1.5; text-align:center;
+    color:#c8d0e0; background:rgba(0,0,0,.45);
+    letter-spacing:.02em;
+  }
+  @media (max-height:420px){
+    #mmWrap{ width:96px; height:96px; top:52px; left:10px; }
+    #mmLabel{ font-size:8px; }
+  }
+  /* 倒计时最后 60 秒：pill 变红闪烁 */
+  @keyframes mmBlink{ 0%,100%{opacity:1;} 50%{opacity:.45;} }
+  .pill.lowtime{ animation:mmBlink 1s ease-in-out infinite;
+    border-color:rgba(255,90,74,.65) !important;
+    background:rgba(120,20,16,.55) !important; }
   #crosshair{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:22px; height:22px; }
   #crosshair::before,#crosshair::after{ content:""; position:absolute; background:rgba(255,255,255,.85); }
   #crosshair::before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
@@ -697,6 +745,11 @@ background:rgba(90,220,255,.03); cursor:default; }
          优先用胸挂里的（胸挂就是快速取用区），胸挂没有再翻背包。
          按钮上会显示当前可用药品的数量，没有药时自动变暗。 -->
     <div class="pill" id="medBtn" style="cursor:pointer">🩹 <span>治疗</span><b id="medBtnN" class="medn">0</b></div>
+  </div>
+  <!-- 小地图：左上角固定，显示校园平面 + 玩家朝向 + 撤离点 -->
+  <div id="mmWrap">
+    <canvas id="mmCanvas" width="132" height="132"></canvas>
+    <div id="mmLabel"></div>
   </div>
   <div id="crosshair"></div>
   <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>

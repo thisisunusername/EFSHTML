@@ -355,6 +355,13 @@ function setupWorld(){
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
+  /* 【每局重置计时】raidT 归零、超时标志清掉。
+     这一步必须在 setupWorld 里做：它是每局的起点，
+     少了它第二局一进来就「时间到」、直接弹阵亡结算。 */
+  try{
+    P.raidT=0;
+    window.__raidOver=false;
+  }catch(e){}
   /* 【局内容器】每次开局重新生成一遍，战利品随机 */
   if(typeof buildContainers==='function') buildContainers();
   if(typeof bindContainerUI==='function') bindContainerUI();

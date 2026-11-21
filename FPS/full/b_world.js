@@ -207,6 +207,9 @@ function setupWorld(){
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
   applyPixelBudget(); // 像素预算制分辨率（低端机自动降采样保帧率）
+  // 操作提示 8 秒后淡出
+  const tip=$('htip');
+  if(tip) setTimeout(()=>tip.classList.add('hide'), 8000);
 }
 
 function showErr(msg){

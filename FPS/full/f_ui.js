@@ -18,8 +18,16 @@ function toast(t){
 }
 
 /* ---- 主菜单 / 开始 / 结束按钮 ---- */
+// 触摸设备才显示摇杆和操作按钮（桌面也可通过触屏检测启用）
+function showTouchUI(){
+  const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+  if(!isTouch) return;
+  const jz=$('joyZone'); if(jz) jz.style.display='block';
+  const az=$('actZone'); if(az) az.style.display='block';
+  const tip=$('htip'); if(tip) tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
+}
 function bindUI(){
-  const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); init(); };
+  const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
   const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
@@ -114,20 +122,28 @@ function bindUI(){
   }
   const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
 
-  // 触屏视角拖拽（右侧操作区）
-  const actZone=$('actZone');
-  if(actZone){
-    let vActive=false, vx=0, vy=0;
-    actZone.addEventListener('touchstart',e=>{ vActive=true; vx=e.touches[0].clientX; vy=e.touches[0].clientY; });
-    actZone.addEventListener('touchmove',e=>{
-      if(!vActive) return;
-      const t=e.touches[0];
-      P.yaw-=(t.clientX-vx)*0.005;
-      P.pitch-=(t.clientY-vy)*0.005;
-      const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
-      vx=t.clientX; vy=t.clientY;
-    });
-    actZone.addEventListener('touchend',()=>{ vActive=false; });
+  // 触屏视角拖拽（屏幕右半区，整屏监听，不依赖按钮）
+  const viewLayer=$('viewLayer');
+  if(viewLayer){
+    let vId=null, vx=0, vy=0;
+    viewLayer.addEventListener('touchstart',e=>{
+      if(vId!==null) return;
+      const t=e.changedTouches[0];
+      vId=t.identifier; vx=t.clientX; vy=t.clientY;
+    }, {passive:true});
+    viewLayer.addEventListener('touchmove',e=>{
+      for(const t of e.changedTouches){
+        if(t.identifier!==vId) continue;
+        P.yaw-=(t.clientX-vx)*0.005;
+        P.pitch-=(t.clientY-vy)*0.005;
+        const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
+        vx=t.clientX; vy=t.clientY;
+      }
+    }, {passive:true});
+    viewLayer.addEventListener('touchend',e=>{
+      for(const t of e.changedTouches) if(t.identifier===vId) vId=null;
+    }, {passive:true});
+    viewLayer.addEventListener('touchcancel',()=>{ vId=null; }, {passive:true});
   }
 }
 

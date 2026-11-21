@@ -1138,10 +1138,30 @@ function camerasWatcher(){
   return null;
 }
 /* 监控会缓慢转向玩家（跟踪），这样"有监控的路"确实有压力 */
-/* 监控是静态的：不转、不扫，直接把整个区域照住 */
 function updateCameras(dt){
-  /* 什么都不做：监控方向固定，靠 cameraSees 的锥形范围覆盖一片区域 */
-  return;
+  if(S.camsOff) return;
+  var f=fl(); if(!f) return;
+  for(var i=0;i<f.objs.length;i++){
+    var c=f.objs[i];
+    if(c.t!=='camera') continue;
+    c.sweep=(c.sweep||0)+dt;
+    /* baseDir：监控的初始朝向，作为没人时左右扫动的中心 */
+    if(c.baseDir===undefined) c.baseDir=c.dir;
+    var base=c.baseDir;
+    var dx=S.px-c.x, dy=S.py-c.y;
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<c.range*1.2){
+      /* 玩家进入监控附近 → 缓慢转到玩家方向 */
+      var want=Math.atan2(dy,dx);
+      var diff=want-c.dir;
+      while(diff>Math.PI) diff-=Math.PI*2;
+      while(diff<-Math.PI) diff+=Math.PI*2;
+      c.dir += diff*0.55*dt;        /* 慢慢转：太快像抽搐，看不清也没法躲 */
+    } else {
+      /* 没人就慢慢左右扫（以 baseDir 为中心，±0.5 弧度摆动） */
+      c.dir = base + Math.sin(c.sweep*0.35)*0.5;
+    }
+  }
 }
 
 /* ================= 排行榜（只存本地 cookie） =================

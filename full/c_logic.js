@@ -816,12 +816,22 @@ function moveNpc(n,dt){
   if(!f || !n.path || n.path.length===0) return;
 
   /* 回合制：玩家一回合走 1 格，NPC 也必须按「格」推进，而不是按秒。
-     dt 是这一回合的等效秒数（ENEMY_TURN）。换算成可推进的格数：
-     速度 1.95 格/秒 × 0.5 秒 ≈ 0.98 格 → 四舍五入到 1 格。
-     用 n.budget 保存本回合剩余的可推进格数，跨格连续消耗，
-     不足 1 格的部分累积到下一回合，避免「每回合只挪一点点」。 */
-  if(n.budget===undefined || n.budget<=0){
-    n.budget = Math.max(1, Math.round(n.speed * dt));
+     dt 是这一回合的等效秒数（ENEMY_TURN=0.5）。
+     【原来为什么飞快】原写法 Math.max(1, Math.round(speed*dt))，
+     而 speed 在 1.7~2.55 时 round(speed*0.5) 全是 1，Math.max 又把 0 抬成 1，
+     于是 tspeed 这一整列参数完全失效：简单和地狱都是「每回合固定走 1 格」，
+     和玩家一步一格同速，看起来就是一顿一顿紧咬不放。
+     【现在】本回合可走格数 = speed * dt，余量跨回合累积，
+     走不满一格时这回合就不动，攒够了再走——速度差才能如实体现。
+     注意：绝不能在这里给「不足一格」做概率补偿，那会把 0.2 格/回合
+     补偿成 0.4 格/回合，难度档位又会被抹平。 */
+  n.budget = (n.budgetCarry||0) + n.speed * dt;
+  n.budgetCarry = 0;
+  if(n.budget < 1){
+    /* 攒得还不够走一格：原地等，余量留到下一回合继续攒 */
+    n.budgetCarry = n.budget;
+    n.budget = 0;
+    return;
   }
 
   var guard=0;

@@ -952,10 +952,10 @@ var SIGHT_STEP = 3;          /* 视线采样密度 */
 /* 坐标约定：格子(ix,iy)的中心 = (ix+0.5, iy+0.5) */
 
 var DIFF = {
-  easy:   {name:'简单',   guards:0, tspeed:1.7, gspeed:1.5, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
-  normal: {name:'普通',   guards:1, tspeed:1.95, gspeed:1.7, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
-  hard:   {name:'困难',   guards:2, tspeed:2.25, gspeed:1.95, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
-  hell:   {name:'地狱',   guards:3, tspeed:2.55, gspeed:2.2, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
+  easy:   {name:'简单',   guards:0, tspeed:0.45, gspeed:0.36, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
+  normal: {name:'普通',   guards:1, tspeed:0.62, gspeed:0.50, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
+  hard:   {name:'困难',   guards:2, tspeed:0.78, gspeed:0.64, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
+  hell:   {name:'地狱',   guards:3, tspeed:0.95, gspeed:0.80, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
 };
 
 var ITEM = {
@@ -1057,7 +1057,7 @@ function buildWorld(){
       objs:[
         {t:'item', x:12.5, y:2.5, id:'flag'},                                      /* 老师工作牌 */
         {t:'switch', x:25.5, y:2.5, id:'sw1', label:'二层电闸'},
-        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:7.5},                  /* 大门旁监控（转动） */
+        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:4.0},                  /* 大门旁监控（转动） */
         {t:'gate', x:4.5, y:16.5, kind:'main', label:'大门'},
         {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:'下楼'},
         {t:'item', x:40.5, y:3.5, id:'torch'},                                        /* 器材室：手电筒 */
@@ -1096,7 +1096,7 @@ function buildWorld(){
       objs:[
         {t:'shop', x:4.5, y:3.5},
         {t:'tree', x:6.5, y:3.5},                                                     /* 校长的树 */
-        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:7.5},
+        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:4.0},
         /* 小卖部旁监控：朝左，覆盖小卖部入口这一片 */
         {t:'gate', x:12.5, y:6.5, kind:'office', label:'校长办公室门（权限锁）'},
         {t:'item', x:12.5, y:3.5, id:'redkey'},                                       /* 红钥匙 */
@@ -1138,8 +1138,8 @@ function buildWorld(){
         {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:'下四层'},
         {t:'cctv', x:10.5, y:2.5, label:'监控总闸'},
         {t:'switch', x:22.5, y:2.5, id:'sw2', label:'三层电闸'},
-        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.5, range:6.5},
-        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.5, range:6.5},
+        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.5, range:3.5},
+        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.5, range:3.5},
         {t:'car', x:7.5, y:13.5, label:'校长的车'},
         {t:'gate', x:20.5, y:13.5, kind:'elec', label:'电子门'},
         {t:'gate', x:25.5, y:13.5, kind:'wall', label:'电子门后的砖墙'}
@@ -1180,7 +1180,7 @@ function buildWorld(){
         {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
         {t:'item', x:9.5,  y:2.5, id:'saw'},
         {t:'item', x:10.5, y:4.5, id:'hammer'},
-        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:6.0},        /* 主任办公室监控（转动） */
+        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:3.5},        /* 主任办公室监控（转动） */
         {t:'item', x:17.5, y:4.5, id:'blueprint'},
         {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},
         {t:'craft', x:4.5, y:13.5},
@@ -2086,12 +2086,22 @@ function moveNpc(n,dt){
   if(!f || !n.path || n.path.length===0) return;
 
   /* 回合制：玩家一回合走 1 格，NPC 也必须按「格」推进，而不是按秒。
-     dt 是这一回合的等效秒数（ENEMY_TURN）。换算成可推进的格数：
-     速度 1.95 格/秒 × 0.5 秒 ≈ 0.98 格 → 四舍五入到 1 格。
-     用 n.budget 保存本回合剩余的可推进格数，跨格连续消耗，
-     不足 1 格的部分累积到下一回合，避免「每回合只挪一点点」。 */
-  if(n.budget===undefined || n.budget<=0){
-    n.budget = Math.max(1, Math.round(n.speed * dt));
+     dt 是这一回合的等效秒数（ENEMY_TURN=0.5）。
+     【原来为什么飞快】原写法 Math.max(1, Math.round(speed*dt))，
+     而 speed 在 1.7~2.55 时 round(speed*0.5) 全是 1，Math.max 又把 0 抬成 1，
+     于是 tspeed 这一整列参数完全失效：简单和地狱都是「每回合固定走 1 格」，
+     和玩家一步一格同速，看起来就是一顿一顿紧咬不放。
+     【现在】本回合可走格数 = speed * dt，余量跨回合累积，
+     走不满一格时这回合就不动，攒够了再走——速度差才能如实体现。
+     注意：绝不能在这里给「不足一格」做概率补偿，那会把 0.2 格/回合
+     补偿成 0.4 格/回合，难度档位又会被抹平。 */
+  n.budget = (n.budgetCarry||0) + n.speed * dt;
+  n.budgetCarry = 0;
+  if(n.budget < 1){
+    /* 攒得还不够走一格：原地等，余量留到下一回合继续攒 */
+    n.budgetCarry = n.budget;
+    n.budget = 0;
+    return;
   }
 
   var guard=0;

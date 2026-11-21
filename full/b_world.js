@@ -8,10 +8,10 @@ var SIGHT_STEP = 3;          /* 视线采样密度 */
 /* 坐标约定：格子(ix,iy)的中心 = (ix+0.5, iy+0.5) */
 
 var DIFF = {
-  easy:   {name:'简单',   guards:0, tspeed:1.7, gspeed:1.5, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
-  normal: {name:'普通',   guards:1, tspeed:1.95, gspeed:1.7, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
-  hard:   {name:'困难',   guards:2, tspeed:2.25, gspeed:1.95, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
-  hell:   {name:'地狱',   guards:3, tspeed:2.55, gspeed:2.2, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
+  easy:   {name:'简单',   guards:0, tspeed:0.45, gspeed:0.36, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
+  normal: {name:'普通',   guards:1, tspeed:0.62, gspeed:0.50, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
+  hard:   {name:'困难',   guards:2, tspeed:0.78, gspeed:0.64, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
+  hell:   {name:'地狱',   guards:3, tspeed:0.95, gspeed:0.80, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
 };
 
 var ITEM = {
@@ -113,7 +113,7 @@ function buildWorld(){
       objs:[
         {t:'item', x:12.5, y:2.5, id:'flag'},                                      /* 老师工作牌 */
         {t:'switch', x:25.5, y:2.5, id:'sw1', label:'二层电闸'},
-        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:7.5},                  /* 大门旁监控（转动） */
+        {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:4.0},                  /* 大门旁监控（转动） */
         {t:'gate', x:4.5, y:16.5, kind:'main', label:'大门'},
         {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:'下楼'},
         {t:'item', x:40.5, y:3.5, id:'torch'},                                        /* 器材室：手电筒 */
@@ -152,7 +152,7 @@ function buildWorld(){
       objs:[
         {t:'shop', x:4.5, y:3.5},
         {t:'tree', x:6.5, y:3.5},                                                     /* 校长的树 */
-        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:7.5},
+        {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:4.0},
         /* 小卖部旁监控：朝左，覆盖小卖部入口这一片 */
         {t:'gate', x:12.5, y:6.5, kind:'office', label:'校长办公室门（权限锁）'},
         {t:'item', x:12.5, y:3.5, id:'redkey'},                                       /* 红钥匙 */
@@ -194,8 +194,8 @@ function buildWorld(){
         {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:'下四层'},
         {t:'cctv', x:10.5, y:2.5, label:'监控总闸'},
         {t:'switch', x:22.5, y:2.5, id:'sw2', label:'三层电闸'},
-        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.5, range:6.5},
-        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.5, range:6.5},
+        {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.5, range:3.5},
+        {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.5, range:3.5},
         {t:'car', x:7.5, y:13.5, label:'校长的车'},
         {t:'gate', x:20.5, y:13.5, kind:'elec', label:'电子门'},
         {t:'gate', x:25.5, y:13.5, kind:'wall', label:'电子门后的砖墙'}
@@ -236,7 +236,7 @@ function buildWorld(){
         {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
         {t:'item', x:9.5,  y:2.5, id:'saw'},
         {t:'item', x:10.5, y:4.5, id:'hammer'},
-        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:6.0},        /* 主任办公室监控（转动） */
+        {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:3.5},        /* 主任办公室监控（转动） */
         {t:'item', x:17.5, y:4.5, id:'blueprint'},
         {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},
         {t:'craft', x:4.5, y:13.5},

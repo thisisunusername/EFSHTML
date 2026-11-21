@@ -531,79 +531,83 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
    - BAG_CAP 描述「能带多少」（背包决定容量） */
 
 /* 装备槽定义：顺序就是左侧从上到下的顺序 */
+/* 【i18n】label 用 getter 而不是字面量：
+   数组在脚本加载时只求值一次，如果这里直接写 T('主武器')，
+   语言切换后这些 label 还停在加载时的语言。
+   getter 每次读取时现算，切换语言立即生效。 */
 const SLOTS=[
-  { key:'primary',  label:'主武器',  fb:'🔫', accept:['gun'] },
-  { key:'secondary',label:'手枪',    fb:'🔫', accept:['pistol'] },
-  { key:'melee',    label:'副武器',  fb:'🔪', accept:['melee'] },
-  { key:'chest',    label:'胸挂',    fb:'🦺', accept:['chest'] },
-  { key:'backpack', label:'背包',    fb:'🎒', accept:['bag'] },
+  { key:'primary',  get label(){ return T('主武器'); },  fb:'🔫', accept:['gun'] },
+  { key:'secondary',get label(){ return T('手枪'); },    fb:'🔫', accept:['pistol'] },
+  { key:'melee',    get label(){ return T('副武器'); },  fb:'🔪', accept:['melee'] },
+  { key:'chest',    get label(){ return T('胸挂'); },    fb:'🦺', accept:['chest'] },
+  { key:'backpack', get label(){ return T('背包'); },    fb:'🎒', accept:['bag'] },
 ];
 
 const SHOP_ITEMS={
   /* ---- 医疗：局内回血，按回复量分档 ---- */
-  med:      {cat:'med', name:'医疗包',   icon:'🩹', price:300,  desc:'恢复 40 生命', heal:40},
-  med_kit:  {cat:'med', name:'急救包',   icon:'🧰', price:900,  desc:'恢复 100 生命（满血）', heal:100},
-  bandage:  {cat:'med', name:'绷带',     icon:'🩶', price:120,  desc:'恢复 15 生命，便宜量大', heal:15},
-  painkill:{cat:'med', name:'止痛药',   icon:'💊', price:250,  desc:'恢复 25 生命并短暂加速', heal:25, buff:'speed'},
+  med:      {cat:'med', get name(){ return T('医疗包'); },   icon:'🩹', price:300,  get desc(){ return T('恢复 40 生命'); }, heal:40},
+  med_kit:  {cat:'med', get name(){ return T('急救包'); },   icon:'🧰', price:900,  get desc(){ return T('恢复 100 生命（满血）'); }, heal:100},
+  bandage:  {cat:'med', get name(){ return T('绷带'); },     icon:'🩶', price:120,  get desc(){ return T('恢复 15 生命，便宜量大'); }, heal:15},
+  painkill:{cat:'med', get name(){ return T('止痛药'); },   icon:'💊', price:250,  get desc(){ return T('恢复 25 生命并短暂加速'); }, heal:25, buff:'speed'},
 
   /* ---- 道具：一次性消耗 ---- */
-  grenade:  {cat:'tool', name:'手雷',    icon:'💣', price:600,  desc:'投掷爆炸，范围伤害', dmg:120},
-  smoke:    {cat:'tool', name:'烟雾弹',  icon:'🌫️', price:350,  desc:'制造烟幕遮挡视线'},
-  flashbang:{cat:'tool', name:'闪光弹',  icon:'⚡', price:400,  desc:'致盲附近敌人'},
-  lockpick: {cat:'tool', name:'开锁器',  icon:'🔧', price:200,  desc:'打开上锁的箱子'},
+  grenade:  {cat:'tool', get name(){ return T('手雷'); },    icon:'💣', price:600,  get desc(){ return T('投掷爆炸，范围伤害'); }, dmg:120},
+  smoke:    {cat:'tool', get name(){ return T('烟雾弹'); },  icon:'🌫️', price:350,  get desc(){ return T('制造烟幕遮挡视线'); }},
+  flashbang:{cat:'tool', get name(){ return T('闪光弹'); },  icon:'⚡', price:400,  get desc(){ return T('致盲附近敌人'); }},
+  lockpick: {cat:'tool', get name(){ return T('开锁器'); },  icon:'🔧', price:200,  get desc(){ return T('打开上锁的箱子'); }},
 
   /* ---- 子弹：按枪种分类，买的是「发」 ---- */
-  ammo_pistol:{cat:'ammo', name:'手枪弹', icon:'🔸', price:80,  desc:'9mm · 50 发', ammo:'pistol', count:50},
-  ammo_rifle: {cat:'ammo', name:'步枪弹', icon:'🔹', price:200, desc:'5.56 · 60 发', ammo:'rifle', count:60},
-  ammo_sniper:{cat:'ammo', name:'狙击弹', icon:'🔻', price:400, desc:'7.62 · 20 发', ammo:'sniper', count:20},
-  ammo_shot:  {cat:'ammo', name:'霰弹',   icon:'🔶', price:180, desc:'12G · 24 发', ammo:'shot', count:24},
+  ammo_pistol:{cat:'ammo', get name(){ return T('手枪弹'); }, icon:'🔸', price:80,  get desc(){ return T('9mm · 50 发'); }, ammo:'pistol', count:50},
+  ammo_rifle: {cat:'ammo', get name(){ return T('步枪弹'); }, icon:'🔹', price:200, get desc(){ return T('5.56 · 60 发'); }, ammo:'rifle', count:60},
+  ammo_sniper:{cat:'ammo', get name(){ return T('狙击弹'); }, icon:'🔻', price:400, get desc(){ return T('7.62 · 20 发'); }, ammo:'sniper', count:20},
+  ammo_shot:  {cat:'ammo', get name(){ return T('霰弹'); },   icon:'🔶', price:180, get desc(){ return T('12G · 24 发'); }, ammo:'shot', count:24},
 
   /* ---- 背包：决定容量，越贵能带的越多 ---- */
-  bp_pouch: {cat:'bag', name:'战术腰包', icon:'👝', price:500,   desc:'容量 12 格',  cap:12},
-  bp_small: {cat:'bag', name:'小型背包', icon:'🎒', price:1500,  desc:'容量 24 格',  cap:24},
-  bp_med:   {cat:'bag', name:'中型背包', icon:'🎒', price:3500,  desc:'容量 36 格',  cap:36},
-  bp_large: {cat:'bag', name:'大型背包', icon:'🧳', price:7000,  desc:'容量 48 格',  cap:48},
+  bp_pouch: {cat:'bag', get name(){ return T('战术腰包'); }, icon:'👝', price:500,   get desc(){ return T('容量 12 格'); },  cap:12},
+  bp_small: {cat:'bag', get name(){ return T('小型背包'); }, icon:'🎒', price:1500,  get desc(){ return T('容量 24 格'); },  cap:24},
+  bp_med:   {cat:'bag', get name(){ return T('中型背包'); }, icon:'🎒', price:3500,  get desc(){ return T('容量 36 格'); },  cap:36},
+  bp_large: {cat:'bag', get name(){ return T('大型背包'); }, icon:'🧳', price:7000,  get desc(){ return T('容量 48 格'); },  cap:48},
 
   /* ---- 头盔：减伤 + 耐久 ---- */
-  helm_light:{cat:'helmet', name:'战术头盔', icon:'⛑️', price:800,  desc:'减伤 10% · 耐久 60',  reduce:.10, dur:60},
-  helm_med:  {cat:'helmet', name:'防弹头盔', icon:'⛑️', price:2200, desc:'减伤 20% · 耐久 120', reduce:.20, dur:120},
-  helm_heavy:{cat:'helmet', name:'重型头盔', icon:'🪖', price:5000, desc:'减伤 32% · 耐久 220', reduce:.32, dur:220},
+  helm_light:{cat:'helmet', get name(){ return T('战术头盔'); }, icon:'⛑️', price:800,  get desc(){ return T('减伤 10% · 耐久 60'); },  reduce:.10, dur:60},
+  helm_med:  {cat:'helmet', get name(){ return T('防弹头盔'); }, icon:'⛑️', price:2200, get desc(){ return T('减伤 20% · 耐久 120'); }, reduce:.20, dur:120},
+  helm_heavy:{cat:'helmet', get name(){ return T('重型头盔'); }, icon:'🪖', price:5000, get desc(){ return T('减伤 32% · 耐久 220'); }, reduce:.32, dur:220},
 
   /* ---- 护甲：减伤 + 耐久 ---- */
-  vest_light:{cat:'armor', name:'轻型护甲', icon:'🦺', price:1200, desc:'减伤 15% · 耐久 80',  reduce:.15, dur:80},
-  vest_med:  {cat:'armor', name:'标准护甲', icon:'🦺', price:3000, desc:'减伤 25% · 耐久 150', reduce:.25, dur:150},
-  vest_heavy:{cat:'armor', name:'重型护甲', icon:'🛡️', price:6500, desc:'减伤 40% · 耐久 260', reduce:.40, dur:260},
+  vest_light:{cat:'armor', get name(){ return T('轻型护甲'); }, icon:'🦺', price:1200, get desc(){ return T('减伤 15% · 耐久 80'); },  reduce:.15, dur:80},
+  vest_med:  {cat:'armor', get name(){ return T('标准护甲'); }, icon:'🦺', price:3000, get desc(){ return T('减伤 25% · 耐久 150'); }, reduce:.25, dur:150},
+  vest_heavy:{cat:'armor', get name(){ return T('重型护甲'); }, icon:'🛡️', price:6500, get desc(){ return T('减伤 40% · 耐久 260'); }, reduce:.40, dur:260},
   /* ---- 武器槽（对应左侧装备栏） ----
      主武器决定你拿的是步枪还是冲锋枪；手枪是副武器，主武器没子弹时切换用；
      小刀是最后的近战手段，不耗子弹。
      这三个 cat 分别对应 SLOTS 里的 primary / secondary / melee。 */
-  gun_rifle:  {cat:'gun',    name:'突击步枪', icon:'🔫', price:4500, desc:'全自动 · 高伤害', ammoType:'rifle',  dmg:26},
-  gun_smg:    {cat:'gun',    name:'冲锋枪',   icon:'🔫', price:2800, desc:'射速快 · 后坐力小', ammoType:'pistol', dmg:18},
-  gun_sniper: {cat:'gun',    name:'狙击步枪', icon:'🎯', price:8000, desc:'单发 · 极高伤害', ammoType:'sniper', dmg:60},
-  pis_default:{cat:'pistol', name:'制式手枪', icon:'🔫', price:600,  desc:'应急副武器', ammoType:'pistol', dmg:14},
-  pis_heavy:  {cat:'pistol', name:'大口径手枪', icon:'🔫', price:1800, desc:'高伤副武器', ammoType:'pistol', dmg:24},
-  melee_knife:{cat:'melee',  name:'战术小刀', icon:'🔪', price:200,  desc:'近战 · 永不耗弹', dmg:35},
-  melee_baton:{cat:'melee',  name:'防暴棍',   icon:'🏏', price:500,  desc:'近战 · 攻击范围大', dmg:28},
+  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26},
+  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18},
+  gun_sniper: {cat:'gun',    get name(){ return T('狙击步枪'); }, icon:'🎯', price:8000, get desc(){ return T('单发 · 极高伤害'); }, ammoType:'sniper', dmg:60},
+  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('应急副武器'); }, ammoType:'pistol', dmg:14},
+  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('高伤副武器'); }, ammoType:'pistol', dmg:24},
+  melee_knife:{cat:'melee',  get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹'); }, dmg:35},
+  melee_baton:{cat:'melee',  get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
-  chest_small:{cat:'chest',  name:'简易胸挂', icon:'🦺', price:800,  desc:'额外 2 个弹匣位', mags:2},
-  chest_med:  {cat:'chest',  name:'战术胸挂', icon:'🦺', price:2000, desc:'额外 4 个弹匣位', mags:4},
-  chest_large:{cat:'chest',  name:'重型胸挂', icon:'🦺', price:4500, desc:'额外 6 个弹匣位', mags:6},
+  chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('额外 2 个弹匣位'); }, mags:2},
+  chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('额外 4 个弹匣位'); }, mags:4},
+  chest_large:{cat:'chest',  get name(){ return T('重型胸挂'); }, icon:'🦺', price:4500, get desc(){ return T('额外 6 个弹匣位'); }, mags:6},
 };
 
 /* 分类标签（顺序即显示顺序） */
 const SHOP_CATS=[
   /* 武器分类要放在最前面：这是玩家在仓库里最先要填的三个槽
      （主武器/手枪/副武器），商店里买不到就永远空着。 */
-  {id:'gun',    name:'主武器'},
-  {id:'pistol', name:'手枪'},
-  {id:'melee',  name:'副武器'},
-  {id:'chest',  name:'胸挂'},
-  {id:'med',    name:'医药'},
-  {id:'tool',   name:'道具'},
-  {id:'ammo',   name:'子弹'},
-  {id:'bag',    name:'背包'},
-  {id:'helmet', name:'头盔'},
-  {id:'armor',  name:'护甲'},
+  {id:'gun',    get name(){ return T('主武器'); }},
+  {id:'pistol', get name(){ return T('手枪'); }},
+  {id:'melee',  get name(){ return T('副武器'); }},
+  {id:'chest',  get name(){ return T('胸挂'); }},
+  {id:'med',    get name(){ return T('医药'); }},
+  {id:'tool',   get name(){ return T('道具'); }},
+  {id:'ammo',   get name(){ return T('子弹'); }},
+  {id:'bag',    get name(){ return T('背包'); }},
+  {id:'helmet', get name(){ return T('头盔'); }},
+  {id:'armor',  get name(){ return T('护甲'); }},
 ];
 let shopTab='gun';   // 当前商店标签页（默认停在主武器，对应仓库第一件事）
 let bagTab='all';    // 当前背包筛选

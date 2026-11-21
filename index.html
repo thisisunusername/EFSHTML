@@ -786,6 +786,30 @@ body.theme-custom #startScr .themeFab{font-size:var(--cf-btnSize)}
 @font-face{font-family:'MaShanZheng';src:url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2'),url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMQ.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'ZCOOLKuaiLe';src:url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2'),url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2Wpo.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'LongCang';src:url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2'),url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrQ.ttf') format('truetype');font-display:swap}
+/* ============ 语言切换按钮（2D 版） ============
+   放在开始界面右上角，和「主题」那个圆形 FAB 并排。
+   用胶囊形而不是圆形，因为「🌐 English」比一个图标宽得多。 */
+.langFab2d{
+  position:absolute; right:16px; top:52px;
+  padding:7px 13px; border-radius:999px; cursor:pointer;
+  background:rgba(20,28,44,.88); border:1px solid rgba(255,255,255,.16);
+  color:#cfe0f5; font-size:12px; font-weight:700;
+  font-family:inherit; line-height:1.2;
+  user-select:none; -webkit-tap-highlight-color:transparent;
+  z-index:5; transition:transform .12s, background .15s;
+}
+.langFab2d:active{ transform:scale(.94); }
+.langFab2d:hover{ background:rgba(30,42,64,.95); }
+
+/* 英文文案比中文长，开始界面容易溢出。
+   只对英文收紧行距与字号，中文不受影响。 */
+html[data-lang="en"] #startScr h1{ font-size:clamp(20px,5vw,32px); }
+html[data-lang="en"] #startScr .sub{ font-size:11px; }
+html[data-lang="en"] #startScr .dbtn{ font-size:12px; }
+html[data-lang="en"] #startScr .dbtn small{ font-size:9px; }
+html[data-lang="en"] #startScr .ghostbtn{ font-size:10.5px; }
+html[data-lang="en"] #startScr .bigbtn{ font-size:15px; }
+
 </style>
 </head>
 <body>
@@ -942,6 +966,606 @@ body.theme-custom #startScr .themeFab{font-size:var(--cf-btnSize)}
 </div>
 <script>
 (function(){
+/* ============================================================
+   i18n_core.js —— 中英双语核心
+   由 build.sh 打进 2D / 3D 两版，必须保持「纯函数、无外部依赖」。
+
+   设计要点：
+   1) 中文原串直接当 key，译文表只在切换英文时用。
+      这样源码里所有中文都不必改，破坏面最小。
+   2) T('中文') 找得到译文返回英文，找不到原样返回中文 ——
+      漏翻最多是「这句还是中文」，绝不会变成 undefined 或空白。
+   3) T() 支持 {0} {1} 占位符，对应 T('复活 {0}', 3)。
+   4) 语言存在 localStorage，跨会话保持；<html lang> 同步更新，
+      方便 CSS 里按语言调字体/字号。
+   ============================================================ */
+const I18N_LANGS = ['zh', 'en'];
+const I18N_LANG_NAMES = { zh: '中文', en: 'English' };
+const I18N_STORE_KEY = 'efs_lang_v1';
+
+/* 当前语言：默认中文，符合原有体验 */
+let I18N_LANG = 'zh';
+
+/* 英文译文表：key 是中文原串，value 是英文。
+   故意做成「平铺字典」而不是分组，因为查表最快也最好维护。 */
+const I18N_EN = {
+
+  /* ---------- 通用 / 按钮 ---------- */
+  '关闭': 'Close',
+  '完成': 'Done',
+  '返回': 'Back',
+  '取消': 'Cancel',
+  '确定': 'OK',
+  '是': 'Yes',
+  '否': 'No',
+  '开': 'ON',
+  '关': 'OFF',
+  '上': 'Up',
+  '下': 'Down',
+  '左': 'Left',
+  '右': 'Right',
+  '收起': 'Collapse',
+  '收起 ▾': 'Collapse ▾',
+  '展开 ▸': 'Expand ▸',
+  '继续': 'Continue',
+  '重试': 'Retry',
+  '已保存': 'Saved',
+  '已复制': 'Copied',
+  '复制': 'Copy',
+  '删除': 'Delete',
+  '清空': 'Clear',
+  '设置': 'Settings',
+  '语言': 'Language',
+
+  /* ---------- 主菜单 / 通用界面 ---------- */
+  '主菜单': 'Main Menu',
+  '回主菜单': 'Back to Menu',
+  '再次挑战': 'Play Again',
+  '再来一次': 'Play Again',
+  '开始游戏': 'Start Game',
+  '开始': 'Start',
+  '暂停': 'Pause',
+  '继续游戏': 'Resume',
+  '重新开始': 'Restart',
+  '玩法说明': 'How to Play',
+  '操作说明': 'Controls',
+  '设置': 'Settings',
+  '排行榜': 'Leaderboard',
+  '成就': 'Achievements',
+  '成就页': 'Achievements',
+  '昵称': 'Nickname',
+  '改昵称': 'Change Name',
+  '导出': 'Export',
+  '导入': 'Import',
+  '主题': 'Theme',
+  '风格': 'Style',
+  '颜色': 'Color',
+  '恢复默认': 'Reset to Default',
+  '原版': 'Classic',
+  '深蓝暗色': 'Deep Blue Dark',
+  '终端': 'Terminal',
+  '磷光绿屏': 'Phosphor Green',
+
+  /* ---------- 难度 / 模式 ---------- */
+  '简单': 'Easy',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '选择难度': 'Select Difficulty',
+  '难度': 'Difficulty',
+  '回 合 制': 'TURN-BASED',
+  '摇杆 + 全地图': 'Joystick + Full Map',
+  '按一下走一格': 'One tile per tap',
+  '连续移动 · 全图可见': 'Free movement · whole map visible',
+
+  /* ---------- 语言 ---------- */
+  '中文': '中文',
+  'English': 'English',
+  '切换语言': 'Switch Language',
+
+  /* ---------- HUD 通用 ---------- */
+  '生命': 'Health',
+  '血量': 'HP',
+  '护甲': 'Armor',
+  '耐久': 'Durability',
+  '货币': 'Currency',
+  '金币': 'Coins',
+  '当前货币': 'Money',
+  '弹药': 'Ammo',
+  '备用弹药': 'Reserve',
+  '背包': 'Backpack',
+  '仓库': 'Stash',
+  '商店': 'Shop',
+  '物品栏': 'Inventory',
+  '装备': 'Equipment',
+  '物品': 'Items',
+  '地图': 'Map',
+  '楼层': 'Floor',
+  '回合': 'Turn',
+  '被 抓': 'Caught',
+  '被抓': 'Caught',
+  '电闸': 'Breaker',
+  '被发现': 'Spotted',
+  '撤离': 'Extract',
+  '撤离点': 'Extraction Point',
+  '击杀数': 'Kills',
+  '撤离次数': 'Extractions',
+
+  /* ---------- 动作 ---------- */
+  '行动': 'Action',
+  '跳过': 'Skip',
+  '移动': 'Move',
+  '跳跃': 'Jump',
+  '奔跑': 'Sprint',
+  '趴下': 'Prone',
+  '站起': 'Stand',
+  '瞄准': 'Aim',
+  '射击': 'Fire',
+  '换弹': 'Reload',
+  '开镜': 'Scope',
+  '开门': 'Open Door',
+  '关门': 'Close Door',
+  '拾取': 'Pick Up',
+  '互动': 'Interact',
+  '搜刮': 'Loot',
+  '使用': 'Use',
+  '装填': 'Load',
+  '卸下': 'Unequip',
+  '装备上': 'Equip',
+  '购买': 'Buy',
+  '卖出': 'Sell',
+  '转视角': 'Look',
+  '视角': 'Camera',
+  '鼠标': 'Mouse',
+  '左键': 'Left Click',
+  '右键': 'Right Click',
+  '空格': 'Space',
+  '交谈': 'Talk',
+  '休息': 'Rest',
+  '制作': 'Craft',
+  '制作台': 'Crafting Bench',
+  '小卖部': 'Tuck Shop',
+
+  /* ---------- 游戏状态 ---------- */
+  '胜利': 'Victory',
+  '失败': 'Defeat',
+  '成功逃脱': 'Escaped',
+  '你被抓住了': 'You were caught',
+  '游戏结束': 'Game Over',
+  '正在加载': 'Loading',
+  '加载中': 'Loading',
+  '准备中': 'Preparing',
+  '进度': 'Progress',
+
+  /* ---------- 3D 版：武器槽 ---------- */
+  '主武器': 'Primary',
+  '副武器': 'Sidearm',
+  '手枪': 'Pistol',
+  '步枪': 'Rifle',
+  '刀': 'Knife',
+  '近战': 'Melee',
+  '胸挂': 'Chest Rig',
+  '头盔': 'Helmet',
+  '防弹衣': 'Body Armor',
+  '切枪': 'Weapon Swap',
+
+  /* ---------- 3D 版：商店物品 ---------- */
+  '医疗包': 'Medkit',
+  '急救包': 'First Aid Kit',
+  '绷带': 'Bandage',
+  '止痛药': 'Painkiller',
+  '手雷': 'Grenade',
+  '烟雾弹': 'Smoke Grenade',
+  '闪光弹': 'Flashbang',
+  '开锁器': 'Lockpick',
+  '手枪弹': '9mm Rounds',
+  '步枪弹': '5.56 Rounds',
+  '狙击弹': '7.62 Rounds',
+  '霰弹': '12G Shells',
+  '战术腰包': 'Tactical Pouch',
+  '小型背包': 'Small Backpack',
+  '中型背包': 'Medium Backpack',
+  '大型背包': 'Large Backpack',
+  '防弹背心': 'Ballistic Vest',
+  '战术头盔': 'Tactical Helmet',
+  '战术小刀': 'Tactical Knife',
+  '哨兵手枪': 'Sentry Pistol',
+  '突击步枪': 'Assault Rifle',
+
+  /* ---------- 3D 版：商店描述 ---------- */
+  '恢复 40 生命': 'Restores 40 HP',
+  '恢复 100 生命（满血）': 'Restores 100 HP (full)',
+  '恢复 15 生命，便宜量大': 'Restores 15 HP, cheap in bulk',
+  '恢复 25 生命并短暂加速': 'Restores 25 HP, brief speed boost',
+  '投掷爆炸，范围伤害': 'Thrown explosive, area damage',
+  '制造烟幕遮挡视线': 'Creates smoke screen to block vision',
+  '致盲附近敌人': 'Blinds nearby enemies',
+  '打开上锁的箱子': 'Opens locked crates',
+  '容量 12 格': '12 slots',
+  '容量 24 格': '24 slots',
+  '容量 36 格': '36 slots',
+  '容量 48 格': '48 slots',
+
+  /* ---------- 提示 / Toast ---------- */
+  '已装备': 'Equipped',
+  '已卸下': 'Unequipped',
+  '已购买': 'Purchased',
+  '货币不足': 'Not enough money',
+  '背包已满': 'Backpack is full',
+  '距离太远': 'Too far away',
+  '需要钥匙': 'Requires a key',
+  '门已锁': 'Door is locked',
+  '无法使用': 'Cannot use',
+  '使用成功': 'Success',
+  '生命已满': 'HP is full',
+  '无法奔跑': 'Cannot sprint',
+  '弹药不足': 'Out of ammo',
+  '换弹中': 'Reloading',
+  '没有武器': 'No weapon',
+  '已切到': 'Switched to',
+  '空槽位': 'Empty slot',
+  '局内不能换装': 'Cannot change gear in a match',
+
+  /* ---------- 3D 版：主菜单 ---------- */
+  '搜打撤': 'Loot · Shoot · Extract',
+  '学校 3D': 'School 3D',
+  '搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。':
+    'Loot supplies → kill enemies → reach the extraction point. Spend money in the shop. Exports are encrypted to prevent tampering.',
+  '▶ 开始（进入游戏）': '▶ Start (Enter Game)',
+  '🛒 商店': '🛒 Shop',
+  '🏠 仓库': '🏠 Stash',
+  '⬇️ 加密导出': '⬇️ Encrypted Export',
+  '⬆️ 加密导入': '⬆️ Encrypted Import',
+  '♻️ 重置数据': '♻️ Reset Data',
+  '← 返回原版': '← Back to Original',
+  '💀 你阵亡了': '💀 You Died',
+  '重新部署': 'Redeploy',
+  '确认重置所有数据？': 'Reset all data?',
+
+  /* ---------- 3D 版：屏幕提示条 ---------- */
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战':
+    '📱 Drag right half to look · left stick to move · bottom-right buttons to fight',
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下 · 靠近门按 E 开门':
+    '📱 Drag right half to look · left stick to move · fire/jump/reload/loot at bottom right · press E near a door',
+  '📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击':
+    '📱 Mobile: drag left half to move · drag right half to look · bottom-right button to fire',
+  '🎮 摇杆已激活 · 拖动移动': '🎮 Joystick active · drag to move',
+  '🔭 开镜中 · 再点一次退出': '🔭 Scoped · tap again to exit',
+  '⌨️ 操作说明': '⌨️ Controls',
+
+  /* ---------- 2D 版：主菜单 ---------- */
+  '逃离学校 · HTML版': 'Escape From the School · HTML Edition',
+  '五种结局 · 被抓两次就失败': 'Five endings · caught twice and you fail',
+  '一层': 'Floor 1',
+  '二层': 'Floor 2',
+  '三层': 'Floor 3',
+  '四层': 'Floor 4',
+  '地下室': 'Basement',
+  '五条逃走路线': 'Five escape routes',
+  '隐藏结局': 'Hidden Ending',
+  '结局': 'Ending',
+  '排行榜': 'Leaderboard',
+  '🏆 排行榜': '🏆 Leaderboard',
+  '🎖 成就': '🎖 Achievements',
+  '✏️ 改昵称': '✏️ Change Name',
+  '⬇️ 导出': '⬇️ Export',
+  '🎨 主题': '🎨 Theme',
+  '重置数据': 'Reset Data',
+  '确认重置？': 'Reset?',
+
+  /* ---------- 3D 版：商店分类 ---------- */
+  '医药': 'Medical',
+  '道具': 'Gadgets',
+  '子弹': 'Ammo',
+  '冲锋枪': 'SMG',
+  '狙击步枪': 'Sniper Rifle',
+  '制式手枪': 'Standard Pistol',
+  '大口径手枪': 'Heavy Pistol',
+  '防弹头盔': 'Ballistic Helmet',
+  '重型头盔': 'Heavy Helmet',
+  '轻型护甲': 'Light Armor',
+  '标准护甲': 'Standard Armor',
+  '重型护甲': 'Heavy Armor',
+  '防暴棍': 'Riot Baton',
+  '简易胸挂': 'Light Chest Rig',
+  '重型胸挂': 'Heavy Chest Rig',
+  '进入游戏': 'Enter Game',
+  '加密导出': 'Encrypted Export',
+  '加密导入': 'Encrypted Import',
+  '返回原版': 'Back to Original',
+  '拾取/互动': 'Loot / Interact',
+
+  /* ---------- 3D 版：商店描述（详细） ---------- */
+  '9mm · 50 发': '9mm · 50 rounds',
+  '5.56 · 60 发': '5.56 · 60 rounds',
+  '7.62 · 20 发': '7.62 · 20 rounds',
+  '12G · 24 发': '12G · 24 shells',
+  '减伤 10% · 耐久 60': '-10% damage · 60 durability',
+  '减伤 20% · 耐久 120': '-20% damage · 120 durability',
+  '减伤 32% · 耐久 220': '-32% damage · 220 durability',
+  '减伤 15% · 耐久 80': '-15% damage · 80 durability',
+  '减伤 25% · 耐久 150': '-25% damage · 150 durability',
+  '减伤 40% · 耐久 260': '-40% damage · 260 durability',
+  '全自动 · 高伤害': 'Full auto · high damage',
+  '射速快 · 后坐力小': 'Fast fire rate · low recoil',
+  '单发 · 极高伤害': 'Single shot · extreme damage',
+  '应急副武器': 'Emergency sidearm',
+  '高伤副武器': 'High-damage sidearm',
+  '近战 · 永不耗弹': 'Melee · never uses ammo',
+  '近战 · 攻击范围大': 'Melee · longer reach',
+  '额外 2 个弹匣位': '+2 magazine slots',
+  '额外 4 个弹匣位': '+4 magazine slots',
+  '额外 6 个弹匣位': '+6 magazine slots',
+
+  /* ---------- 3D 版：横屏遮罩 ---------- */
+  '请横屏游玩': 'Please Rotate Your Device',
+  '3D 第一人称需要横屏。把设备转过来，或者点下面的按钮。':
+    '3D first-person needs landscape. Rotate your device, or tap the button below.',
+  '进入横屏': 'Go Landscape',
+
+
+  /* ============================================================
+     2D 版：房间 / 地点名
+     ============================================================ */
+  '教室': 'Classroom',
+  '老师办公室': "Teacher's Office",
+  '厕所': 'Restroom',
+  '电闸室': 'Breaker Room',
+  '体育馆前厅': 'Gym Lobby',
+  '器材室': 'Equipment Room',
+  '走廊': 'Hallway',
+  '大门厅': 'Main Lobby',
+  '楼梯间': 'Stairwell',
+  '空教室': 'Empty Classroom',
+  '图书角': 'Reading Corner',
+  '体育馆': 'Gymnasium',
+  '器材间': 'Equipment Closet',
+  '二层电闸': '2F Breaker',
+  '大门': 'Main Gate',
+  '下楼': 'Go Downstairs',
+  '小卖部': 'Tuck Shop',
+  '校长办公室': "Principal's Office",
+  '侧门区': 'Side Door Area',
+  '门厅': 'Foyer',
+  '杂物间': 'Storage Room',
+  '校长办公室门（权限锁）': "Principal's Office Door (Access Locked)",
+  '侧门': 'Side Door',
+  '上楼': 'Go Upstairs',
+  '下地下车库': 'Go to Garage',
+  '保安室': 'Security Room',
+  '车库': 'Garage',
+  '电子门通道': 'Electronic Door Passage',
+  '墙后通道': 'Passage Behind the Wall',
+  '上一层': 'Go Up One Floor',
+  '下四层': 'Go to Floor 4',
+  '监控总闸': 'CCTV Master Breaker',
+  '三层电闸': '3F Breaker',
+  '校长的车': "Principal's Car",
+  '电子门': 'Electronic Door',
+  '电子门后的砖墙': 'Brick Wall Behind the Electronic Door',
+  '工具房': 'Tool Room',
+  '主任办公室': "Dean's Office",
+  '制作室': 'Crafting Room',
+  '地下室门厅': 'Basement Lobby',
+  '库房': 'Stockroom',
+  '上三层': 'Go to Floor 3',
+  '四层电闸': '4F Breaker',
+  '地下室门': 'Basement Door',
+  '回四层': 'Back to Floor 4',
+  '通往学校外面的楼梯': 'Stairs Leading Outside',
+
+  /* ============================================================
+     2D 版：道具
+     ============================================================ */
+  '老师工作牌': "Teacher's Badge",
+  '红钥匙': 'Red Key',
+  '黄色钥匙': 'Yellow Key',
+  '锯子': 'Saw',
+  '锤子': 'Hammer',
+  '木头': 'Wood',
+  '小刀': 'Knife',
+  '黑钥匙制作图': 'Black Key Blueprint',
+  '黑钥匙': 'Black Key',
+  '隐身针': 'Invisibility Syringe',
+  '可乐': 'Cola',
+  '手电筒': 'Flashlight',
+
+  /* ============================================================
+     2D 版：结局标题
+     ============================================================ */
+  '结局一 · 被抓住了': 'Ending 1 · Caught',
+  '结局二 · 大门逃脱': 'Ending 2 · Main Gate Escape',
+  '结局三 · 侧门逃脱': 'Ending 3 · Side Door Escape',
+  '结局四 · 地下车库逃脱': 'Ending 4 · Garage Escape',
+  '结局五 · 地下室逃脱': 'Ending 5 · Basement Escape',
+  '结局六 · 打电话给原作者': 'Ending 6 · Call the Original Author',
+  '隐藏结局': 'Hidden Ending',
+  '隐藏结局 · 仅地狱模式可触发': 'Hidden Ending · Hell mode only',
+
+  /* ============================================================
+     2D 版：常用提示 / 交互
+     ============================================================ */
+  '按 E 打开小卖部': 'Press E to open the tuck shop',
+  '按 E 使用制作台': 'Press E to use the crafting bench',
+  '按 E 拉闸': 'Press E to pull the breaker',
+  '按 E 拉下监控总闸（全楼监控停摆）': 'Press E to cut the CCTV master breaker (all cameras go dark)',
+  '按 E 用锤子砸校长的车': "Press E to smash the principal's car with a hammer",
+  '按 E 锯树（需要锯子）': 'Press E to saw the tree (requires a saw)',
+  '按 E 尝试打开': 'Press E to try opening',
+  '按 E 拾取 ': 'Press E to pick up ',
+  '按 E 用小刀捅他（25% 概率）': 'Press E to stab them with a knife (25% chance)',
+  '走近这里就能逃出去': 'Get close to escape',
+  '这是监控，别在它视野里停留': "That's a camera — do not linger in its sight",
+  '任务：找一条路逃出学校': 'Objective: find a way out of the school',
+  'WASD / 方向键移动，别被老师看见': 'WASD / Arrow keys to move — stay out of sight',
+  'WASD / 方向键移动': 'WASD / Arrow keys to move',
+  '只有在教室或厕所才能跳过回合': 'You can only skip a turn in a classroom or restroom',
+  '跳过一回合，老师 / 保安移动了': 'Turn skipped — teachers and guards moved',
+  '无名同学': 'Nameless Student',
+  '无名': 'Anonymous',
+  '老师': 'Teacher',
+  '班主任': 'Homeroom Teacher',
+  '保安': 'Security Guard',
+  '监控': 'Camera',
+  '排行榜（本机记录）': 'Leaderboard (local records)',
+  '还没有记录，通关一次就会出现在这里。': 'No records yet — finish a run and it will show up here.',
+  '成绩只存在这台设备的 cookie 里，不上传服务器。': "Scores are stored only in the local cookie of this device, never uploaded.",
+  '输入你的昵称（存在本机 cookie）': 'Enter your nickname (stored in local cookie)',
+  '昵称已保存：': 'Nickname saved: ',
+  '成就解锁': 'Achievement Unlocked',
+  '成就再次达成': 'Achievement Reached Again',
+  '尚未解锁': 'Locked',
+  '已解锁': 'Unlocked',
+  '累计达成': 'Total reached',
+  '自定义': 'Custom',
+  '继续': 'Continue',
+  '制作': 'Craft',
+  '已拥有': 'Owned',
+  '免 费': 'FREE',
+  '小卖部 · 每局只能选一个': 'Tuck Shop · pick only one per run',
+  '小卖部 · 全部免费，但每局只能选一个': 'Tuck Shop · all free, but only one per run',
+  '这里没有可以互动的东西': 'Nothing to interact with here',
+  '已经拿过了': 'Already taken',
+  '获得 ': 'Obtained ',
+  '收回：': 'Taken back: ',
+  '给予：': 'Given: ',
+  '已开': 'OPEN',
+  '关闭': 'Close',
+  '需要钥匙': 'A key is required',
+  '需要黑钥匙': 'Requires the Black Key',
+  '需要小刀': 'Requires a knife',
+  '需要锯子才能锯树（工具房里有）': 'You need a saw to cut the tree (one is in the tool room)',
+  '需要锤子才能砸车': 'You need a hammer to smash the car',
+  '这棵树已经被锯过了': 'This tree has already been cut',
+  '这个电闸已经拉下了': 'This breaker is already down',
+  '车已经砸烂了': 'The car is already wrecked',
+  '监控已经关掉了': 'CCTV is already off',
+  '电子门已经打开了': 'The electronic door is already open',
+  '砖墙已经砸开了': 'The brick wall is already broken',
+  '地下室门锁着，需要黑钥匙': 'The basement door is locked — you need the Black Key',
+  '地下室门开了，下去吧': 'The basement door is open — head down',
+  '权限锁': 'Access Locked',
+  '练习': 'Practice',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '地狱难度：所有常规出口都被封死了，只能走电子门或地下室':
+    'Hell mode: all normal exits are sealed — you must use the electronic door or the basement',
+  '三个电闸已全部拉下，电子门通了': 'All three breakers are down — the electronic door has power',
+  '拉下监控总闸：全楼的监控都黑了': 'CCTV master breaker pulled — every camera is dark',
+
+};
+
+/* 把 {0} {1} 换掉。只在 T() 内部用。 */
+function i18nFormat(str, args){
+  if(!args || !args.length) return str;
+  return String(str).replace(/\{(\d+)\}/g, function(m, i){
+    const v = args[+i];
+    return (v === undefined || v === null) ? m : String(v);
+  });
+}
+
+/* 核心翻译函数：中文原串 -> 当前语言 */
+function T(str, a, b, c){
+  if(str == null) return str;
+  let out = str;
+  if(I18N_LANG === 'en'){
+    const hit = I18N_EN[str];
+    if(hit !== undefined) out = hit;
+  }
+  return i18nFormat(out, arguments.length > 1 ? Array.prototype.slice.call(arguments, 1) : null);
+}
+
+/* 按当前语言二选一，用于「中文文案 / 英文文案」都需要保留原样的场合 */
+function TL(zh, en){ return I18N_LANG === 'en' ? en : zh; }
+
+/* 读取持久化的语言 */
+function i18nLoad(){
+  let v = null;
+  try{ v = localStorage.getItem(I18N_STORE_KEY); }catch(e){ v = null; }
+  if(v && I18N_LANGS.indexOf(v) >= 0) I18N_LANG = v;
+  else I18N_LANG = 'zh';
+  return I18N_LANG;
+}
+
+/* 保存语言 */
+function i18nSave(){
+  try{ localStorage.setItem(I18N_STORE_KEY, I18N_LANG); }catch(e){}
+}
+
+/* 应用 <html lang> 与 <html data-lang>，CSS 可据此调字号 */
+function i18nApplyDoc(){
+  if(typeof document === 'undefined' || !document.documentElement) return;
+  const el = document.documentElement;
+  el.setAttribute('data-lang', I18N_LANG);
+  el.setAttribute('lang', I18N_LANG === 'en' ? 'en' : 'zh-CN');
+}
+
+/* 切换语言。返回是否真的变了。
+   rebuild 由各版自己传进来（重绘界面），这样 core 不需要知道界面细节。 */
+function i18nSetLang(lang, rebuild){
+  if(I18N_LANGS.indexOf(lang) < 0) return false;
+  if(lang === I18N_LANG) return false;
+  I18N_LANG = lang;
+  i18nSave();
+  i18nApplyDoc();
+  if(typeof rebuild === 'function'){ try{ rebuild(); }catch(e){} }
+  return true;
+}
+
+/* 在两种语言间来回切 */
+function i18nToggle(rebuild){
+  return i18nSetLang(I18N_LANG === 'zh' ? 'en' : 'zh', rebuild);
+}
+
+/* 扫描 DOM 里带 data-i18n 的元素并替换文本。
+   属性用法：data-i18n 填中文原串即可；
+   也可以填 data-i18n-ph 换 placeholder、data-i18n-title 换 title。 */
+function i18nApplyDOM(root){
+  if(typeof document === 'undefined') return;
+  const scope = root || document;
+  const nodes = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n]') : [];
+  for(let i = 0; i < nodes.length; i++){
+    const n = nodes[i];
+    n.textContent = T(n.getAttribute('data-i18n'));
+  }
+  const phs = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-ph]') : [];
+  for(let i = 0; i < phs.length; i++){
+    const n = phs[i];
+    n.setAttribute('placeholder', T(n.getAttribute('data-i18n-ph')));
+  }
+  const tts = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-title]') : [];
+  for(let i = 0; i < tts.length; i++){
+    const n = tts[i];
+    n.setAttribute('title', T(n.getAttribute('data-i18n-title')));
+  }
+}
+
+/* 生成一个语言切换按钮并挂到指定容器上。
+   两版共用同一套外观，颜色跟各自主题走（用 CSS 变量）。 */
+function i18nMountToggle(parent, rebuild, cls){
+  if(typeof document === 'undefined' || !parent) return null;
+  let btn = document.getElementById('langBtn');
+  if(!btn){
+    btn = document.createElement('button');
+    btn.id = 'langBtn';
+    btn.className = cls || 'langBtn';
+    btn.type = 'button';
+    parent.appendChild(btn);
+  }
+  const paint = function(){
+    btn.textContent = I18N_LANG === 'zh' ? '🌐 English' : '🌐 中文';
+    btn.setAttribute('title', T('切换语言'));
+    btn.setAttribute('aria-label', T('切换语言'));
+  };
+  paint();
+  btn.onclick = function(ev){
+    if(ev) ev.stopPropagation();
+    i18nToggle(function(){ rebuild && rebuild(); paint(); });
+  };
+  return btn;
+}
+
 'use strict';
 /* ================= 常量 ================= */
 var PW = 35, PH = 18;
@@ -952,25 +1576,25 @@ var SIGHT_STEP = 3;          /* 视线采样密度 */
 /* 坐标约定：格子(ix,iy)的中心 = (ix+0.5, iy+0.5) */
 
 var DIFF = {
-  easy:   {name:'简单',   guards:0, tspeed:0.45, gspeed:0.36, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
-  normal: {name:'普通',   guards:1, tspeed:0.62, gspeed:0.50, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
-  hard:   {name:'困难',   guards:2, tspeed:0.78, gspeed:0.64, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
-  hell:   {name:'地狱',   guards:3, tspeed:0.95, gspeed:0.80, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
+  easy:   {name:T('简单'),   guards:0, tspeed:0.45, gspeed:0.36, sight:5.0, roam:1, replan:14, see:5.0, lives:2},
+  normal: {name:T('普通'),   guards:1, tspeed:0.62, gspeed:0.50, sight:5.6, roam:2, replan:11, see:3.0, lives:2},
+  hard:   {name:T('困难'),   guards:2, tspeed:0.78, gspeed:0.64, sight:6.2, roam:3, replan:8.5, see:1.0, lives:2},
+  hell:   {name:T('地狱'),   guards:3, tspeed:0.95, gspeed:0.80, sight:6.8, roam:4, replan:6, see:0, lives:1, instant:true, onlyRoute45:true}
 };
 
 var ITEM = {
-  flag:      {name:'老师工作牌',   icon:'🪪', color:'#ffd166'},
-  redkey:    {name:'红钥匙',       icon:'🔴', color:'#ef4444'},
-  yellowkey: {name:'黄色钥匙',     icon:'🟡', color:'#eab308'},
-  saw:       {name:'锯子',         icon:'🪚', color:'#9fb3c8'},
-  hammer:    {name:'锤子',         icon:'🔨', color:'#a78bfa'},
-  wood:      {name:'木头',         icon:'🪵', color:'#b98b5a'},
-  knife:     {name:'小刀',         icon:'🔪', color:'#cbd5e1'},
-  blueprint: {name:'黑钥匙制作图', icon:'📜', color:'#f472b6'},
-  blackkey:  {name:'黑钥匙',       icon:'⚫', color:'#94a3b8'},
-  stealth:   {name:'隐身针',       icon:'💉', color:'#22d3ee'},
-  cola:      {name:'可乐',         icon:'🥤', color:'#f87171'},
-  torch:     {name:'手电筒',       icon:'🔦', color:'#fde047'}
+  flag:      {name:T('老师工作牌'),   icon:'🪪', color:'#ffd166'},
+  redkey:    {name:T('红钥匙'),       icon:'🔴', color:'#ef4444'},
+  yellowkey: {name:T('黄色钥匙'),     icon:'🟡', color:'#eab308'},
+  saw:       {name:T('锯子'),         icon:'🪚', color:'#9fb3c8'},
+  hammer:    {name:T('锤子'),         icon:'🔨', color:'#a78bfa'},
+  wood:      {name:T('木头'),         icon:'🪵', color:'#b98b5a'},
+  knife:     {name:T('小刀'),         icon:'🔪', color:'#cbd5e1'},
+  blueprint: {name:T('黑钥匙制作图'), icon:'📜', color:'#f472b6'},
+  blackkey:  {name:T('黑钥匙'),       icon:'⚫', color:'#94a3b8'},
+  stealth:   {name:T('隐身针'),       icon:'💉', color:'#22d3ee'},
+  cola:      {name:T('可乐'),         icon:'🥤', color:'#f87171'},
+  torch:     {name:T('手电筒'),       icon:'🔦', color:'#fde047'}
 };
 var INV_ORDER = ['flag','redkey','yellowkey','saw','hammer','wood','knife','blueprint','blackkey','stealth','cola','torch'];
 
@@ -1037,29 +1661,29 @@ function buildWorld(){
     carve(g,38,10,42,16); carve(g,40,9,40,9);    /* 器材间（扩展） */
 
     W['2F'] = {
-      key:'2F', name:'一层', w:w, h:h, g:g, dark:false,
+      key:'2F', name:T('一层'), w:w, h:h, g:g, dark:false,
       rooms:[
-        {name:'教室',       x0:1, y0:1,  x1:7,  y1:5,  safe:'class'},
-        {name:'老师办公室', x0:9, y0:1,  x1:14, y1:5},
-        {name:'厕所',       x0:16,y0:1,  x1:20, y1:5,  safe:'toilet'},
-        {name:'电闸室',     x0:22,y0:1,  x1:27, y1:5},
-        {name:'体育馆前厅', x0:29,y0:1,  x1:34, y1:5},
-        {name:'器材室',     x0:36,y0:1,  x1:42, y1:5},
-        {name:'走廊',       x0:1, y0:7,  x1:42, y1:8},
-        {name:'大门厅',     x0:1, y0:10, x1:8,  y1:16},
-        {name:'楼梯间',     x0:11,y0:10, x1:16, y1:16},
-        {name:'空教室',     x0:19,y0:10, x1:24, y1:16, safe:'class'},
-        {name:'图书角',     x0:26,y0:10, x1:30, y1:16},
-        {name:'体育馆',     x0:32,y0:10, x1:36, y1:16},
-        {name:'器材间',     x0:38,y0:10, x1:42, y1:16}
+        {name:T('教室'),       x0:1, y0:1,  x1:7,  y1:5,  safe:'class'},
+        {name:T('老师办公室'), x0:9, y0:1,  x1:14, y1:5},
+        {name:T('厕所'),       x0:16,y0:1,  x1:20, y1:5,  safe:'toilet'},
+        {name:T('电闸室'),     x0:22,y0:1,  x1:27, y1:5},
+        {name:T('体育馆前厅'), x0:29,y0:1,  x1:34, y1:5},
+        {name:T('器材室'),     x0:36,y0:1,  x1:42, y1:5},
+        {name:T('走廊'),       x0:1, y0:7,  x1:42, y1:8},
+        {name:T('大门厅'),     x0:1, y0:10, x1:8,  y1:16},
+        {name:T('楼梯间'),     x0:11,y0:10, x1:16, y1:16},
+        {name:T('空教室'),     x0:19,y0:10, x1:24, y1:16, safe:'class'},
+        {name:T('图书角'),     x0:26,y0:10, x1:30, y1:16},
+        {name:T('体育馆'),     x0:32,y0:10, x1:36, y1:16},
+        {name:T('器材间'),     x0:38,y0:10, x1:42, y1:16}
       ],
       patrol:[{x:4.5,y:7.5},{x:18.5,y:8.5},{x:29.5,y:7.5},{x:13.5,y:12.5},{x:21.5,y:7.5},{x:34.5,y:12.5},{x:40.5,y:7.5}],
       objs:[
         {t:'item', x:12.5, y:2.5, id:'flag'},                                      /* 老师工作牌 */
-        {t:'switch', x:25.5, y:2.5, id:'sw1', label:'二层电闸'},
+        {t:'switch', x:25.5, y:2.5, id:'sw1', label:T('二层电闸')},
         {t:'camera', x:2.5, y:12.5, dir:0, cone:0.5, range:4.0},                  /* 大门旁监控（转动） */
-        {t:'gate', x:4.5, y:16.5, kind:'main', label:'大门'},
-        {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:'下楼'},
+        {t:'gate', x:4.5, y:16.5, kind:'main', label:T('大门')},
+        {t:'stairs', x:13.5, y:13.5, to:'1F', tx:3.5, ty:13.5, label:T('下楼')},
         {t:'item', x:40.5, y:3.5, id:'torch'},                                        /* 器材室：手电筒 */
         {t:'item', x:34.5, y:13.5, id:'cola'}                                          /* 体育馆：可乐 */
       ]
@@ -1080,17 +1704,17 @@ function buildWorld(){
     carve(g,24,10,30,16); carve(g,27,9,27,9);    /* 杂物间 */
 
     W['1F'] = {
-      key:'1F', name:'二层', w:w, h:h, g:g, dark:false,
+      key:'1F', name:T('二层'), w:w, h:h, g:g, dark:false,
       rooms:[
-        {name:'小卖部',     x0:1, y0:1,  x1:7,  y1:5},
-        {name:'校长办公室', x0:9, y0:1,  x1:15, y1:5},
-        {name:'厕所',       x0:17,y0:1,  x1:20, y1:5, safe:'toilet'},
-        {name:'厕所',       x0:22,y0:1,  x1:25, y1:5, safe:'toilet'},
-        {name:'走廊',       x0:1, y0:7,  x1:30, y1:8},
-        {name:'楼梯间',     x0:1, y0:10, x1:7,  y1:16},
-        {name:'侧门区',     x0:9, y0:10, x1:15, y1:16},
-        {name:'门厅',       x0:17,y0:10, x1:22, y1:16},
-        {name:'杂物间',     x0:24,y0:10, x1:30, y1:16}
+        {name:T('小卖部'),     x0:1, y0:1,  x1:7,  y1:5},
+        {name:T('校长办公室'), x0:9, y0:1,  x1:15, y1:5},
+        {name:T('厕所'),       x0:17,y0:1,  x1:20, y1:5, safe:'toilet'},
+        {name:T('厕所'),       x0:22,y0:1,  x1:25, y1:5, safe:'toilet'},
+        {name:T('走廊'),       x0:1, y0:7,  x1:30, y1:8},
+        {name:T('楼梯间'),     x0:1, y0:10, x1:7,  y1:16},
+        {name:T('侧门区'),     x0:9, y0:10, x1:15, y1:16},
+        {name:T('门厅'),       x0:17,y0:10, x1:22, y1:16},
+        {name:T('杂物间'),     x0:24,y0:10, x1:30, y1:16}
       ],
       patrol:[{x:4.5,y:7.5},{x:12.5,y:8.5},{x:19.5,y:7.5},{x:28.5,y:8.5},{x:3.5,y:13.5},{x:19.5,y:12.5}],
       objs:[
@@ -1098,11 +1722,11 @@ function buildWorld(){
         {t:'tree', x:6.5, y:3.5},                                                     /* 校长的树 */
         {t:'camera', x:8.5, y:7.5, dir:Math.PI, cone:0.5, range:4.0},
         /* 小卖部旁监控：朝左，覆盖小卖部入口这一片 */
-        {t:'gate', x:12.5, y:6.5, kind:'office', label:'校长办公室门（权限锁）'},
+        {t:'gate', x:12.5, y:6.5, kind:'office', label:T('校长办公室门（权限锁）')},
         {t:'item', x:12.5, y:3.5, id:'redkey'},                                       /* 红钥匙 */
-        {t:'gate', x:12.5, y:16.5, kind:'side', label:'侧门'},
-        {t:'stairs', x:3.5, y:12.5, to:'2F', tx:13.5, ty:12.5, label:'上楼'},
-        {t:'stairs', x:6.5, y:15.5, to:'B1', tx:3.5,  ty:5.5,  label:'下地下车库'}
+        {t:'gate', x:12.5, y:16.5, kind:'side', label:T('侧门')},
+        {t:'stairs', x:3.5, y:12.5, to:'2F', tx:13.5, ty:12.5, label:T('上楼')},
+        {t:'stairs', x:6.5, y:15.5, to:'B1', tx:3.5,  ty:5.5,  label:T('下地下车库')}
       ]
     };
   })();
@@ -1121,28 +1745,28 @@ function buildWorld(){
     carve(g,26,11,28,16);                         /* 砖墙后的小隔间 */
 
     W['B1'] = {
-      key:'B1', name:'三层', w:w, h:h, g:g, dark:true,
+      key:'B1', name:T('三层'), w:w, h:h, g:g, dark:true,
       rooms:[
-        {name:'楼梯间',   x0:1,  y0:1,  x1:6,  y1:6},
-        {name:'保安室',   x0:8,  y0:1,  x1:12, y1:5},
-        {name:'厕所',     x0:14, y0:1,  x1:18, y1:5, safe:'toilet'},
-        {name:'电闸室',   x0:20, y0:1,  x1:25, y1:5},
-        {name:'走廊',     x0:1,  y0:8,  x1:28, y1:9},
-        {name:'车库',     x0:1,  y0:11, x1:14, y1:16},
-        {name:'电子门通道',x0:17, y0:11, x1:19, y1:16},
-        {name:'墙后通道', x0:21, y0:11, x1:24, y1:16}
+        {name:T('楼梯间'),   x0:1,  y0:1,  x1:6,  y1:6},
+        {name:T('保安室'),   x0:8,  y0:1,  x1:12, y1:5},
+        {name:T('厕所'),     x0:14, y0:1,  x1:18, y1:5, safe:'toilet'},
+        {name:T('电闸室'),   x0:20, y0:1,  x1:25, y1:5},
+        {name:T('走廊'),     x0:1,  y0:8,  x1:28, y1:9},
+        {name:T('车库'),     x0:1,  y0:11, x1:14, y1:16},
+        {name:T('电子门通道'),x0:17, y0:11, x1:19, y1:16},
+        {name:T('墙后通道'), x0:21, y0:11, x1:24, y1:16}
       ],
       patrol:[{x:2.5,y:8.5},{x:10.5,y:8.5},{x:20.5,y:8.5},{x:27.5,y:8.5},{x:7.5,y:13.5}],
       objs:[
-        {t:'stairs', x:3.5, y:3.5, to:'1F', tx:6.5, ty:16.5, label:'上一层'},
-        {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:'下四层'},
-        {t:'cctv', x:10.5, y:2.5, label:'监控总闸'},
-        {t:'switch', x:22.5, y:2.5, id:'sw2', label:'三层电闸'},
+        {t:'stairs', x:3.5, y:3.5, to:'1F', tx:6.5, ty:16.5, label:T('上一层')},
+        {t:'stairs', x:1.5, y:5.5, to:'B2', tx:3.5, ty:5.5,  label:T('下四层')},
+        {t:'cctv', x:10.5, y:2.5, label:T('监控总闸')},
+        {t:'switch', x:22.5, y:2.5, id:'sw2', label:T('三层电闸')},
         {t:'camera', x:10.5, y:8.5, dir:0,       cone:0.5, range:3.5},
         {t:'camera', x:20.5, y:8.5, dir:Math.PI, cone:0.5, range:3.5},
-        {t:'car', x:7.5, y:13.5, label:'校长的车'},
-        {t:'gate', x:20.5, y:13.5, kind:'elec', label:'电子门'},
-        {t:'gate', x:25.5, y:13.5, kind:'wall', label:'电子门后的砖墙'}
+        {t:'car', x:7.5, y:13.5, label:T('校长的车')},
+        {t:'gate', x:20.5, y:13.5, kind:'elec', label:T('电子门')},
+        {t:'gate', x:25.5, y:13.5, kind:'wall', label:T('电子门后的砖墙')}
       ]
     };
   })();
@@ -1162,29 +1786,29 @@ function buildWorld(){
     carve(g,22,11,27,16);  carve(g,24,10,24,10); /* 库房 */
 
     W['B2'] = {
-      key:'B2', name:'四层', w:w, h:h, g:g, dark:true,
+      key:'B2', name:T('四层'), w:w, h:h, g:g, dark:true,
       rooms:[
-        {name:'楼梯间',     x0:1,  y0:1,  x1:6,  y1:6},
-        {name:'工具房',     x0:8,  y0:1,  x1:12, y1:5},
-        {name:'主任办公室', x0:14, y0:1,  x1:19, y1:5},
-        {name:'厕所',       x0:21, y0:1,  x1:24, y1:5, safe:'toilet'},
-        {name:'厕所',       x0:26, y0:1,  x1:28, y1:5, safe:'toilet'},
-        {name:'走廊',       x0:1,  y0:8,  x1:28, y1:9},
-        {name:'制作室',     x0:1,  y0:11, x1:7,  y1:16},
-        {name:'电闸室',     x0:9,  y0:11, x1:13, y1:16},
-        {name:'地下室门厅', x0:15, y0:11, x1:20, y1:16},
-        {name:'库房',       x0:22, y0:11, x1:27, y1:16}
+        {name:T('楼梯间'),     x0:1,  y0:1,  x1:6,  y1:6},
+        {name:T('工具房'),     x0:8,  y0:1,  x1:12, y1:5},
+        {name:T('主任办公室'), x0:14, y0:1,  x1:19, y1:5},
+        {name:T('厕所'),       x0:21, y0:1,  x1:24, y1:5, safe:'toilet'},
+        {name:T('厕所'),       x0:26, y0:1,  x1:28, y1:5, safe:'toilet'},
+        {name:T('走廊'),       x0:1,  y0:8,  x1:28, y1:9},
+        {name:T('制作室'),     x0:1,  y0:11, x1:7,  y1:16},
+        {name:T('电闸室'),     x0:9,  y0:11, x1:13, y1:16},
+        {name:T('地下室门厅'), x0:15, y0:11, x1:20, y1:16},
+        {name:T('库房'),       x0:22, y0:11, x1:27, y1:16}
       ],
       patrol:[{x:2.5,y:8.5},{x:10.5,y:8.5},{x:18.5,y:8.5},{x:27.5,y:8.5},{x:4.5,y:13.5},{x:17.5,y:15.5}],
       objs:[
-        {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:'上三层'},
+        {t:'stairs', x:3.5, y:3.5, to:'B1', tx:1.5, ty:5.5, label:T('上三层')},
         {t:'item', x:9.5,  y:2.5, id:'saw'},
         {t:'item', x:10.5, y:4.5, id:'hammer'},
         {t:'camera', x:16.5, y:2.5, dir:Math.PI/2, cone:0.5, range:3.5},        /* 主任办公室监控（转动） */
         {t:'item', x:17.5, y:4.5, id:'blueprint'},
-        {t:'switch', x:11.5, y:13.5, id:'sw3', label:'四层电闸'},
+        {t:'switch', x:11.5, y:13.5, id:'sw3', label:T('四层电闸')},
         {t:'craft', x:4.5, y:13.5},
-        {t:'gate', x:17.5, y:13.5, kind:'basement', label:'地下室门'}
+        {t:'gate', x:17.5, y:13.5, kind:'basement', label:T('地下室门')}
       ]
     };
   })();
@@ -1198,11 +1822,11 @@ function buildWorld(){
     wallr(g,9,10,11,11);
 
     W['B3'] = {
-      key:'B3', name:'地下室', w:w, h:h, g:g, dark:true,
-      rooms:[ {name:'地下室', x0:1, y0:1, x1:23, y1:13} ],
+      key:'B3', name:T('地下室'), w:w, h:h, g:g, dark:true,
+      rooms:[ {name:T('地下室'), x0:1, y0:1, x1:23, y1:13} ],
       objs:[
-        {t:'stairs', x:3.5, y:3.5, to:'B2', tx:19.5, ty:13.5, label:'回四层'},
-        {t:'stairWin', x:21.5, y:2.5, label:'通往学校外面的楼梯'}
+        {t:'stairs', x:3.5, y:3.5, to:'B2', tx:19.5, ty:13.5, label:T('回四层')},
+        {t:'stairWin', x:21.5, y:2.5, label:T('通往学校外面的楼梯')}
       ]
     };
   })();
@@ -4944,6 +5568,308 @@ function customBindUI(){
   });
 }
 function customRefreshSwatches(){ customApply(); }
+/* ============================================================
+   _i18n2d.js —— 2D 版国际化接入层
+
+   2D 版和 3D 版共用同一个 i18n_core.js（T() 等纯函数），
+   但界面结构完全不同，所以接入层各写各的。
+
+   2D 版的文字分三类：
+   A) HTML 里写死的静态文本（标题、按钮、难度名）—— 按选择器重写
+   B) JS 动态生成的（面板内容、结局、成就）—— 由各 build 函数拼字符串，
+      在源头包 T()，这里不重复处理
+   C) canvas 里画的 —— 画字时包 T()
+   ============================================================ */
+
+/* 统一重绘入口。切语言后调这个。 */
+function i18n2dRebuild(){
+  try{ i18n2dPaintStart(); }catch(e){}
+  try{ i18n2dPaintHUD();   }catch(e){}
+  try{ i18n2dPaintTheme(); }catch(e){}
+  try{ i18nApplyDOM();     }catch(e){}
+  try{ i18nApplyDoc();     }catch(e){}
+  /* 面板如果开着，重开一次让里面的文案跟着变 */
+  try{
+    var p=document.getElementById('panel');
+    if(p && !p.classList.contains('hidden') && typeof window.__reopenPanel === 'function'){
+      window.__reopenPanel();
+    }
+  }catch(e){}
+  /* 结束界面同理 */
+  try{
+    var e2=document.getElementById('endScr');
+    if(e2 && !e2.classList.contains('hidden') && typeof window.__repaintEnd === 'function'){
+      window.__repaintEnd();
+    }
+  }catch(e){}
+}
+
+/* 快捷设文本：找不到节点就跳过，不报错 */
+function T2Set(el, txt){ if(el) el.textContent = txt; }
+function T2Sel(sel, txt, root){
+  var r = root || document;
+  if(!r || !r.querySelector) return;
+  var n = r.querySelector(sel);
+  if(n) n.textContent = txt;
+}
+
+/* ---------- A) 开始界面 / 结束界面 ---------- */
+function i18n2dPaintStart(){
+  if(typeof document==='undefined') return;
+  var ss = document.getElementById('startScr');
+  if(!ss) return;
+
+  /* 大标题下面是副标题，两条 .sub 各自含义不同，按顺序处理 */
+  var subs = ss.querySelectorAll('p.sub');
+  if(subs.length >= 1){
+    /* 第一条是「逃离学校 · HTML版」 */
+    if(!subs[0].getAttribute('data-i18n-key'))
+      subs[0].setAttribute('data-i18n-key','逃离学校 · HTML版');
+    subs[0].textContent = T(subs[0].getAttribute('data-i18n-key'));
+  }
+  if(subs.length >= 2){
+    if(!subs[1].getAttribute('data-i18n-key'))
+      subs[1].setAttribute('data-i18n-key','五种结局 · 被抓两次就失败');
+    subs[1].textContent = T(subs[1].getAttribute('data-i18n-key'));
+  }
+
+  /* 玩法模式 / 选择难度 两个小标题 */
+  var labels = ss.querySelectorAll('p.sub[style*=margin-top]');
+  for(var i=0;i<labels.length;i++){
+    var el = labels[i];
+    var key = el.getAttribute('data-i18n-key');
+    if(!key){
+      var cur = (el.textContent||'').trim();
+      if(/玩法/.test(cur)) key='玩法模式';
+      else if(/难度/.test(cur)) key='选择难度';
+      else continue;
+      el.setAttribute('data-i18n-key', key);
+    }
+    el.textContent = T(key);
+  }
+
+  /* 模式按钮：每个是 .dbtn，内含 <small> 副标题 */
+  var MODE = [
+    { main:'回 合 制',        sub:'按一下走一格' },
+    { main:'摇杆 + 全地图',   sub:'连续移动 · 全图可见' },
+    { main:'🔫 FPS 搜打撤',   sub:'3D 第一人称 · three.js' }
+  ];
+  var mbtns = ss.querySelectorAll('.diffs .dbtn');
+  /* 前三个是模式，后四个（若存在）是难度 —— 用 data 属性区分更稳 */
+  var modeBtns = ss.querySelectorAll('.dbtn[data-mode], #fpsModeBtn');
+  for(var j=0;j<modeBtns.length;j++){
+    var b = modeBtns[j];
+    var small = b.querySelector('small');
+    var key = b.getAttribute('data-i18n-key');
+    if(!key){
+      var raw = (b.childNodes[0] && b.childNodes[0].nodeValue) ? b.childNodes[0].nodeValue.trim() : '';
+      if(raw) b.setAttribute('data-i18n-key', raw);
+      key = raw;
+    }
+    if(key){
+      /* 只改第一个文本节点，保留 <small> 结构 */
+      if(b.childNodes[0] && b.childNodes[0].nodeType === 3){
+        b.childNodes[0].nodeValue = T(key);
+      }
+    }
+    if(small){
+      var sk = small.getAttribute('data-i18n-key');
+      if(!sk){ sk = (small.textContent||'').trim(); if(sk) small.setAttribute('data-i18n-key', sk); }
+      if(sk) small.textContent = T(sk);
+    }
+  }
+
+  /* 难度按钮：data-diff */
+  var dbtns = ss.querySelectorAll('.dbtn[data-diff]');
+  for(var k2=0;k2<dbtns.length;k2++){
+    var db = dbtns[k2];
+    var dsk = db.getAttribute('data-i18n-key');
+    if(!dsk){
+      var dv = (db.childNodes[0] && db.childNodes[0].nodeValue) ? db.childNodes[0].nodeValue.trim() : '';
+      if(dv) db.setAttribute('data-i18n-key', dv);
+      dsk = dv;
+    }
+    if(dsk && db.childNodes[0] && db.childNodes[0].nodeType === 3){
+      /* 「简 单」中间有空格，翻译表里存的是「简单」，
+         所以查表前去掉所有空白，查不到就保留原文。 */
+      var squeezed = dsk.replace(/\s+/g,'');
+      var hit = T(squeezed);
+      db.childNodes[0].nodeValue = (hit !== squeezed) ? hit : dsk;
+    }
+    var dsm = db.querySelector('small');
+    if(dsm){
+      var dsk2 = dsm.getAttribute('data-i18n-key');
+      if(!dsk2){ dsk2=(dsm.textContent||'').trim(); if(dsk2) dsm.setAttribute('data-i18n-key', dsk2); }
+      if(dsk2) dsm.textContent = T(dsk2);
+    }
+  }
+
+  /* 固定按钮 */
+  T2Sel('#startBtn', T('开始游戏'), ss);
+  T2Sel('#boardBtn', T('🏆 排行榜'), ss);
+  T2Sel('#achBtn',   T('🎖 成就'),   ss);
+  T2Sel('#nameBtn',  T('✏️ 改昵称'), ss);
+  T2Sel('#expBtn',   T('⬇️ 导出'),   ss);
+  T2Sel('#againBtn', T('再来一次'),  document.getElementById('endScr')||document);
+  T2Sel('#backMenuBtn', T('回主菜单'));
+
+  /* 结束界面标题（内含「结局」/「隐藏结局」时动态改写，这里只处理静态部分） */
+}
+
+/* ---------- B) HUD ---------- */
+function i18n2dPaintHUD(){
+  if(typeof document==='undefined') return;
+  /* 楼层名：由游戏逻辑写入，这里只在已有时翻译。
+     楼层名（一层/二层…）翻译表里有，但它是游戏状态，
+     所以交给 writeFloor 那类函数处理更准；这里兜底处理一次。 */
+  var fn = document.getElementById('floorName');
+  if(fn){
+    var k = fn.getAttribute('data-i18n-key');
+    if(!k){ k=(fn.textContent||'').trim(); if(k) fn.setAttribute('data-i18n-key',k); }
+    if(k) fn.textContent = T(k);
+  }
+  /* 「被抓 x/2」里的「被抓」是带 <b> 的，只改前面的文本节点 */
+  var chips = document.querySelectorAll('#hud .chip');
+  for(var i=0;i<chips.length;i++){
+    var c = chips[i];
+    var first = c.childNodes[0];
+    if(!first || first.nodeType !== 3) continue;
+    var raw = first.nodeValue.trim();
+    if(!raw) continue;
+    var ck = c.getAttribute('data-i18n-key');
+    if(!ck){ c.setAttribute('data-i18n-key', raw); ck = raw; }
+    first.nodeValue = T(ck) + ' ';
+  }
+  /* 被发现读条 */
+  var st = document.getElementById('seeTxt');
+  if(st){
+    var sk = st.getAttribute('data-i18n-key');
+    if(!sk){ sk='被发现 {0}s / {1}s'; st.setAttribute('data-i18n-key', sk); }
+    /* 数值部分由逻辑层写入，这里只保证文案骨架正确 */
+  }
+  /* 底部提示 */
+  var hint = document.getElementById('hintText');
+  if(hint){
+    var hk = hint.getAttribute('data-i18n-key');
+    if(!hk){ hk='WASD / 方向键移动'; hint.setAttribute('data-i18n-key', hk); }
+    hint.textContent = T(hk);
+  }
+  /* 两个操作按钮 */
+  var btnE = document.getElementById('btnE');
+  if(btnE){
+    var sp = btnE.querySelector('span');
+    /* 结构是 <span>✋</span>行动 */
+    var txtNode = null;
+    for(var n=0;n<btnE.childNodes.length;n++){
+      if(btnE.childNodes[n].nodeType===3 && (btnE.childNodes[n].nodeValue||'').trim()) txtNode=btnE.childNodes[n];
+    }
+    if(txtNode){
+      var ek = btnE.getAttribute('data-i18n-key');
+      if(!ek){ ek=txtNode.nodeValue.trim(); btnE.setAttribute('data-i18n-key', ek); }
+      txtNode.nodeValue = T(ek);
+    }
+  }
+  var btnV = document.getElementById('btnV');
+  if(btnV){
+    var txtNode2 = null;
+    for(var n2=0;n2<btnV.childNodes.length;n2++){
+      if(btnV.childNodes[n2].nodeType===3 && (btnV.childNodes[n2].nodeValue||'').trim()) txtNode2=btnV.childNodes[n2];
+    }
+    if(txtNode2){
+      var vk = btnV.getAttribute('data-i18n-key');
+      if(!vk){ vk=txtNode2.nodeValue.trim(); btnV.setAttribute('data-i18n-key', vk); }
+      txtNode2.nodeValue = T(vk);
+    }
+  }
+  /* 面板关闭按钮 */
+  var pc = document.getElementById('panelClose');
+  if(pc) pc.textContent = T('关闭');
+}
+
+/* ---------- C) 主题面板 ---------- */
+function i18n2dPaintTheme(){
+  if(typeof document==='undefined') return;
+  var tp = document.getElementById('themePanel');
+  if(!tp) return;
+  var h3 = tp.querySelector('h3');
+  if(h3) h3.textContent = T('🎨 主题');
+  T2Sel('#themeClose', T('完成'), tp);
+  T2Sel('#themeReset', T('恢复默认'), tp);
+  T2Sel('.tlabel', T('风格'), tp);
+
+  /* 三个风格格：原版 / Material / 终端 */
+  var stys = tp.querySelectorAll('.tsty');
+  for(var i=0;i<stys.length;i++){
+    var st = stys[i];
+    var sm = st.querySelector('small');
+    var key = st.getAttribute('data-i18n-key');
+    if(!key){
+      var v = (st.childNodes[0] && st.childNodes[0].nodeValue) ? st.childNodes[0].nodeValue.trim() : '';
+      if(v) st.setAttribute('data-i18n-key', v);
+      key = v;
+    }
+    if(key && st.childNodes[0] && st.childNodes[0].nodeType===3){
+      st.childNodes[0].nodeValue = T(key);
+    }
+    if(sm){
+      var sk = sm.getAttribute('data-i18n-key');
+      if(!sk){ sk=(sm.textContent||'').trim(); if(sk) sm.setAttribute('data-i18n-key', sk); }
+      if(sk) sm.textContent = T(sk);
+    }
+  }
+  /* 标题「颜色（256 色）」 */
+  var tl = tp.querySelectorAll('.tlabel');
+  if(tl.length >= 2){
+    var ck = tl[1].getAttribute('data-i18n-key');
+    if(!ck){ ck='颜色'; tl[1].setAttribute('data-i18n-key', ck); }
+  }
+  /* 说明长文 */
+  var note = document.getElementById('themeNote');
+  if(note){
+    var nk = note.getAttribute('data-i18n-key');
+    if(!nk){ nk = (note.textContent||'').trim(); if(nk) note.setAttribute('data-i18n-key', nk); }
+    if(nk) note.textContent = T(nk);
+  }
+}
+
+/* ---------- 挂语言按钮 ----------
+   2D 版放在开始界面右上角，用 .themeFab 同一套定位风格，
+   避免跟「选择难度」那堆按钮抢位置。 */
+function i18n2dMountButton(){
+  if(typeof document==='undefined') return null;
+  var ss = document.getElementById('startScr');
+  if(!ss) return null;
+  var btn = document.getElementById('langBtn');
+  if(!btn){
+    btn = document.createElement('div');
+    btn.id = 'langBtn';
+    btn.className = 'langFab2d';
+    ss.appendChild(btn);
+  }
+  btn.onclick = function(ev){
+    if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+    i18nToggle(function(){ i18n2dRebuild(); });
+    paint();
+  };
+  function paint(){
+    btn.textContent = I18N_LANG === 'zh' ? '🌐 English' : '🌐 中文';
+    btn.setAttribute('title', T('切换语言'));
+  }
+  paint();
+  return btn;
+}
+
+/* 初始化 */
+function i18n2dInit(){
+  i18nLoad();
+  i18nApplyDoc();
+  i18n2dMountButton();
+  var run = function(){ try{ i18n2dRebuild(); }catch(e){} };
+  if(typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+  else setTimeout(run, 0);
+  setTimeout(run, 150);
+}
+
 /* ================= 画布基础 ================= */
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
@@ -5424,6 +6350,10 @@ themeLoad();        /* 载入主题设置 */
 themeApply();       /* 应用主题（原版 / Material + 256 色） */
 renderAchChip();
 refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
+/* 【国际化】读语言 + 挂切换按钮 + 重绘开始界面。
+   放在所有 build/apply 之后：i18n2dRebuild 会去改这些函数
+   刚写好的 DOM，顺序反了就会被覆盖回中文。 */
+try{ if(typeof i18n2dInit==='function') i18n2dInit(); }catch(e){}
 S.mode='menu';
 requestAnimationFrame(loop);
 })();

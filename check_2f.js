@@ -1,7 +1,10 @@
 const fs=require('fs');
 const vm=require('vm');
 const src=fs.readFileSync('/tmp/efsrepo/full/b_world.js','utf8');
-const ctx={console, Math, Int32Array, JSON};
+/* b_world.js 里的 DIFF/ITEM/W 名字现在都包了 T()，
+   单独跑这个检查时必须补一个恒等函数桩，否则 ReferenceError。 */
+const T=(x)=>x;
+const ctx={console, Math, Int32Array, JSON, T};
 vm.createContext(ctx);
 vm.runInContext(src+'\nbuildWorld();\nthis.__W=W;', ctx);
 const W=ctx.__W;

@@ -63,10 +63,10 @@ global.requestAnimationFrame=()=>0;
 Object.defineProperty(global,'navigator',{configurable:true,writable:true,
   value:{userAgent:'node',maxTouchPoints:5}});
 
-const parts=['b_world.js','c_player.js','d_game.js','e_io.js','f_ui.js','x_ext.js','w_weapon.js','y_audio.js','z_render.js'];
+const parts=['I18N','b_world.js','c_player.js','d_game.js','e_io.js','f_ui.js','x_ext.js','w_weapon.js','y_audio.js','z_render.js'];
 let code='';
-for(const p of parts){ if(!fs.existsSync('full/'+p)) continue;
-  code+='\n/* ==== '+p+' ==== */\n'+fs.readFileSync('full/'+p,'utf8'); }
+for(const p of parts){ { const fp = p==='I18N' ? '../i18n/i18n_core.js' : 'full/'+p; if(!fs.existsSync(fp)) continue; }
+  code+='\n/* ==== '+p+' ==== */\n'+fs.readFileSync(p==='I18N' ? '../i18n/i18n_core.js' : 'full/'+p, 'utf8'); }
 code='const THREE=global.__THREE__;\n'+code;
 
 let S;

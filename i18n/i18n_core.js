@@ -1,0 +1,599 @@
+/* ============================================================
+   i18n_core.js —— 中英双语核心
+   由 build.sh 打进 2D / 3D 两版，必须保持「纯函数、无外部依赖」。
+
+   设计要点：
+   1) 中文原串直接当 key，译文表只在切换英文时用。
+      这样源码里所有中文都不必改，破坏面最小。
+   2) T('中文') 找得到译文返回英文，找不到原样返回中文 ——
+      漏翻最多是「这句还是中文」，绝不会变成 undefined 或空白。
+   3) T() 支持 {0} {1} 占位符，对应 T('复活 {0}', 3)。
+   4) 语言存在 localStorage，跨会话保持；<html lang> 同步更新，
+      方便 CSS 里按语言调字体/字号。
+   ============================================================ */
+const I18N_LANGS = ['zh', 'en'];
+const I18N_LANG_NAMES = { zh: '中文', en: 'English' };
+const I18N_STORE_KEY = 'efs_lang_v1';
+
+/* 当前语言：默认中文，符合原有体验 */
+let I18N_LANG = 'zh';
+
+/* 英文译文表：key 是中文原串，value 是英文。
+   故意做成「平铺字典」而不是分组，因为查表最快也最好维护。 */
+const I18N_EN = {
+
+  /* ---------- 通用 / 按钮 ---------- */
+  '关闭': 'Close',
+  '完成': 'Done',
+  '返回': 'Back',
+  '取消': 'Cancel',
+  '确定': 'OK',
+  '是': 'Yes',
+  '否': 'No',
+  '开': 'ON',
+  '关': 'OFF',
+  '上': 'Up',
+  '下': 'Down',
+  '左': 'Left',
+  '右': 'Right',
+  '收起': 'Collapse',
+  '收起 ▾': 'Collapse ▾',
+  '展开 ▸': 'Expand ▸',
+  '继续': 'Continue',
+  '重试': 'Retry',
+  '已保存': 'Saved',
+  '已复制': 'Copied',
+  '复制': 'Copy',
+  '删除': 'Delete',
+  '清空': 'Clear',
+  '设置': 'Settings',
+  '语言': 'Language',
+
+  /* ---------- 主菜单 / 通用界面 ---------- */
+  '主菜单': 'Main Menu',
+  '回主菜单': 'Back to Menu',
+  '再次挑战': 'Play Again',
+  '再来一次': 'Play Again',
+  '开始游戏': 'Start Game',
+  '开始': 'Start',
+  '暂停': 'Pause',
+  '继续游戏': 'Resume',
+  '重新开始': 'Restart',
+  '玩法说明': 'How to Play',
+  '操作说明': 'Controls',
+  '设置': 'Settings',
+  '排行榜': 'Leaderboard',
+  '成就': 'Achievements',
+  '成就页': 'Achievements',
+  '昵称': 'Nickname',
+  '改昵称': 'Change Name',
+  '导出': 'Export',
+  '导入': 'Import',
+  '主题': 'Theme',
+  '风格': 'Style',
+  '颜色': 'Color',
+  '恢复默认': 'Reset to Default',
+  '原版': 'Classic',
+  '深蓝暗色': 'Deep Blue Dark',
+  '终端': 'Terminal',
+  '磷光绿屏': 'Phosphor Green',
+
+  /* ---------- 难度 / 模式 ---------- */
+  '简单': 'Easy',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '选择难度': 'Select Difficulty',
+  '难度': 'Difficulty',
+  '回 合 制': 'TURN-BASED',
+  '摇杆 + 全地图': 'Joystick + Full Map',
+  '按一下走一格': 'One tile per tap',
+  '连续移动 · 全图可见': 'Free movement · whole map visible',
+
+  /* ---------- 语言 ---------- */
+  '中文': '中文',
+  'English': 'English',
+  '切换语言': 'Switch Language',
+
+  /* ---------- HUD 通用 ---------- */
+  '生命': 'Health',
+  '血量': 'HP',
+  '护甲': 'Armor',
+  '耐久': 'Durability',
+  '货币': 'Currency',
+  '金币': 'Coins',
+  '当前货币': 'Money',
+  '弹药': 'Ammo',
+  '备用弹药': 'Reserve',
+  '背包': 'Backpack',
+  '仓库': 'Stash',
+  '商店': 'Shop',
+  '物品栏': 'Inventory',
+  '装备': 'Equipment',
+  '物品': 'Items',
+  '地图': 'Map',
+  '楼层': 'Floor',
+  '回合': 'Turn',
+  '被 抓': 'Caught',
+  '被抓': 'Caught',
+  '电闸': 'Breaker',
+  '被发现': 'Spotted',
+  '撤离': 'Extract',
+  '撤离点': 'Extraction Point',
+  '击杀数': 'Kills',
+  '撤离次数': 'Extractions',
+
+  /* ---------- 动作 ---------- */
+  '行动': 'Action',
+  '跳过': 'Skip',
+  '移动': 'Move',
+  '跳跃': 'Jump',
+  '奔跑': 'Sprint',
+  '趴下': 'Prone',
+  '站起': 'Stand',
+  '瞄准': 'Aim',
+  '射击': 'Fire',
+  '换弹': 'Reload',
+  '开镜': 'Scope',
+  '开门': 'Open Door',
+  '关门': 'Close Door',
+  '拾取': 'Pick Up',
+  '互动': 'Interact',
+  '搜刮': 'Loot',
+  '使用': 'Use',
+  '装填': 'Load',
+  '卸下': 'Unequip',
+  '装备上': 'Equip',
+  '购买': 'Buy',
+  '卖出': 'Sell',
+  '转视角': 'Look',
+  '视角': 'Camera',
+  '鼠标': 'Mouse',
+  '左键': 'Left Click',
+  '右键': 'Right Click',
+  '空格': 'Space',
+  '交谈': 'Talk',
+  '休息': 'Rest',
+  '制作': 'Craft',
+  '制作台': 'Crafting Bench',
+  '小卖部': 'Tuck Shop',
+
+  /* ---------- 游戏状态 ---------- */
+  '胜利': 'Victory',
+  '失败': 'Defeat',
+  '成功逃脱': 'Escaped',
+  '你被抓住了': 'You were caught',
+  '游戏结束': 'Game Over',
+  '正在加载': 'Loading',
+  '加载中': 'Loading',
+  '准备中': 'Preparing',
+  '进度': 'Progress',
+
+  /* ---------- 3D 版：武器槽 ---------- */
+  '主武器': 'Primary',
+  '副武器': 'Sidearm',
+  '手枪': 'Pistol',
+  '步枪': 'Rifle',
+  '刀': 'Knife',
+  '近战': 'Melee',
+  '胸挂': 'Chest Rig',
+  '头盔': 'Helmet',
+  '防弹衣': 'Body Armor',
+  '切枪': 'Weapon Swap',
+
+  /* ---------- 3D 版：商店物品 ---------- */
+  '医疗包': 'Medkit',
+  '急救包': 'First Aid Kit',
+  '绷带': 'Bandage',
+  '止痛药': 'Painkiller',
+  '手雷': 'Grenade',
+  '烟雾弹': 'Smoke Grenade',
+  '闪光弹': 'Flashbang',
+  '开锁器': 'Lockpick',
+  '手枪弹': '9mm Rounds',
+  '步枪弹': '5.56 Rounds',
+  '狙击弹': '7.62 Rounds',
+  '霰弹': '12G Shells',
+  '战术腰包': 'Tactical Pouch',
+  '小型背包': 'Small Backpack',
+  '中型背包': 'Medium Backpack',
+  '大型背包': 'Large Backpack',
+  '防弹背心': 'Ballistic Vest',
+  '战术头盔': 'Tactical Helmet',
+  '战术小刀': 'Tactical Knife',
+  '哨兵手枪': 'Sentry Pistol',
+  '突击步枪': 'Assault Rifle',
+
+  /* ---------- 3D 版：商店描述 ---------- */
+  '恢复 40 生命': 'Restores 40 HP',
+  '恢复 100 生命（满血）': 'Restores 100 HP (full)',
+  '恢复 15 生命，便宜量大': 'Restores 15 HP, cheap in bulk',
+  '恢复 25 生命并短暂加速': 'Restores 25 HP, brief speed boost',
+  '投掷爆炸，范围伤害': 'Thrown explosive, area damage',
+  '制造烟幕遮挡视线': 'Creates smoke screen to block vision',
+  '致盲附近敌人': 'Blinds nearby enemies',
+  '打开上锁的箱子': 'Opens locked crates',
+  '容量 12 格': '12 slots',
+  '容量 24 格': '24 slots',
+  '容量 36 格': '36 slots',
+  '容量 48 格': '48 slots',
+
+  /* ---------- 提示 / Toast ---------- */
+  '已装备': 'Equipped',
+  '已卸下': 'Unequipped',
+  '已购买': 'Purchased',
+  '货币不足': 'Not enough money',
+  '背包已满': 'Backpack is full',
+  '距离太远': 'Too far away',
+  '需要钥匙': 'Requires a key',
+  '门已锁': 'Door is locked',
+  '无法使用': 'Cannot use',
+  '使用成功': 'Success',
+  '生命已满': 'HP is full',
+  '无法奔跑': 'Cannot sprint',
+  '弹药不足': 'Out of ammo',
+  '换弹中': 'Reloading',
+  '没有武器': 'No weapon',
+  '已切到': 'Switched to',
+  '空槽位': 'Empty slot',
+  '局内不能换装': 'Cannot change gear in a match',
+
+  /* ---------- 3D 版：主菜单 ---------- */
+  '搜打撤': 'Loot · Shoot · Extract',
+  '学校 3D': 'School 3D',
+  '搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。':
+    'Loot supplies → kill enemies → reach the extraction point. Spend money in the shop. Exports are encrypted to prevent tampering.',
+  '▶ 开始（进入游戏）': '▶ Start (Enter Game)',
+  '🛒 商店': '🛒 Shop',
+  '🏠 仓库': '🏠 Stash',
+  '⬇️ 加密导出': '⬇️ Encrypted Export',
+  '⬆️ 加密导入': '⬆️ Encrypted Import',
+  '♻️ 重置数据': '♻️ Reset Data',
+  '← 返回原版': '← Back to Original',
+  '💀 你阵亡了': '💀 You Died',
+  '重新部署': 'Redeploy',
+  '确认重置所有数据？': 'Reset all data?',
+
+  /* ---------- 3D 版：屏幕提示条 ---------- */
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战':
+    '📱 Drag right half to look · left stick to move · bottom-right buttons to fight',
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下 · 靠近门按 E 开门':
+    '📱 Drag right half to look · left stick to move · fire/jump/reload/loot at bottom right · press E near a door',
+  '📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击':
+    '📱 Mobile: drag left half to move · drag right half to look · bottom-right button to fire',
+  '🎮 摇杆已激活 · 拖动移动': '🎮 Joystick active · drag to move',
+  '🔭 开镜中 · 再点一次退出': '🔭 Scoped · tap again to exit',
+  '⌨️ 操作说明': '⌨️ Controls',
+
+  /* ---------- 2D 版：主菜单 ---------- */
+  '逃离学校 · HTML版': 'Escape From the School · HTML Edition',
+  '五种结局 · 被抓两次就失败': 'Five endings · caught twice and you fail',
+  '一层': 'Floor 1',
+  '二层': 'Floor 2',
+  '三层': 'Floor 3',
+  '四层': 'Floor 4',
+  '地下室': 'Basement',
+  '五条逃走路线': 'Five escape routes',
+  '隐藏结局': 'Hidden Ending',
+  '结局': 'Ending',
+  '排行榜': 'Leaderboard',
+  '🏆 排行榜': '🏆 Leaderboard',
+  '🎖 成就': '🎖 Achievements',
+  '✏️ 改昵称': '✏️ Change Name',
+  '⬇️ 导出': '⬇️ Export',
+  '🎨 主题': '🎨 Theme',
+  '重置数据': 'Reset Data',
+  '确认重置？': 'Reset?',
+
+  /* ---------- 3D 版：商店分类 ---------- */
+  '医药': 'Medical',
+  '道具': 'Gadgets',
+  '子弹': 'Ammo',
+  '冲锋枪': 'SMG',
+  '狙击步枪': 'Sniper Rifle',
+  '制式手枪': 'Standard Pistol',
+  '大口径手枪': 'Heavy Pistol',
+  '防弹头盔': 'Ballistic Helmet',
+  '重型头盔': 'Heavy Helmet',
+  '轻型护甲': 'Light Armor',
+  '标准护甲': 'Standard Armor',
+  '重型护甲': 'Heavy Armor',
+  '防暴棍': 'Riot Baton',
+  '简易胸挂': 'Light Chest Rig',
+  '重型胸挂': 'Heavy Chest Rig',
+  '进入游戏': 'Enter Game',
+  '加密导出': 'Encrypted Export',
+  '加密导入': 'Encrypted Import',
+  '返回原版': 'Back to Original',
+  '拾取/互动': 'Loot / Interact',
+
+  /* ---------- 3D 版：商店描述（详细） ---------- */
+  '9mm · 50 发': '9mm · 50 rounds',
+  '5.56 · 60 发': '5.56 · 60 rounds',
+  '7.62 · 20 发': '7.62 · 20 rounds',
+  '12G · 24 发': '12G · 24 shells',
+  '减伤 10% · 耐久 60': '-10% damage · 60 durability',
+  '减伤 20% · 耐久 120': '-20% damage · 120 durability',
+  '减伤 32% · 耐久 220': '-32% damage · 220 durability',
+  '减伤 15% · 耐久 80': '-15% damage · 80 durability',
+  '减伤 25% · 耐久 150': '-25% damage · 150 durability',
+  '减伤 40% · 耐久 260': '-40% damage · 260 durability',
+  '全自动 · 高伤害': 'Full auto · high damage',
+  '射速快 · 后坐力小': 'Fast fire rate · low recoil',
+  '单发 · 极高伤害': 'Single shot · extreme damage',
+  '应急副武器': 'Emergency sidearm',
+  '高伤副武器': 'High-damage sidearm',
+  '近战 · 永不耗弹': 'Melee · never uses ammo',
+  '近战 · 攻击范围大': 'Melee · longer reach',
+  '额外 2 个弹匣位': '+2 magazine slots',
+  '额外 4 个弹匣位': '+4 magazine slots',
+  '额外 6 个弹匣位': '+6 magazine slots',
+
+  /* ---------- 3D 版：横屏遮罩 ---------- */
+  '请横屏游玩': 'Please Rotate Your Device',
+  '3D 第一人称需要横屏。把设备转过来，或者点下面的按钮。':
+    '3D first-person needs landscape. Rotate your device, or tap the button below.',
+  '进入横屏': 'Go Landscape',
+
+
+  /* ============================================================
+     2D 版：房间 / 地点名
+     ============================================================ */
+  '教室': 'Classroom',
+  '老师办公室': "Teacher's Office",
+  '厕所': 'Restroom',
+  '电闸室': 'Breaker Room',
+  '体育馆前厅': 'Gym Lobby',
+  '器材室': 'Equipment Room',
+  '走廊': 'Hallway',
+  '大门厅': 'Main Lobby',
+  '楼梯间': 'Stairwell',
+  '空教室': 'Empty Classroom',
+  '图书角': 'Reading Corner',
+  '体育馆': 'Gymnasium',
+  '器材间': 'Equipment Closet',
+  '二层电闸': '2F Breaker',
+  '大门': 'Main Gate',
+  '下楼': 'Go Downstairs',
+  '小卖部': 'Tuck Shop',
+  '校长办公室': "Principal's Office",
+  '侧门区': 'Side Door Area',
+  '门厅': 'Foyer',
+  '杂物间': 'Storage Room',
+  '校长办公室门（权限锁）': "Principal's Office Door (Access Locked)",
+  '侧门': 'Side Door',
+  '上楼': 'Go Upstairs',
+  '下地下车库': 'Go to Garage',
+  '保安室': 'Security Room',
+  '车库': 'Garage',
+  '电子门通道': 'Electronic Door Passage',
+  '墙后通道': 'Passage Behind the Wall',
+  '上一层': 'Go Up One Floor',
+  '下四层': 'Go to Floor 4',
+  '监控总闸': 'CCTV Master Breaker',
+  '三层电闸': '3F Breaker',
+  '校长的车': "Principal's Car",
+  '电子门': 'Electronic Door',
+  '电子门后的砖墙': 'Brick Wall Behind the Electronic Door',
+  '工具房': 'Tool Room',
+  '主任办公室': "Dean's Office",
+  '制作室': 'Crafting Room',
+  '地下室门厅': 'Basement Lobby',
+  '库房': 'Stockroom',
+  '上三层': 'Go to Floor 3',
+  '四层电闸': '4F Breaker',
+  '地下室门': 'Basement Door',
+  '回四层': 'Back to Floor 4',
+  '通往学校外面的楼梯': 'Stairs Leading Outside',
+
+  /* ============================================================
+     2D 版：道具
+     ============================================================ */
+  '老师工作牌': "Teacher's Badge",
+  '红钥匙': 'Red Key',
+  '黄色钥匙': 'Yellow Key',
+  '锯子': 'Saw',
+  '锤子': 'Hammer',
+  '木头': 'Wood',
+  '小刀': 'Knife',
+  '黑钥匙制作图': 'Black Key Blueprint',
+  '黑钥匙': 'Black Key',
+  '隐身针': 'Invisibility Syringe',
+  '可乐': 'Cola',
+  '手电筒': 'Flashlight',
+
+  /* ============================================================
+     2D 版：结局标题
+     ============================================================ */
+  '结局一 · 被抓住了': 'Ending 1 · Caught',
+  '结局二 · 大门逃脱': 'Ending 2 · Main Gate Escape',
+  '结局三 · 侧门逃脱': 'Ending 3 · Side Door Escape',
+  '结局四 · 地下车库逃脱': 'Ending 4 · Garage Escape',
+  '结局五 · 地下室逃脱': 'Ending 5 · Basement Escape',
+  '结局六 · 打电话给原作者': 'Ending 6 · Call the Original Author',
+  '隐藏结局': 'Hidden Ending',
+  '隐藏结局 · 仅地狱模式可触发': 'Hidden Ending · Hell mode only',
+
+  /* ============================================================
+     2D 版：常用提示 / 交互
+     ============================================================ */
+  '按 E 打开小卖部': 'Press E to open the tuck shop',
+  '按 E 使用制作台': 'Press E to use the crafting bench',
+  '按 E 拉闸': 'Press E to pull the breaker',
+  '按 E 拉下监控总闸（全楼监控停摆）': 'Press E to cut the CCTV master breaker (all cameras go dark)',
+  '按 E 用锤子砸校长的车': "Press E to smash the principal's car with a hammer",
+  '按 E 锯树（需要锯子）': 'Press E to saw the tree (requires a saw)',
+  '按 E 尝试打开': 'Press E to try opening',
+  '按 E 拾取 ': 'Press E to pick up ',
+  '按 E 用小刀捅他（25% 概率）': 'Press E to stab them with a knife (25% chance)',
+  '走近这里就能逃出去': 'Get close to escape',
+  '这是监控，别在它视野里停留': "That's a camera — do not linger in its sight",
+  '任务：找一条路逃出学校': 'Objective: find a way out of the school',
+  'WASD / 方向键移动，别被老师看见': 'WASD / Arrow keys to move — stay out of sight',
+  'WASD / 方向键移动': 'WASD / Arrow keys to move',
+  '只有在教室或厕所才能跳过回合': 'You can only skip a turn in a classroom or restroom',
+  '跳过一回合，老师 / 保安移动了': 'Turn skipped — teachers and guards moved',
+  '无名同学': 'Nameless Student',
+  '无名': 'Anonymous',
+  '老师': 'Teacher',
+  '班主任': 'Homeroom Teacher',
+  '保安': 'Security Guard',
+  '监控': 'Camera',
+  '排行榜（本机记录）': 'Leaderboard (local records)',
+  '还没有记录，通关一次就会出现在这里。': 'No records yet — finish a run and it will show up here.',
+  '成绩只存在这台设备的 cookie 里，不上传服务器。': "Scores are stored only in the local cookie of this device, never uploaded.",
+  '输入你的昵称（存在本机 cookie）': 'Enter your nickname (stored in local cookie)',
+  '昵称已保存：': 'Nickname saved: ',
+  '成就解锁': 'Achievement Unlocked',
+  '成就再次达成': 'Achievement Reached Again',
+  '尚未解锁': 'Locked',
+  '已解锁': 'Unlocked',
+  '累计达成': 'Total reached',
+  '自定义': 'Custom',
+  '继续': 'Continue',
+  '制作': 'Craft',
+  '已拥有': 'Owned',
+  '免 费': 'FREE',
+  '小卖部 · 每局只能选一个': 'Tuck Shop · pick only one per run',
+  '小卖部 · 全部免费，但每局只能选一个': 'Tuck Shop · all free, but only one per run',
+  '这里没有可以互动的东西': 'Nothing to interact with here',
+  '已经拿过了': 'Already taken',
+  '获得 ': 'Obtained ',
+  '收回：': 'Taken back: ',
+  '给予：': 'Given: ',
+  '已开': 'OPEN',
+  '关闭': 'Close',
+  '需要钥匙': 'A key is required',
+  '需要黑钥匙': 'Requires the Black Key',
+  '需要小刀': 'Requires a knife',
+  '需要锯子才能锯树（工具房里有）': 'You need a saw to cut the tree (one is in the tool room)',
+  '需要锤子才能砸车': 'You need a hammer to smash the car',
+  '这棵树已经被锯过了': 'This tree has already been cut',
+  '这个电闸已经拉下了': 'This breaker is already down',
+  '车已经砸烂了': 'The car is already wrecked',
+  '监控已经关掉了': 'CCTV is already off',
+  '电子门已经打开了': 'The electronic door is already open',
+  '砖墙已经砸开了': 'The brick wall is already broken',
+  '地下室门锁着，需要黑钥匙': 'The basement door is locked — you need the Black Key',
+  '地下室门开了，下去吧': 'The basement door is open — head down',
+  '权限锁': 'Access Locked',
+  '练习': 'Practice',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '地狱难度：所有常规出口都被封死了，只能走电子门或地下室':
+    'Hell mode: all normal exits are sealed — you must use the electronic door or the basement',
+  '三个电闸已全部拉下，电子门通了': 'All three breakers are down — the electronic door has power',
+  '拉下监控总闸：全楼的监控都黑了': 'CCTV master breaker pulled — every camera is dark',
+
+};
+
+/* 把 {0} {1} 换掉。只在 T() 内部用。 */
+function i18nFormat(str, args){
+  if(!args || !args.length) return str;
+  return String(str).replace(/\{(\d+)\}/g, function(m, i){
+    const v = args[+i];
+    return (v === undefined || v === null) ? m : String(v);
+  });
+}
+
+/* 核心翻译函数：中文原串 -> 当前语言 */
+function T(str, a, b, c){
+  if(str == null) return str;
+  let out = str;
+  if(I18N_LANG === 'en'){
+    const hit = I18N_EN[str];
+    if(hit !== undefined) out = hit;
+  }
+  return i18nFormat(out, arguments.length > 1 ? Array.prototype.slice.call(arguments, 1) : null);
+}
+
+/* 按当前语言二选一，用于「中文文案 / 英文文案」都需要保留原样的场合 */
+function TL(zh, en){ return I18N_LANG === 'en' ? en : zh; }
+
+/* 读取持久化的语言 */
+function i18nLoad(){
+  let v = null;
+  try{ v = localStorage.getItem(I18N_STORE_KEY); }catch(e){ v = null; }
+  if(v && I18N_LANGS.indexOf(v) >= 0) I18N_LANG = v;
+  else I18N_LANG = 'zh';
+  return I18N_LANG;
+}
+
+/* 保存语言 */
+function i18nSave(){
+  try{ localStorage.setItem(I18N_STORE_KEY, I18N_LANG); }catch(e){}
+}
+
+/* 应用 <html lang> 与 <html data-lang>，CSS 可据此调字号 */
+function i18nApplyDoc(){
+  if(typeof document === 'undefined' || !document.documentElement) return;
+  const el = document.documentElement;
+  el.setAttribute('data-lang', I18N_LANG);
+  el.setAttribute('lang', I18N_LANG === 'en' ? 'en' : 'zh-CN');
+}
+
+/* 切换语言。返回是否真的变了。
+   rebuild 由各版自己传进来（重绘界面），这样 core 不需要知道界面细节。 */
+function i18nSetLang(lang, rebuild){
+  if(I18N_LANGS.indexOf(lang) < 0) return false;
+  if(lang === I18N_LANG) return false;
+  I18N_LANG = lang;
+  i18nSave();
+  i18nApplyDoc();
+  if(typeof rebuild === 'function'){ try{ rebuild(); }catch(e){} }
+  return true;
+}
+
+/* 在两种语言间来回切 */
+function i18nToggle(rebuild){
+  return i18nSetLang(I18N_LANG === 'zh' ? 'en' : 'zh', rebuild);
+}
+
+/* 扫描 DOM 里带 data-i18n 的元素并替换文本。
+   属性用法：data-i18n 填中文原串即可；
+   也可以填 data-i18n-ph 换 placeholder、data-i18n-title 换 title。 */
+function i18nApplyDOM(root){
+  if(typeof document === 'undefined') return;
+  const scope = root || document;
+  const nodes = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n]') : [];
+  for(let i = 0; i < nodes.length; i++){
+    const n = nodes[i];
+    n.textContent = T(n.getAttribute('data-i18n'));
+  }
+  const phs = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-ph]') : [];
+  for(let i = 0; i < phs.length; i++){
+    const n = phs[i];
+    n.setAttribute('placeholder', T(n.getAttribute('data-i18n-ph')));
+  }
+  const tts = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-title]') : [];
+  for(let i = 0; i < tts.length; i++){
+    const n = tts[i];
+    n.setAttribute('title', T(n.getAttribute('data-i18n-title')));
+  }
+}
+
+/* 生成一个语言切换按钮并挂到指定容器上。
+   两版共用同一套外观，颜色跟各自主题走（用 CSS 变量）。 */
+function i18nMountToggle(parent, rebuild, cls){
+  if(typeof document === 'undefined' || !parent) return null;
+  let btn = document.getElementById('langBtn');
+  if(!btn){
+    btn = document.createElement('button');
+    btn.id = 'langBtn';
+    btn.className = cls || 'langBtn';
+    btn.type = 'button';
+    parent.appendChild(btn);
+  }
+  const paint = function(){
+    btn.textContent = I18N_LANG === 'zh' ? '🌐 English' : '🌐 中文';
+    btn.setAttribute('title', T('切换语言'));
+    btn.setAttribute('aria-label', T('切换语言'));
+  };
+  paint();
+  btn.onclick = function(ev){
+    if(ev) ev.stopPropagation();
+    i18nToggle(function(){ rebuild && rebuild(); paint(); });
+  };
+  return btn;
+}

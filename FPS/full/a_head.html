@@ -204,7 +204,65 @@
     #wpnBar .ws .wn{ font-size:7px; max-width:34px; }
   }
 
-  /* 菜单 */
+  /* ============ 横屏强制遮罩 ============
+   竖屏时盖住整个游戏，要求用户转屏。
+   z-index 要比所有东西都高（商店 210、背包 210、死亡界面）
+   否则会出现「遮罩下面还能点到按钮」。 */
+#orientMask{
+  position:fixed; inset:0; z-index:9999;
+  display:none;                /* 由 orientRefresh() 改成 flex */
+  align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #171c2b 0%, #0b0e14 70%);
+  touch-action:none;
+}
+#orientMask .omBox{
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  padding:28px 26px; max-width:88vw; text-align:center;
+}
+#orientMask .omIcon{
+  font-size:54px; line-height:1;
+  animation:omSpin 2.4s ease-in-out infinite;
+}
+/* 手机图标左右摇一下，比箭头更直观地暗示「转过来」 */
+@keyframes omSpin{
+  0%,45%   { transform:rotate(0deg); }
+  55%,100% { transform:rotate(90deg); }
+}
+#orientMask .omTitle{
+  font-size:20px; font-weight:800; color:#e8e8f0; letter-spacing:.5px;
+}
+#orientMask .omDesc{
+  font-size:13px; line-height:1.7; color:#9aa6bd; max-width:420px;
+}
+#orientMask .omBtn{
+  margin-top:4px; padding:11px 26px; border-radius:11px; cursor:pointer;
+  border:2px solid var(--accent); background:rgba(124,92,255,.22);
+  color:#cbbcff; font-size:14px; font-weight:700; font-family:inherit;
+}
+#orientMask .omBtn:active{ transform:scale(.96); }
+
+/* ============ 语言切换按钮 ============
+   复用主菜单 .btn.ghost.small 的外观，这里只补一点宽度保证
+   「🌐 English」和「🌐 中文」切换时按钮不会尺寸跳动。 */
+#langBtn{ min-width:96px; }
+
+/* 英文文案普遍比中文长 30% 左右，主菜单 .box 高度会溢出。
+   只对英文收紧行距与字号，中文保持原样不受影响。 */
+html[data-lang="en"] #menu .box{ line-height:1.5; }
+html[data-lang="en"] #menu h1{ font-size:clamp(18px,3.2vw,26px); }
+html[data-lang="en"] #menu p.sub{ font-size:12px; }
+html[data-lang="en"] #menu .kk span{ font-size:11px; }
+html[data-lang="en"] #menu .btn{ font-size:12.5px; }
+html[data-lang="en"] .keysbox-note{ font-size:10.5px; }
+
+/* 英文下 HUD 的「背包」比「Backpack」短，pill 会被撑宽。
+   给一个上限并省略，避免挤掉右侧的弹药格。 */
+html[data-lang="en"] #bagBtn span{
+  display:inline-block; max-width:58px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom;
+}
+
+/* 菜单 */
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
   #menu .box{ width:100%; max-width:520px; max-height:92vh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:24px; }
   #menu .box::-webkit-scrollbar{ width:8px; }

@@ -115,5 +115,16 @@ window.__relayout=function(){
 };
 window.addEventListener('resize',()=>{ if(typeof window.__relayout==='function') window.__relayout(); });
 
+/* 【国际化】读语言 + 挂切换按钮 + 首次重绘。
+   放在这里是刻意的：必须在所有分块都执行完（各 buildXXX 已定义）
+   之后才能跑，否则重绘时函数还不存在。
+   包 try 是因为即便国际化挂了，游戏本身也得能跑。 */
+try{ if(typeof i18nInitUI==='function') i18nInitUI(); }catch(e){ console.error('i18n init failed', e); }
+
+/* 【强制横屏】建遮罩 + 绑定转屏监听。
+   同样放最后：orientRefresh 里会调 window.__relayout，
+   那是上面刚定义的，必须已存在。 */
+try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('orient init failed', e); }
+
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

@@ -478,6 +478,10 @@ themeLoad();        /* 载入主题设置 */
 themeApply();       /* 应用主题（原版 / Material + 256 色） */
 renderAchChip();
 refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
+/* 【国际化】读语言 + 挂切换按钮 + 重绘开始界面。
+   放在所有 build/apply 之后：i18n2dRebuild 会去改这些函数
+   刚写好的 DOM，顺序反了就会被覆盖回中文。 */
+try{ if(typeof i18n2dInit==='function') i18n2dInit(); }catch(e){}
 S.mode='menu';
 requestAnimationFrame(loop);
 })();

@@ -786,6 +786,30 @@ body.theme-custom #startScr .themeFab{font-size:var(--cf-btnSize)}
 @font-face{font-family:'MaShanZheng';src:url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMG.woff2') format('woff2'),url('https://fonts.gstatic.com/s/mashanzheng/v18/NaPecZTRCLxvwo41b4gvzkXaRMQ.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'ZCOOLKuaiLe';src:url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2WpoU.woff2') format('woff2'),url('https://fonts.gstatic.com/s/zcoolkuaile/v22/tssqApdaRQokwFjFJjvM6h2Wpo.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'LongCang';src:url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrXIF.woff2') format('woff2'),url('https://fonts.gstatic.com/s/longcang/v21/LYjAdGP8kkgoTec8zkRgrQ.ttf') format('truetype');font-display:swap}
+/* ============ 语言切换按钮（2D 版） ============
+   放在开始界面右上角，和「主题」那个圆形 FAB 并排。
+   用胶囊形而不是圆形，因为「🌐 English」比一个图标宽得多。 */
+.langFab2d{
+  position:absolute; right:16px; top:52px;
+  padding:7px 13px; border-radius:999px; cursor:pointer;
+  background:rgba(20,28,44,.88); border:1px solid rgba(255,255,255,.16);
+  color:#cfe0f5; font-size:12px; font-weight:700;
+  font-family:inherit; line-height:1.2;
+  user-select:none; -webkit-tap-highlight-color:transparent;
+  z-index:5; transition:transform .12s, background .15s;
+}
+.langFab2d:active{ transform:scale(.94); }
+.langFab2d:hover{ background:rgba(30,42,64,.95); }
+
+/* 英文文案比中文长，开始界面容易溢出。
+   只对英文收紧行距与字号，中文不受影响。 */
+html[data-lang="en"] #startScr h1{ font-size:clamp(20px,5vw,32px); }
+html[data-lang="en"] #startScr .sub{ font-size:11px; }
+html[data-lang="en"] #startScr .dbtn{ font-size:12px; }
+html[data-lang="en"] #startScr .dbtn small{ font-size:9px; }
+html[data-lang="en"] #startScr .ghostbtn{ font-size:10.5px; }
+html[data-lang="en"] #startScr .bigbtn{ font-size:15px; }
+
 </style>
 </head>
 <body>

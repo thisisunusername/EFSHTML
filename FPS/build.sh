@@ -10,6 +10,8 @@ OUT=index.html
 {
   cat full/a_head.html            # HTML+CSS+importmap+<script type="module">+import * as THREE
   printf '\n'
+  # i18n 核心必须第一个：T() 在 b_world 起就被调用（物品名/场景标签）
+  cat ../i18n/i18n_core.js; printf '\n'
   cat full/b_world.js;   printf '\n'
   cat full/c_player.js;  printf '\n'
   cat full/d_game.js;    printf '\n'
@@ -19,6 +21,10 @@ OUT=index.html
   cat full/x_ext.js;     printf '\n'
   cat full/w_weapon.js;  printf '\n'
   cat full/y_audio.js;   printf '\n'
+  # 强制横屏：依赖 T()（遮罩文案），必须在 i18n_core 之后
+  cat full/_orient.js;   printf '\n'
+  # 国际化接入层：要调 buildShop/buildBagNew 等，必须排在 f_ui 之后
+  cat full/u_i18n.js;    printf '\n'
   cat full/z_render.js
   printf '\n</script>\n'
   printf '</body>\n'
@@ -167,6 +173,17 @@ if command -v node >/dev/null 2>&1 && [ -f wpn_test.js ]; then
   else
     echo "$WP" | tail -20
     echo "武器切换测试失败"
+    exit 1
+  fi
+fi
+# 中英双语 + 强制横屏
+if command -v node >/dev/null 2>&1 && [ -f i18n_test.js ]; then
+  I8=$(node i18n_test.js 2>&1)
+  if echo "$I8" | grep -q 'I18N_OK'; then
+    echo "I18N_OK: 中英双语切换 + 强制横屏遮罩全部正确"
+  else
+    echo "$I8" | tail -20
+    echo "国际化测试失败"
     exit 1
   fi
 fi

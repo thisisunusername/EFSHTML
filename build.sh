@@ -10,11 +10,15 @@ OUT=index.html
 {
   cat full/a_head.html
   printf '(function(){\n'
+# i18n 核心：T() 在 b_world 的 DIFF/ITEM/W 里就被调用，必须最先
+  cat i18n/i18n_core.js; printf '\n'
 # b_world.js 自带 'use strict';，这里不再重复输出
   cat full/b_world.js;   printf '\n'
   cat full/c_logic.js;   printf '\n'
   cat full/d_actions.js; printf '\n'
   cat full/f_theme.js;   printf '\n'
+  # 国际化接入层：要读 startScr/HUD 等节点，放在渲染之后、尾部之前
+  cat full/_i18n2d.js;   printf '\n'
   cat full/e_render.js
   printf '</script>\n'
   printf '</body>\n'
@@ -38,4 +42,15 @@ if command -v node >/dev/null 2>&1; then
   fi
 else
   echo "OK: $OUT ($(wc -c < "$OUT") bytes)，未安装 node，跳过语法检查"
+fi
+# 2D 版中英双语
+if command -v node >/dev/null 2>&1 && [ -f i18n_2d_test.js ]; then
+  I2=$(node i18n_2d_test.js 2>&1)
+  if echo "$I2" | grep -q 'I18N_2D_OK'; then
+    echo "I18N_2D_OK: 2D 版房间/道具/结局/难度中英双语全部正确"
+  else
+    echo "$I2" | tail -20
+    echo "2D 国际化测试失败"
+    exit 1
+  fi
 fi

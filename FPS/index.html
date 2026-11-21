@@ -204,7 +204,65 @@
     #wpnBar .ws .wn{ font-size:7px; max-width:34px; }
   }
 
-  /* 菜单 */
+  /* ============ 横屏强制遮罩 ============
+   竖屏时盖住整个游戏，要求用户转屏。
+   z-index 要比所有东西都高（商店 210、背包 210、死亡界面）
+   否则会出现「遮罩下面还能点到按钮」。 */
+#orientMask{
+  position:fixed; inset:0; z-index:9999;
+  display:none;                /* 由 orientRefresh() 改成 flex */
+  align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #171c2b 0%, #0b0e14 70%);
+  touch-action:none;
+}
+#orientMask .omBox{
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  padding:28px 26px; max-width:88vw; text-align:center;
+}
+#orientMask .omIcon{
+  font-size:54px; line-height:1;
+  animation:omSpin 2.4s ease-in-out infinite;
+}
+/* 手机图标左右摇一下，比箭头更直观地暗示「转过来」 */
+@keyframes omSpin{
+  0%,45%   { transform:rotate(0deg); }
+  55%,100% { transform:rotate(90deg); }
+}
+#orientMask .omTitle{
+  font-size:20px; font-weight:800; color:#e8e8f0; letter-spacing:.5px;
+}
+#orientMask .omDesc{
+  font-size:13px; line-height:1.7; color:#9aa6bd; max-width:420px;
+}
+#orientMask .omBtn{
+  margin-top:4px; padding:11px 26px; border-radius:11px; cursor:pointer;
+  border:2px solid var(--accent); background:rgba(124,92,255,.22);
+  color:#cbbcff; font-size:14px; font-weight:700; font-family:inherit;
+}
+#orientMask .omBtn:active{ transform:scale(.96); }
+
+/* ============ 语言切换按钮 ============
+   复用主菜单 .btn.ghost.small 的外观，这里只补一点宽度保证
+   「🌐 English」和「🌐 中文」切换时按钮不会尺寸跳动。 */
+#langBtn{ min-width:96px; }
+
+/* 英文文案普遍比中文长 30% 左右，主菜单 .box 高度会溢出。
+   只对英文收紧行距与字号，中文保持原样不受影响。 */
+html[data-lang="en"] #menu .box{ line-height:1.5; }
+html[data-lang="en"] #menu h1{ font-size:clamp(18px,3.2vw,26px); }
+html[data-lang="en"] #menu p.sub{ font-size:12px; }
+html[data-lang="en"] #menu .kk span{ font-size:11px; }
+html[data-lang="en"] #menu .btn{ font-size:12.5px; }
+html[data-lang="en"] .keysbox-note{ font-size:10.5px; }
+
+/* 英文下 HUD 的「背包」比「Backpack」短，pill 会被撑宽。
+   给一个上限并省略，避免挤掉右侧的弹药格。 */
+html[data-lang="en"] #bagBtn span{
+  display:inline-block; max-width:58px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom;
+}
+
+/* 菜单 */
   #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
   #menu .box{ width:100%; max-width:520px; max-height:92vh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:24px; }
   #menu .box::-webkit-scrollbar{ width:8px; }
@@ -577,6 +635,606 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+
+/* ============================================================
+   i18n_core.js —— 中英双语核心
+   由 build.sh 打进 2D / 3D 两版，必须保持「纯函数、无外部依赖」。
+
+   设计要点：
+   1) 中文原串直接当 key，译文表只在切换英文时用。
+      这样源码里所有中文都不必改，破坏面最小。
+   2) T('中文') 找得到译文返回英文，找不到原样返回中文 ——
+      漏翻最多是「这句还是中文」，绝不会变成 undefined 或空白。
+   3) T() 支持 {0} {1} 占位符，对应 T('复活 {0}', 3)。
+   4) 语言存在 localStorage，跨会话保持；<html lang> 同步更新，
+      方便 CSS 里按语言调字体/字号。
+   ============================================================ */
+const I18N_LANGS = ['zh', 'en'];
+const I18N_LANG_NAMES = { zh: '中文', en: 'English' };
+const I18N_STORE_KEY = 'efs_lang_v1';
+
+/* 当前语言：默认中文，符合原有体验 */
+let I18N_LANG = 'zh';
+
+/* 英文译文表：key 是中文原串，value 是英文。
+   故意做成「平铺字典」而不是分组，因为查表最快也最好维护。 */
+const I18N_EN = {
+
+  /* ---------- 通用 / 按钮 ---------- */
+  '关闭': 'Close',
+  '完成': 'Done',
+  '返回': 'Back',
+  '取消': 'Cancel',
+  '确定': 'OK',
+  '是': 'Yes',
+  '否': 'No',
+  '开': 'ON',
+  '关': 'OFF',
+  '上': 'Up',
+  '下': 'Down',
+  '左': 'Left',
+  '右': 'Right',
+  '收起': 'Collapse',
+  '收起 ▾': 'Collapse ▾',
+  '展开 ▸': 'Expand ▸',
+  '继续': 'Continue',
+  '重试': 'Retry',
+  '已保存': 'Saved',
+  '已复制': 'Copied',
+  '复制': 'Copy',
+  '删除': 'Delete',
+  '清空': 'Clear',
+  '设置': 'Settings',
+  '语言': 'Language',
+
+  /* ---------- 主菜单 / 通用界面 ---------- */
+  '主菜单': 'Main Menu',
+  '回主菜单': 'Back to Menu',
+  '再次挑战': 'Play Again',
+  '再来一次': 'Play Again',
+  '开始游戏': 'Start Game',
+  '开始': 'Start',
+  '暂停': 'Pause',
+  '继续游戏': 'Resume',
+  '重新开始': 'Restart',
+  '玩法说明': 'How to Play',
+  '操作说明': 'Controls',
+  '设置': 'Settings',
+  '排行榜': 'Leaderboard',
+  '成就': 'Achievements',
+  '成就页': 'Achievements',
+  '昵称': 'Nickname',
+  '改昵称': 'Change Name',
+  '导出': 'Export',
+  '导入': 'Import',
+  '主题': 'Theme',
+  '风格': 'Style',
+  '颜色': 'Color',
+  '恢复默认': 'Reset to Default',
+  '原版': 'Classic',
+  '深蓝暗色': 'Deep Blue Dark',
+  '终端': 'Terminal',
+  '磷光绿屏': 'Phosphor Green',
+
+  /* ---------- 难度 / 模式 ---------- */
+  '简单': 'Easy',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '选择难度': 'Select Difficulty',
+  '难度': 'Difficulty',
+  '回 合 制': 'TURN-BASED',
+  '摇杆 + 全地图': 'Joystick + Full Map',
+  '按一下走一格': 'One tile per tap',
+  '连续移动 · 全图可见': 'Free movement · whole map visible',
+
+  /* ---------- 语言 ---------- */
+  '中文': '中文',
+  'English': 'English',
+  '切换语言': 'Switch Language',
+
+  /* ---------- HUD 通用 ---------- */
+  '生命': 'Health',
+  '血量': 'HP',
+  '护甲': 'Armor',
+  '耐久': 'Durability',
+  '货币': 'Currency',
+  '金币': 'Coins',
+  '当前货币': 'Money',
+  '弹药': 'Ammo',
+  '备用弹药': 'Reserve',
+  '背包': 'Backpack',
+  '仓库': 'Stash',
+  '商店': 'Shop',
+  '物品栏': 'Inventory',
+  '装备': 'Equipment',
+  '物品': 'Items',
+  '地图': 'Map',
+  '楼层': 'Floor',
+  '回合': 'Turn',
+  '被 抓': 'Caught',
+  '被抓': 'Caught',
+  '电闸': 'Breaker',
+  '被发现': 'Spotted',
+  '撤离': 'Extract',
+  '撤离点': 'Extraction Point',
+  '击杀数': 'Kills',
+  '撤离次数': 'Extractions',
+
+  /* ---------- 动作 ---------- */
+  '行动': 'Action',
+  '跳过': 'Skip',
+  '移动': 'Move',
+  '跳跃': 'Jump',
+  '奔跑': 'Sprint',
+  '趴下': 'Prone',
+  '站起': 'Stand',
+  '瞄准': 'Aim',
+  '射击': 'Fire',
+  '换弹': 'Reload',
+  '开镜': 'Scope',
+  '开门': 'Open Door',
+  '关门': 'Close Door',
+  '拾取': 'Pick Up',
+  '互动': 'Interact',
+  '搜刮': 'Loot',
+  '使用': 'Use',
+  '装填': 'Load',
+  '卸下': 'Unequip',
+  '装备上': 'Equip',
+  '购买': 'Buy',
+  '卖出': 'Sell',
+  '转视角': 'Look',
+  '视角': 'Camera',
+  '鼠标': 'Mouse',
+  '左键': 'Left Click',
+  '右键': 'Right Click',
+  '空格': 'Space',
+  '交谈': 'Talk',
+  '休息': 'Rest',
+  '制作': 'Craft',
+  '制作台': 'Crafting Bench',
+  '小卖部': 'Tuck Shop',
+
+  /* ---------- 游戏状态 ---------- */
+  '胜利': 'Victory',
+  '失败': 'Defeat',
+  '成功逃脱': 'Escaped',
+  '你被抓住了': 'You were caught',
+  '游戏结束': 'Game Over',
+  '正在加载': 'Loading',
+  '加载中': 'Loading',
+  '准备中': 'Preparing',
+  '进度': 'Progress',
+
+  /* ---------- 3D 版：武器槽 ---------- */
+  '主武器': 'Primary',
+  '副武器': 'Sidearm',
+  '手枪': 'Pistol',
+  '步枪': 'Rifle',
+  '刀': 'Knife',
+  '近战': 'Melee',
+  '胸挂': 'Chest Rig',
+  '头盔': 'Helmet',
+  '防弹衣': 'Body Armor',
+  '切枪': 'Weapon Swap',
+
+  /* ---------- 3D 版：商店物品 ---------- */
+  '医疗包': 'Medkit',
+  '急救包': 'First Aid Kit',
+  '绷带': 'Bandage',
+  '止痛药': 'Painkiller',
+  '手雷': 'Grenade',
+  '烟雾弹': 'Smoke Grenade',
+  '闪光弹': 'Flashbang',
+  '开锁器': 'Lockpick',
+  '手枪弹': '9mm Rounds',
+  '步枪弹': '5.56 Rounds',
+  '狙击弹': '7.62 Rounds',
+  '霰弹': '12G Shells',
+  '战术腰包': 'Tactical Pouch',
+  '小型背包': 'Small Backpack',
+  '中型背包': 'Medium Backpack',
+  '大型背包': 'Large Backpack',
+  '防弹背心': 'Ballistic Vest',
+  '战术头盔': 'Tactical Helmet',
+  '战术小刀': 'Tactical Knife',
+  '哨兵手枪': 'Sentry Pistol',
+  '突击步枪': 'Assault Rifle',
+
+  /* ---------- 3D 版：商店描述 ---------- */
+  '恢复 40 生命': 'Restores 40 HP',
+  '恢复 100 生命（满血）': 'Restores 100 HP (full)',
+  '恢复 15 生命，便宜量大': 'Restores 15 HP, cheap in bulk',
+  '恢复 25 生命并短暂加速': 'Restores 25 HP, brief speed boost',
+  '投掷爆炸，范围伤害': 'Thrown explosive, area damage',
+  '制造烟幕遮挡视线': 'Creates smoke screen to block vision',
+  '致盲附近敌人': 'Blinds nearby enemies',
+  '打开上锁的箱子': 'Opens locked crates',
+  '容量 12 格': '12 slots',
+  '容量 24 格': '24 slots',
+  '容量 36 格': '36 slots',
+  '容量 48 格': '48 slots',
+
+  /* ---------- 提示 / Toast ---------- */
+  '已装备': 'Equipped',
+  '已卸下': 'Unequipped',
+  '已购买': 'Purchased',
+  '货币不足': 'Not enough money',
+  '背包已满': 'Backpack is full',
+  '距离太远': 'Too far away',
+  '需要钥匙': 'Requires a key',
+  '门已锁': 'Door is locked',
+  '无法使用': 'Cannot use',
+  '使用成功': 'Success',
+  '生命已满': 'HP is full',
+  '无法奔跑': 'Cannot sprint',
+  '弹药不足': 'Out of ammo',
+  '换弹中': 'Reloading',
+  '没有武器': 'No weapon',
+  '已切到': 'Switched to',
+  '空槽位': 'Empty slot',
+  '局内不能换装': 'Cannot change gear in a match',
+
+  /* ---------- 3D 版：主菜单 ---------- */
+  '搜打撤': 'Loot · Shoot · Extract',
+  '学校 3D': 'School 3D',
+  '搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。':
+    'Loot supplies → kill enemies → reach the extraction point. Spend money in the shop. Exports are encrypted to prevent tampering.',
+  '▶ 开始（进入游戏）': '▶ Start (Enter Game)',
+  '🛒 商店': '🛒 Shop',
+  '🏠 仓库': '🏠 Stash',
+  '⬇️ 加密导出': '⬇️ Encrypted Export',
+  '⬆️ 加密导入': '⬆️ Encrypted Import',
+  '♻️ 重置数据': '♻️ Reset Data',
+  '← 返回原版': '← Back to Original',
+  '💀 你阵亡了': '💀 You Died',
+  '重新部署': 'Redeploy',
+  '确认重置所有数据？': 'Reset all data?',
+
+  /* ---------- 3D 版：屏幕提示条 ---------- */
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战':
+    '📱 Drag right half to look · left stick to move · bottom-right buttons to fight',
+  '📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下 · 靠近门按 E 开门':
+    '📱 Drag right half to look · left stick to move · fire/jump/reload/loot at bottom right · press E near a door',
+  '📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击':
+    '📱 Mobile: drag left half to move · drag right half to look · bottom-right button to fire',
+  '🎮 摇杆已激活 · 拖动移动': '🎮 Joystick active · drag to move',
+  '🔭 开镜中 · 再点一次退出': '🔭 Scoped · tap again to exit',
+  '⌨️ 操作说明': '⌨️ Controls',
+
+  /* ---------- 2D 版：主菜单 ---------- */
+  '逃离学校 · HTML版': 'Escape From the School · HTML Edition',
+  '五种结局 · 被抓两次就失败': 'Five endings · caught twice and you fail',
+  '一层': 'Floor 1',
+  '二层': 'Floor 2',
+  '三层': 'Floor 3',
+  '四层': 'Floor 4',
+  '地下室': 'Basement',
+  '五条逃走路线': 'Five escape routes',
+  '隐藏结局': 'Hidden Ending',
+  '结局': 'Ending',
+  '排行榜': 'Leaderboard',
+  '🏆 排行榜': '🏆 Leaderboard',
+  '🎖 成就': '🎖 Achievements',
+  '✏️ 改昵称': '✏️ Change Name',
+  '⬇️ 导出': '⬇️ Export',
+  '🎨 主题': '🎨 Theme',
+  '重置数据': 'Reset Data',
+  '确认重置？': 'Reset?',
+
+  /* ---------- 3D 版：商店分类 ---------- */
+  '医药': 'Medical',
+  '道具': 'Gadgets',
+  '子弹': 'Ammo',
+  '冲锋枪': 'SMG',
+  '狙击步枪': 'Sniper Rifle',
+  '制式手枪': 'Standard Pistol',
+  '大口径手枪': 'Heavy Pistol',
+  '防弹头盔': 'Ballistic Helmet',
+  '重型头盔': 'Heavy Helmet',
+  '轻型护甲': 'Light Armor',
+  '标准护甲': 'Standard Armor',
+  '重型护甲': 'Heavy Armor',
+  '防暴棍': 'Riot Baton',
+  '简易胸挂': 'Light Chest Rig',
+  '重型胸挂': 'Heavy Chest Rig',
+  '进入游戏': 'Enter Game',
+  '加密导出': 'Encrypted Export',
+  '加密导入': 'Encrypted Import',
+  '返回原版': 'Back to Original',
+  '拾取/互动': 'Loot / Interact',
+
+  /* ---------- 3D 版：商店描述（详细） ---------- */
+  '9mm · 50 发': '9mm · 50 rounds',
+  '5.56 · 60 发': '5.56 · 60 rounds',
+  '7.62 · 20 发': '7.62 · 20 rounds',
+  '12G · 24 发': '12G · 24 shells',
+  '减伤 10% · 耐久 60': '-10% damage · 60 durability',
+  '减伤 20% · 耐久 120': '-20% damage · 120 durability',
+  '减伤 32% · 耐久 220': '-32% damage · 220 durability',
+  '减伤 15% · 耐久 80': '-15% damage · 80 durability',
+  '减伤 25% · 耐久 150': '-25% damage · 150 durability',
+  '减伤 40% · 耐久 260': '-40% damage · 260 durability',
+  '全自动 · 高伤害': 'Full auto · high damage',
+  '射速快 · 后坐力小': 'Fast fire rate · low recoil',
+  '单发 · 极高伤害': 'Single shot · extreme damage',
+  '应急副武器': 'Emergency sidearm',
+  '高伤副武器': 'High-damage sidearm',
+  '近战 · 永不耗弹': 'Melee · never uses ammo',
+  '近战 · 攻击范围大': 'Melee · longer reach',
+  '额外 2 个弹匣位': '+2 magazine slots',
+  '额外 4 个弹匣位': '+4 magazine slots',
+  '额外 6 个弹匣位': '+6 magazine slots',
+
+  /* ---------- 3D 版：横屏遮罩 ---------- */
+  '请横屏游玩': 'Please Rotate Your Device',
+  '3D 第一人称需要横屏。把设备转过来，或者点下面的按钮。':
+    '3D first-person needs landscape. Rotate your device, or tap the button below.',
+  '进入横屏': 'Go Landscape',
+
+
+  /* ============================================================
+     2D 版：房间 / 地点名
+     ============================================================ */
+  '教室': 'Classroom',
+  '老师办公室': "Teacher's Office",
+  '厕所': 'Restroom',
+  '电闸室': 'Breaker Room',
+  '体育馆前厅': 'Gym Lobby',
+  '器材室': 'Equipment Room',
+  '走廊': 'Hallway',
+  '大门厅': 'Main Lobby',
+  '楼梯间': 'Stairwell',
+  '空教室': 'Empty Classroom',
+  '图书角': 'Reading Corner',
+  '体育馆': 'Gymnasium',
+  '器材间': 'Equipment Closet',
+  '二层电闸': '2F Breaker',
+  '大门': 'Main Gate',
+  '下楼': 'Go Downstairs',
+  '小卖部': 'Tuck Shop',
+  '校长办公室': "Principal's Office",
+  '侧门区': 'Side Door Area',
+  '门厅': 'Foyer',
+  '杂物间': 'Storage Room',
+  '校长办公室门（权限锁）': "Principal's Office Door (Access Locked)",
+  '侧门': 'Side Door',
+  '上楼': 'Go Upstairs',
+  '下地下车库': 'Go to Garage',
+  '保安室': 'Security Room',
+  '车库': 'Garage',
+  '电子门通道': 'Electronic Door Passage',
+  '墙后通道': 'Passage Behind the Wall',
+  '上一层': 'Go Up One Floor',
+  '下四层': 'Go to Floor 4',
+  '监控总闸': 'CCTV Master Breaker',
+  '三层电闸': '3F Breaker',
+  '校长的车': "Principal's Car",
+  '电子门': 'Electronic Door',
+  '电子门后的砖墙': 'Brick Wall Behind the Electronic Door',
+  '工具房': 'Tool Room',
+  '主任办公室': "Dean's Office",
+  '制作室': 'Crafting Room',
+  '地下室门厅': 'Basement Lobby',
+  '库房': 'Stockroom',
+  '上三层': 'Go to Floor 3',
+  '四层电闸': '4F Breaker',
+  '地下室门': 'Basement Door',
+  '回四层': 'Back to Floor 4',
+  '通往学校外面的楼梯': 'Stairs Leading Outside',
+
+  /* ============================================================
+     2D 版：道具
+     ============================================================ */
+  '老师工作牌': "Teacher's Badge",
+  '红钥匙': 'Red Key',
+  '黄色钥匙': 'Yellow Key',
+  '锯子': 'Saw',
+  '锤子': 'Hammer',
+  '木头': 'Wood',
+  '小刀': 'Knife',
+  '黑钥匙制作图': 'Black Key Blueprint',
+  '黑钥匙': 'Black Key',
+  '隐身针': 'Invisibility Syringe',
+  '可乐': 'Cola',
+  '手电筒': 'Flashlight',
+
+  /* ============================================================
+     2D 版：结局标题
+     ============================================================ */
+  '结局一 · 被抓住了': 'Ending 1 · Caught',
+  '结局二 · 大门逃脱': 'Ending 2 · Main Gate Escape',
+  '结局三 · 侧门逃脱': 'Ending 3 · Side Door Escape',
+  '结局四 · 地下车库逃脱': 'Ending 4 · Garage Escape',
+  '结局五 · 地下室逃脱': 'Ending 5 · Basement Escape',
+  '结局六 · 打电话给原作者': 'Ending 6 · Call the Original Author',
+  '隐藏结局': 'Hidden Ending',
+  '隐藏结局 · 仅地狱模式可触发': 'Hidden Ending · Hell mode only',
+
+  /* ============================================================
+     2D 版：常用提示 / 交互
+     ============================================================ */
+  '按 E 打开小卖部': 'Press E to open the tuck shop',
+  '按 E 使用制作台': 'Press E to use the crafting bench',
+  '按 E 拉闸': 'Press E to pull the breaker',
+  '按 E 拉下监控总闸（全楼监控停摆）': 'Press E to cut the CCTV master breaker (all cameras go dark)',
+  '按 E 用锤子砸校长的车': "Press E to smash the principal's car with a hammer",
+  '按 E 锯树（需要锯子）': 'Press E to saw the tree (requires a saw)',
+  '按 E 尝试打开': 'Press E to try opening',
+  '按 E 拾取 ': 'Press E to pick up ',
+  '按 E 用小刀捅他（25% 概率）': 'Press E to stab them with a knife (25% chance)',
+  '走近这里就能逃出去': 'Get close to escape',
+  '这是监控，别在它视野里停留': "That's a camera — do not linger in its sight",
+  '任务：找一条路逃出学校': 'Objective: find a way out of the school',
+  'WASD / 方向键移动，别被老师看见': 'WASD / Arrow keys to move — stay out of sight',
+  'WASD / 方向键移动': 'WASD / Arrow keys to move',
+  '只有在教室或厕所才能跳过回合': 'You can only skip a turn in a classroom or restroom',
+  '跳过一回合，老师 / 保安移动了': 'Turn skipped — teachers and guards moved',
+  '无名同学': 'Nameless Student',
+  '无名': 'Anonymous',
+  '老师': 'Teacher',
+  '班主任': 'Homeroom Teacher',
+  '保安': 'Security Guard',
+  '监控': 'Camera',
+  '排行榜（本机记录）': 'Leaderboard (local records)',
+  '还没有记录，通关一次就会出现在这里。': 'No records yet — finish a run and it will show up here.',
+  '成绩只存在这台设备的 cookie 里，不上传服务器。': "Scores are stored only in the local cookie of this device, never uploaded.",
+  '输入你的昵称（存在本机 cookie）': 'Enter your nickname (stored in local cookie)',
+  '昵称已保存：': 'Nickname saved: ',
+  '成就解锁': 'Achievement Unlocked',
+  '成就再次达成': 'Achievement Reached Again',
+  '尚未解锁': 'Locked',
+  '已解锁': 'Unlocked',
+  '累计达成': 'Total reached',
+  '自定义': 'Custom',
+  '继续': 'Continue',
+  '制作': 'Craft',
+  '已拥有': 'Owned',
+  '免 费': 'FREE',
+  '小卖部 · 每局只能选一个': 'Tuck Shop · pick only one per run',
+  '小卖部 · 全部免费，但每局只能选一个': 'Tuck Shop · all free, but only one per run',
+  '这里没有可以互动的东西': 'Nothing to interact with here',
+  '已经拿过了': 'Already taken',
+  '获得 ': 'Obtained ',
+  '收回：': 'Taken back: ',
+  '给予：': 'Given: ',
+  '已开': 'OPEN',
+  '关闭': 'Close',
+  '需要钥匙': 'A key is required',
+  '需要黑钥匙': 'Requires the Black Key',
+  '需要小刀': 'Requires a knife',
+  '需要锯子才能锯树（工具房里有）': 'You need a saw to cut the tree (one is in the tool room)',
+  '需要锤子才能砸车': 'You need a hammer to smash the car',
+  '这棵树已经被锯过了': 'This tree has already been cut',
+  '这个电闸已经拉下了': 'This breaker is already down',
+  '车已经砸烂了': 'The car is already wrecked',
+  '监控已经关掉了': 'CCTV is already off',
+  '电子门已经打开了': 'The electronic door is already open',
+  '砖墙已经砸开了': 'The brick wall is already broken',
+  '地下室门锁着，需要黑钥匙': 'The basement door is locked — you need the Black Key',
+  '地下室门开了，下去吧': 'The basement door is open — head down',
+  '权限锁': 'Access Locked',
+  '练习': 'Practice',
+  '普通': 'Normal',
+  '困难': 'Hard',
+  '地狱': 'Hell',
+  '地狱难度：所有常规出口都被封死了，只能走电子门或地下室':
+    'Hell mode: all normal exits are sealed — you must use the electronic door or the basement',
+  '三个电闸已全部拉下，电子门通了': 'All three breakers are down — the electronic door has power',
+  '拉下监控总闸：全楼的监控都黑了': 'CCTV master breaker pulled — every camera is dark',
+
+};
+
+/* 把 {0} {1} 换掉。只在 T() 内部用。 */
+function i18nFormat(str, args){
+  if(!args || !args.length) return str;
+  return String(str).replace(/\{(\d+)\}/g, function(m, i){
+    const v = args[+i];
+    return (v === undefined || v === null) ? m : String(v);
+  });
+}
+
+/* 核心翻译函数：中文原串 -> 当前语言 */
+function T(str, a, b, c){
+  if(str == null) return str;
+  let out = str;
+  if(I18N_LANG === 'en'){
+    const hit = I18N_EN[str];
+    if(hit !== undefined) out = hit;
+  }
+  return i18nFormat(out, arguments.length > 1 ? Array.prototype.slice.call(arguments, 1) : null);
+}
+
+/* 按当前语言二选一，用于「中文文案 / 英文文案」都需要保留原样的场合 */
+function TL(zh, en){ return I18N_LANG === 'en' ? en : zh; }
+
+/* 读取持久化的语言 */
+function i18nLoad(){
+  let v = null;
+  try{ v = localStorage.getItem(I18N_STORE_KEY); }catch(e){ v = null; }
+  if(v && I18N_LANGS.indexOf(v) >= 0) I18N_LANG = v;
+  else I18N_LANG = 'zh';
+  return I18N_LANG;
+}
+
+/* 保存语言 */
+function i18nSave(){
+  try{ localStorage.setItem(I18N_STORE_KEY, I18N_LANG); }catch(e){}
+}
+
+/* 应用 <html lang> 与 <html data-lang>，CSS 可据此调字号 */
+function i18nApplyDoc(){
+  if(typeof document === 'undefined' || !document.documentElement) return;
+  const el = document.documentElement;
+  el.setAttribute('data-lang', I18N_LANG);
+  el.setAttribute('lang', I18N_LANG === 'en' ? 'en' : 'zh-CN');
+}
+
+/* 切换语言。返回是否真的变了。
+   rebuild 由各版自己传进来（重绘界面），这样 core 不需要知道界面细节。 */
+function i18nSetLang(lang, rebuild){
+  if(I18N_LANGS.indexOf(lang) < 0) return false;
+  if(lang === I18N_LANG) return false;
+  I18N_LANG = lang;
+  i18nSave();
+  i18nApplyDoc();
+  if(typeof rebuild === 'function'){ try{ rebuild(); }catch(e){} }
+  return true;
+}
+
+/* 在两种语言间来回切 */
+function i18nToggle(rebuild){
+  return i18nSetLang(I18N_LANG === 'zh' ? 'en' : 'zh', rebuild);
+}
+
+/* 扫描 DOM 里带 data-i18n 的元素并替换文本。
+   属性用法：data-i18n 填中文原串即可；
+   也可以填 data-i18n-ph 换 placeholder、data-i18n-title 换 title。 */
+function i18nApplyDOM(root){
+  if(typeof document === 'undefined') return;
+  const scope = root || document;
+  const nodes = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n]') : [];
+  for(let i = 0; i < nodes.length; i++){
+    const n = nodes[i];
+    n.textContent = T(n.getAttribute('data-i18n'));
+  }
+  const phs = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-ph]') : [];
+  for(let i = 0; i < phs.length; i++){
+    const n = phs[i];
+    n.setAttribute('placeholder', T(n.getAttribute('data-i18n-ph')));
+  }
+  const tts = scope.querySelectorAll ? scope.querySelectorAll('[data-i18n-title]') : [];
+  for(let i = 0; i < tts.length; i++){
+    const n = tts[i];
+    n.setAttribute('title', T(n.getAttribute('data-i18n-title')));
+  }
+}
+
+/* 生成一个语言切换按钮并挂到指定容器上。
+   两版共用同一套外观，颜色跟各自主题走（用 CSS 变量）。 */
+function i18nMountToggle(parent, rebuild, cls){
+  if(typeof document === 'undefined' || !parent) return null;
+  let btn = document.getElementById('langBtn');
+  if(!btn){
+    btn = document.createElement('button');
+    btn.id = 'langBtn';
+    btn.className = cls || 'langBtn';
+    btn.type = 'button';
+    parent.appendChild(btn);
+  }
+  const paint = function(){
+    btn.textContent = I18N_LANG === 'zh' ? '🌐 English' : '🌐 中文';
+    btn.setAttribute('title', T('切换语言'));
+    btn.setAttribute('aria-label', T('切换语言'));
+  };
+  paint();
+  btn.onclick = function(ev){
+    if(ev) ev.stopPropagation();
+    i18nToggle(function(){ rebuild && rebuild(); paint(); });
+  };
+  return btn;
+}
 
 /* ============ b_world.js：场景初始化 + 学校地图（还原现实） ============ */
 const $=id=>document.getElementById(id);
@@ -2004,79 +2662,83 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
    - BAG_CAP 描述「能带多少」（背包决定容量） */
 
 /* 装备槽定义：顺序就是左侧从上到下的顺序 */
+/* 【i18n】label 用 getter 而不是字面量：
+   数组在脚本加载时只求值一次，如果这里直接写 T('主武器')，
+   语言切换后这些 label 还停在加载时的语言。
+   getter 每次读取时现算，切换语言立即生效。 */
 const SLOTS=[
-  { key:'primary',  label:'主武器',  fb:'🔫', accept:['gun'] },
-  { key:'secondary',label:'手枪',    fb:'🔫', accept:['pistol'] },
-  { key:'melee',    label:'副武器',  fb:'🔪', accept:['melee'] },
-  { key:'chest',    label:'胸挂',    fb:'🦺', accept:['chest'] },
-  { key:'backpack', label:'背包',    fb:'🎒', accept:['bag'] },
+  { key:'primary',  get label(){ return T('主武器'); },  fb:'🔫', accept:['gun'] },
+  { key:'secondary',get label(){ return T('手枪'); },    fb:'🔫', accept:['pistol'] },
+  { key:'melee',    get label(){ return T('副武器'); },  fb:'🔪', accept:['melee'] },
+  { key:'chest',    get label(){ return T('胸挂'); },    fb:'🦺', accept:['chest'] },
+  { key:'backpack', get label(){ return T('背包'); },    fb:'🎒', accept:['bag'] },
 ];
 
 const SHOP_ITEMS={
   /* ---- 医疗：局内回血，按回复量分档 ---- */
-  med:      {cat:'med', name:'医疗包',   icon:'🩹', price:300,  desc:'恢复 40 生命', heal:40},
-  med_kit:  {cat:'med', name:'急救包',   icon:'🧰', price:900,  desc:'恢复 100 生命（满血）', heal:100},
-  bandage:  {cat:'med', name:'绷带',     icon:'🩶', price:120,  desc:'恢复 15 生命，便宜量大', heal:15},
-  painkill:{cat:'med', name:'止痛药',   icon:'💊', price:250,  desc:'恢复 25 生命并短暂加速', heal:25, buff:'speed'},
+  med:      {cat:'med', get name(){ return T('医疗包'); },   icon:'🩹', price:300,  get desc(){ return T('恢复 40 生命'); }, heal:40},
+  med_kit:  {cat:'med', get name(){ return T('急救包'); },   icon:'🧰', price:900,  get desc(){ return T('恢复 100 生命（满血）'); }, heal:100},
+  bandage:  {cat:'med', get name(){ return T('绷带'); },     icon:'🩶', price:120,  get desc(){ return T('恢复 15 生命，便宜量大'); }, heal:15},
+  painkill:{cat:'med', get name(){ return T('止痛药'); },   icon:'💊', price:250,  get desc(){ return T('恢复 25 生命并短暂加速'); }, heal:25, buff:'speed'},
 
   /* ---- 道具：一次性消耗 ---- */
-  grenade:  {cat:'tool', name:'手雷',    icon:'💣', price:600,  desc:'投掷爆炸，范围伤害', dmg:120},
-  smoke:    {cat:'tool', name:'烟雾弹',  icon:'🌫️', price:350,  desc:'制造烟幕遮挡视线'},
-  flashbang:{cat:'tool', name:'闪光弹',  icon:'⚡', price:400,  desc:'致盲附近敌人'},
-  lockpick: {cat:'tool', name:'开锁器',  icon:'🔧', price:200,  desc:'打开上锁的箱子'},
+  grenade:  {cat:'tool', get name(){ return T('手雷'); },    icon:'💣', price:600,  get desc(){ return T('投掷爆炸，范围伤害'); }, dmg:120},
+  smoke:    {cat:'tool', get name(){ return T('烟雾弹'); },  icon:'🌫️', price:350,  get desc(){ return T('制造烟幕遮挡视线'); }},
+  flashbang:{cat:'tool', get name(){ return T('闪光弹'); },  icon:'⚡', price:400,  get desc(){ return T('致盲附近敌人'); }},
+  lockpick: {cat:'tool', get name(){ return T('开锁器'); },  icon:'🔧', price:200,  get desc(){ return T('打开上锁的箱子'); }},
 
   /* ---- 子弹：按枪种分类，买的是「发」 ---- */
-  ammo_pistol:{cat:'ammo', name:'手枪弹', icon:'🔸', price:80,  desc:'9mm · 50 发', ammo:'pistol', count:50},
-  ammo_rifle: {cat:'ammo', name:'步枪弹', icon:'🔹', price:200, desc:'5.56 · 60 发', ammo:'rifle', count:60},
-  ammo_sniper:{cat:'ammo', name:'狙击弹', icon:'🔻', price:400, desc:'7.62 · 20 发', ammo:'sniper', count:20},
-  ammo_shot:  {cat:'ammo', name:'霰弹',   icon:'🔶', price:180, desc:'12G · 24 发', ammo:'shot', count:24},
+  ammo_pistol:{cat:'ammo', get name(){ return T('手枪弹'); }, icon:'🔸', price:80,  get desc(){ return T('9mm · 50 发'); }, ammo:'pistol', count:50},
+  ammo_rifle: {cat:'ammo', get name(){ return T('步枪弹'); }, icon:'🔹', price:200, get desc(){ return T('5.56 · 60 发'); }, ammo:'rifle', count:60},
+  ammo_sniper:{cat:'ammo', get name(){ return T('狙击弹'); }, icon:'🔻', price:400, get desc(){ return T('7.62 · 20 发'); }, ammo:'sniper', count:20},
+  ammo_shot:  {cat:'ammo', get name(){ return T('霰弹'); },   icon:'🔶', price:180, get desc(){ return T('12G · 24 发'); }, ammo:'shot', count:24},
 
   /* ---- 背包：决定容量，越贵能带的越多 ---- */
-  bp_pouch: {cat:'bag', name:'战术腰包', icon:'👝', price:500,   desc:'容量 12 格',  cap:12},
-  bp_small: {cat:'bag', name:'小型背包', icon:'🎒', price:1500,  desc:'容量 24 格',  cap:24},
-  bp_med:   {cat:'bag', name:'中型背包', icon:'🎒', price:3500,  desc:'容量 36 格',  cap:36},
-  bp_large: {cat:'bag', name:'大型背包', icon:'🧳', price:7000,  desc:'容量 48 格',  cap:48},
+  bp_pouch: {cat:'bag', get name(){ return T('战术腰包'); }, icon:'👝', price:500,   get desc(){ return T('容量 12 格'); },  cap:12},
+  bp_small: {cat:'bag', get name(){ return T('小型背包'); }, icon:'🎒', price:1500,  get desc(){ return T('容量 24 格'); },  cap:24},
+  bp_med:   {cat:'bag', get name(){ return T('中型背包'); }, icon:'🎒', price:3500,  get desc(){ return T('容量 36 格'); },  cap:36},
+  bp_large: {cat:'bag', get name(){ return T('大型背包'); }, icon:'🧳', price:7000,  get desc(){ return T('容量 48 格'); },  cap:48},
 
   /* ---- 头盔：减伤 + 耐久 ---- */
-  helm_light:{cat:'helmet', name:'战术头盔', icon:'⛑️', price:800,  desc:'减伤 10% · 耐久 60',  reduce:.10, dur:60},
-  helm_med:  {cat:'helmet', name:'防弹头盔', icon:'⛑️', price:2200, desc:'减伤 20% · 耐久 120', reduce:.20, dur:120},
-  helm_heavy:{cat:'helmet', name:'重型头盔', icon:'🪖', price:5000, desc:'减伤 32% · 耐久 220', reduce:.32, dur:220},
+  helm_light:{cat:'helmet', get name(){ return T('战术头盔'); }, icon:'⛑️', price:800,  get desc(){ return T('减伤 10% · 耐久 60'); },  reduce:.10, dur:60},
+  helm_med:  {cat:'helmet', get name(){ return T('防弹头盔'); }, icon:'⛑️', price:2200, get desc(){ return T('减伤 20% · 耐久 120'); }, reduce:.20, dur:120},
+  helm_heavy:{cat:'helmet', get name(){ return T('重型头盔'); }, icon:'🪖', price:5000, get desc(){ return T('减伤 32% · 耐久 220'); }, reduce:.32, dur:220},
 
   /* ---- 护甲：减伤 + 耐久 ---- */
-  vest_light:{cat:'armor', name:'轻型护甲', icon:'🦺', price:1200, desc:'减伤 15% · 耐久 80',  reduce:.15, dur:80},
-  vest_med:  {cat:'armor', name:'标准护甲', icon:'🦺', price:3000, desc:'减伤 25% · 耐久 150', reduce:.25, dur:150},
-  vest_heavy:{cat:'armor', name:'重型护甲', icon:'🛡️', price:6500, desc:'减伤 40% · 耐久 260', reduce:.40, dur:260},
+  vest_light:{cat:'armor', get name(){ return T('轻型护甲'); }, icon:'🦺', price:1200, get desc(){ return T('减伤 15% · 耐久 80'); },  reduce:.15, dur:80},
+  vest_med:  {cat:'armor', get name(){ return T('标准护甲'); }, icon:'🦺', price:3000, get desc(){ return T('减伤 25% · 耐久 150'); }, reduce:.25, dur:150},
+  vest_heavy:{cat:'armor', get name(){ return T('重型护甲'); }, icon:'🛡️', price:6500, get desc(){ return T('减伤 40% · 耐久 260'); }, reduce:.40, dur:260},
   /* ---- 武器槽（对应左侧装备栏） ----
      主武器决定你拿的是步枪还是冲锋枪；手枪是副武器，主武器没子弹时切换用；
      小刀是最后的近战手段，不耗子弹。
      这三个 cat 分别对应 SLOTS 里的 primary / secondary / melee。 */
-  gun_rifle:  {cat:'gun',    name:'突击步枪', icon:'🔫', price:4500, desc:'全自动 · 高伤害', ammoType:'rifle',  dmg:26},
-  gun_smg:    {cat:'gun',    name:'冲锋枪',   icon:'🔫', price:2800, desc:'射速快 · 后坐力小', ammoType:'pistol', dmg:18},
-  gun_sniper: {cat:'gun',    name:'狙击步枪', icon:'🎯', price:8000, desc:'单发 · 极高伤害', ammoType:'sniper', dmg:60},
-  pis_default:{cat:'pistol', name:'制式手枪', icon:'🔫', price:600,  desc:'应急副武器', ammoType:'pistol', dmg:14},
-  pis_heavy:  {cat:'pistol', name:'大口径手枪', icon:'🔫', price:1800, desc:'高伤副武器', ammoType:'pistol', dmg:24},
-  melee_knife:{cat:'melee',  name:'战术小刀', icon:'🔪', price:200,  desc:'近战 · 永不耗弹', dmg:35},
-  melee_baton:{cat:'melee',  name:'防暴棍',   icon:'🏏', price:500,  desc:'近战 · 攻击范围大', dmg:28},
+  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26},
+  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18},
+  gun_sniper: {cat:'gun',    get name(){ return T('狙击步枪'); }, icon:'🎯', price:8000, get desc(){ return T('单发 · 极高伤害'); }, ammoType:'sniper', dmg:60},
+  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('应急副武器'); }, ammoType:'pistol', dmg:14},
+  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('高伤副武器'); }, ammoType:'pistol', dmg:24},
+  melee_knife:{cat:'melee',  get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹'); }, dmg:35},
+  melee_baton:{cat:'melee',  get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28},
   /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
-  chest_small:{cat:'chest',  name:'简易胸挂', icon:'🦺', price:800,  desc:'额外 2 个弹匣位', mags:2},
-  chest_med:  {cat:'chest',  name:'战术胸挂', icon:'🦺', price:2000, desc:'额外 4 个弹匣位', mags:4},
-  chest_large:{cat:'chest',  name:'重型胸挂', icon:'🦺', price:4500, desc:'额外 6 个弹匣位', mags:6},
+  chest_small:{cat:'chest',  get name(){ return T('简易胸挂'); }, icon:'🦺', price:800,  get desc(){ return T('额外 2 个弹匣位'); }, mags:2},
+  chest_med:  {cat:'chest',  get name(){ return T('战术胸挂'); }, icon:'🦺', price:2000, get desc(){ return T('额外 4 个弹匣位'); }, mags:4},
+  chest_large:{cat:'chest',  get name(){ return T('重型胸挂'); }, icon:'🦺', price:4500, get desc(){ return T('额外 6 个弹匣位'); }, mags:6},
 };
 
 /* 分类标签（顺序即显示顺序） */
 const SHOP_CATS=[
   /* 武器分类要放在最前面：这是玩家在仓库里最先要填的三个槽
      （主武器/手枪/副武器），商店里买不到就永远空着。 */
-  {id:'gun',    name:'主武器'},
-  {id:'pistol', name:'手枪'},
-  {id:'melee',  name:'副武器'},
-  {id:'chest',  name:'胸挂'},
-  {id:'med',    name:'医药'},
-  {id:'tool',   name:'道具'},
-  {id:'ammo',   name:'子弹'},
-  {id:'bag',    name:'背包'},
-  {id:'helmet', name:'头盔'},
-  {id:'armor',  name:'护甲'},
+  {id:'gun',    get name(){ return T('主武器'); }},
+  {id:'pistol', get name(){ return T('手枪'); }},
+  {id:'melee',  get name(){ return T('副武器'); }},
+  {id:'chest',  get name(){ return T('胸挂'); }},
+  {id:'med',    get name(){ return T('医药'); }},
+  {id:'tool',   get name(){ return T('道具'); }},
+  {id:'ammo',   get name(){ return T('子弹'); }},
+  {id:'bag',    get name(){ return T('背包'); }},
+  {id:'helmet', get name(){ return T('头盔'); }},
+  {id:'armor',  get name(){ return T('护甲'); }},
 ];
 let shopTab='gun';   // 当前商店标签页（默认停在主武器，对应仓库第一件事）
 let bagTab='all';    // 当前背包筛选
@@ -3583,6 +4245,410 @@ function updAudio(dt){
   }
 }
 
+/* ============================================================
+   _orient.js —— 3D 版强制横屏
+
+   为什么不用 CSS transform:rotate 把整个游戏转过来？
+   因为 3D 版有大量触摸坐标计算（摇杆、右半屏转视角、按钮热区），
+   它们全都直接用 clientX/clientY 跟 innerWidth/innerHeight 算。
+   一旦给容器加 rotate(90deg)，DOM 坐标和屏幕坐标就整体错位，
+   所有触摸判定会全部偏掉 —— 那是比竖屏更难查的 bug。
+
+   所以采用「强制横屏 + 竖屏遮罩」两条路：
+   1) 能调 Screen Orientation API 就真的锁成 landscape
+      （全屏状态下 Chrome / Android 有效）。
+   2) 锁不住的（iOS Safari、非全屏、桌面小窗）就盖一层遮罩，
+      提示把设备转过来，并在用户点击时尝试进全屏后再锁。
+      竖屏下游戏本身照常渲染，只是被遮住，不会出现半截画面。
+   ============================================================ */
+
+/* 竖屏遮罩的 DOM id */
+const ORIENT_MASK_ID = 'orientMask';
+
+/* 当前是否处于「应该被遮住」的竖屏状态 */
+let orientBlocked = false;
+
+/* 判定竖屏：用 innerWidth/innerHeight。
+   注意不能用 screen.orientation.type，部分 WebView 里它是空的。 */
+function orientIsPortrait(){
+  if(typeof window === 'undefined') return false;
+  const w = window.innerWidth || 0;
+  const h = window.innerHeight || 0;
+  if(w <= 0 || h <= 0) return false;
+  return h > w;
+}
+
+/* 尝试真正锁定横屏。失败不算错，遮罩会兜底。 */
+function orientTryLock(){
+  try{
+    const so = (typeof screen !== 'undefined') ? screen.orientation : null;
+    if(so && typeof so.lock === 'function'){
+      const p = so.lock('landscape');
+      /* lock() 返回 Promise，被拒时别让控制台报未捕获异常 */
+      if(p && typeof p.catch === 'function') p.catch(function(){});
+      return true;
+    }
+  }catch(e){}
+  try{
+    if(typeof screen !== 'undefined' && screen.lockOrientation){
+      screen.lockOrientation('landscape');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+/* 解除锁定（桌面宽屏时没必要锁） */
+function orientUnlock(){
+  try{
+    const so = (typeof screen !== 'undefined') ? screen.orientation : null;
+    if(so && typeof so.unlock === 'function') so.unlock();
+  }catch(e){}
+}
+
+/* 创建遮罩 */
+function orientBuildMask(){
+  if(typeof document === 'undefined') return null;
+  let m = document.getElementById(ORIENT_MASK_ID);
+  if(m) return m;
+  m = document.createElement('div');
+  m.id = ORIENT_MASK_ID;
+  m.innerHTML = ''
+    + '<div class="omBox">'
+    +   '<div class="omIcon">\uD83D\uDCF1</div>'
+    +   '<div class="omTitle" data-om="title"></div>'
+    +   '<div class="omDesc" data-om="desc"></div>'
+    +   '<button class="omBtn" data-om="btn" type="button"></button>'
+    + '</div>';
+  document.body.appendChild(m);
+  /* 遮罩本身吃掉所有事件，防止「竖屏时还能点到下面的按钮」 */
+  m.addEventListener('touchstart', function(e){ e.preventDefault(); }, { passive:false });
+  m.addEventListener('touchmove',  function(e){ e.preventDefault(); }, { passive:false });
+  const btn = m.querySelector('[data-om="btn"]');
+  if(btn){
+    btn.onclick = function(ev){
+      if(ev) ev.stopPropagation();
+      /* 用户手势里先试全屏，再锁方向 —— 顺序不能反，
+         非全屏状态下 lock() 基本都被拒。 */
+      try{
+        const el = document.documentElement;
+        const rq = el.requestFullscreen || el.webkitRequestFullscreen;
+        if(rq){
+          const p = rq.call(el);
+          if(p && typeof p.then === 'function'){
+            p.then(function(){ orientTryLock(); orientRefresh(); }).catch(function(){ orientTryLock(); orientRefresh(); });
+          } else { orientTryLock(); orientRefresh(); }
+        } else { orientTryLock(); orientRefresh(); }
+      }catch(e){ orientTryLock(); orientRefresh(); }
+    };
+  }
+  return m;
+}
+
+/* 刷新遮罩上的文案（语言切换后要跟着变） */
+function orientPaintMask(){
+  const m = document.getElementById(ORIENT_MASK_ID);
+  if(!m) return;
+  const t = m.querySelector('[data-om="title"]');
+  const d = m.querySelector('[data-om="desc"]');
+  const b = m.querySelector('[data-om="btn"]');
+  if(t) t.textContent = T('请横屏游玩');
+  if(d) d.textContent = T('3D 第一人称需要横屏。把设备转过来，或者点下面的按钮。');
+  if(b) b.textContent = T('进入横屏');
+}
+
+/* 核心：根据当前朝向决定遮罩显隐 */
+function orientRefresh(){
+  if(typeof document === 'undefined' || !document.body) return;
+  const portrait = orientIsPortrait();
+  const mask = orientBuildMask();
+  if(!mask) return;
+  const wasBlocked = orientBlocked;
+  orientBlocked = portrait;
+  orientPaintMask();
+  if(portrait){
+    mask.style.display = 'flex';
+  } else {
+    mask.style.display = 'none';
+    /* 转到横屏了：如果之前正在玩，尝试顺便锁定一下，避免再转回去 */
+    if(wasBlocked){ orientTryLock(); }
+  }
+  /* 通知渲染层重算尺寸。转屏时 innerWidth/Height 在部分机器上
+     要晚一帧才更新，所以补一次 rAF。 */
+  if(typeof window !== 'undefined' && typeof window.__relayout === 'function'){
+    try{ window.__relayout(); }catch(e){}
+    try{
+      if(typeof requestAnimationFrame === 'function'){
+        requestAnimationFrame(function(){ try{ window.__relayout(); }catch(e){} });
+      }
+    }catch(e){}
+  }
+}
+
+/* 初始化：绑定事件 + 首次刷新。
+   用 matchMedia('(orientation:portrait)') 精确监听，比 resize 稳，
+   因为 resize 在转屏时会连发好几次。 */
+function orientInit(){
+  if(typeof window === 'undefined') return;
+  orientBuildMask();
+  orientRefresh();
+  let mq = null;
+  try{ mq = window.matchMedia('(orientation:portrait)'); }catch(e){ mq = null; }
+  if(mq){
+    const onChange = function(){ orientRefresh(); };
+    if(mq.addEventListener) mq.addEventListener('change', onChange);
+    else if(mq.addListener) mq.addListener(onChange);
+  }
+  window.addEventListener('orientationchange', function(){ orientRefresh(); });
+  window.addEventListener('resize', function(){ orientRefresh(); });
+  if(typeof document !== 'undefined' && document.addEventListener){
+    document.addEventListener('fullscreenchange', function(){ orientRefresh(); });
+  }
+  /* 桌面端：宽屏不锁，避免影响多窗口使用 */
+  if(!orientIsPortrait()){
+    const w = window.innerWidth || 0;
+    if(w < 900) orientTryLock();
+  }
+}
+
+/* ============================================================
+   u_i18n.js —— 3D 版国际化接入层
+
+   i18n_core.js 只提供 T()/i18nSetLang() 这些纯函数，
+   不知道「这个游戏有哪些界面要重绘」。本文件负责把它接上去。
+
+   为什么用 querySelector 而不是一堆 getElementById：
+   主菜单里的 stat 标题、按键说明都是无 id 的 <div class="k">，
+   按结构定位（.row > .stat > .k）比给它们逐个加 id 更稳，
+   也不会动到 a_head.html 里的既有结构。
+   ============================================================ */
+
+/* 重绘所有依赖语言的界面。
+   每一步单独 try：某块没准备好（还没进局、面板未建）
+   不应该把整个切换流程弄崩。 */
+function i18nRebuildAll(){
+  try{ i18nPaintMenu();   }catch(e){}
+  try{ i18nPaintHUD();    }catch(e){}
+  try{ i18nPaintPanels(); }catch(e){}
+  try{ i18nApplyDOM();    }catch(e){}
+  try{ if(typeof refreshHUD==='function')       refreshHUD();     }catch(e){}
+  try{ if(typeof buildShop==='function')        buildShop();      }catch(e){}
+  try{ if(typeof buildBagNew==='function')      buildBagNew();    }catch(e){}
+  try{ if(typeof buildStash==='function')       buildStash();     }catch(e){}
+  try{ if(typeof refreshWpnBar==='function')    refreshWpnBar();  }catch(e){}
+  try{ if(typeof orientPaintMask==='function')  orientPaintMask();}catch(e){}
+  try{ i18nApplyDoc();    }catch(e){}
+}
+
+/* 快捷：按选择器改文本 */
+function i18nSetText(sel, txt, root){
+  const r = root || (typeof document!=='undefined' ? document : null);
+  if(!r || !r.querySelector) return false;
+  const n = r.querySelector(sel);
+  if(!n) return false;
+  n.textContent = txt;
+  return true;
+}
+
+/* ---------- 主菜单 ---------- */
+function i18nPaintMenu(){
+  if(typeof document==='undefined') return;
+  const box=document.querySelector('#menu .box');
+  if(!box) return;
+
+  /* 标题：🔫 FPS 搜打撤 · 学校 3D
+     里面有 <span>搜打撤</span>，所以整串重写，保留 emoji 与结构 */
+  const h1=box.querySelector('h1');
+  if(h1){
+    h1.innerHTML='🔫 FPS <span>'+T('搜打撤')+'</span> '+T('· 学校 3D');
+  }
+
+  /* 副标题 */
+  const sub=box.querySelector('p.sub');
+  if(sub) sub.textContent=T('搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。');
+
+  /* 操作说明标题 + 手机提示 */
+  i18nSetText('.keysbox-t', '⌨️ '+T('操作说明'), box);
+  i18nSetText('.keysbox-note', T('📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击'), box);
+
+  /* 键位说明：只翻 <span> 里的中文动作名，<kbd> 是键盘按键名不能动。
+     按下标对应 a_head.html 里 .keysgrid > .kk 的顺序。
+     【必须按下标而不是按内容匹配】—— 一旦英文生效内容就变了，
+     按内容找第二次就找不到。 */
+  const ACTIONS=[
+    '移动', '转视角', '射击', '换弹', '奔跑',
+    '跳跃', '拾取/互动', '商店', '菜单'
+  ];
+  const KKATTR=[
+    '移动', '转视角', '射击', '换弹', '奔跑',
+    '跳跃', '拾取/互动', '商店', '菜单'
+  ];
+  const kks=box.querySelectorAll('.keysgrid .kk');
+  for(let i=0;i<kks.length;i++){
+    const sp=kks[i].querySelector('span');
+    if(!sp) continue;
+    /* 用 data-i18n-key 记住原始中文，切换语言时以它为准，
+       避免「已经翻成英文再翻回中文」时找不到 key。 */
+    if(!sp.getAttribute('data-i18n-key')){
+      sp.setAttribute('data-i18n-key', ACTIONS[i] || sp.textContent);
+    }
+    sp.textContent=T(sp.getAttribute('data-i18n-key'));
+  }
+
+  /* 三个统计格：当前货币 / 撤离次数 / 击杀数 */
+  const stats=[T('当前货币'), T('撤离次数'), T('击杀数')];
+  const ks=box.querySelectorAll('.stat .k');
+  for(let i=0;i<ks.length;i++){
+    if(!ks[i].getAttribute('data-i18n-key')){
+      ks[i].setAttribute('data-i18n-key', ['当前货币','撤离次数','击杀数'][i] || ks[i].textContent);
+    }
+    ks[i].textContent=T(ks[i].getAttribute('data-i18n-key'));
+  }
+
+  /* 按钮：逐个按 id 重写。emoji 写在代码里，不依赖原文 */
+  const REPLACE={
+    btnPlay:'▶ '+T('开始游戏')+' ( '+T('进入游戏')+' )',
+    btnShop:'🛒 '+T('商店'),
+    btnStash:'🏠 '+T('仓库'),
+    btnExport:'⬇️ '+T('加密导出'),
+    btnImport:'⬆️ '+T('加密导入'),
+    btnReset:'♻️ '+T('重置数据'),
+    btnBack:'← '+T('返回原版'),
+  };
+  for(const id in REPLACE){
+    const n=document.getElementById(id);
+    if(n) n.textContent=REPLACE[id];
+  }
+  /* 开始按钮英文下不要空格粘连 */
+  const bp=document.getElementById('btnPlay');
+  if(bp){
+    bp.textContent = I18N_LANG==='en'
+      ? '▶ '+T('开始游戏')
+      : '▶ 开始（进入游戏）';
+  }
+
+  /* 死亡界面 */
+  const dh=document.querySelector('#death h2');
+  if(dh) dh.textContent='💀 '+T('你阵亡了');
+  const bdr=document.getElementById('btnRespawn');
+  if(bdr) bdr.textContent=T('重新部署');
+  const bdm=document.getElementById('btnDeathMenu');
+  if(bdm) bdm.textContent=T('回主菜单');
+}
+
+/* ---------- HUD ---------- */
+function i18nPaintHUD(){
+  if(typeof document==='undefined') return;
+  /* 唯一需要翻的固定文案是「背包」和「开/关」。
+     弹药、时间之类是数字，不用管。 */
+  const bagBtn=document.getElementById('bagBtn');
+  if(bagBtn){
+    /* 结构是 🎒 <span>背包</span>，只改 span */
+    const sp=bagBtn.querySelector('span');
+    if(sp){
+      if(!sp.getAttribute('data-i18n-key')) sp.setAttribute('data-i18n-key', sp.textContent.trim());
+      sp.textContent=T(sp.getAttribute('data-i18n-key'));
+    }
+  }
+  const sndTxt=document.getElementById('sndTxt');
+  if(sndTxt){
+    const raw=sndTxt.getAttribute('data-i18n-key') || sndTxt.textContent.trim();
+    sndTxt.setAttribute('data-i18n-key', raw);
+    /* 音效开关的「开/关」是状态量，按当前显示值翻。
+       raw 只会是「开」或「关」两种之一。 */
+    sndTxt.textContent=T(raw==='开'?'开':(raw==='关'?'关':raw));
+  }
+  /* 常驻操作提示条 */
+  if(typeof refreshHtip==='function') refreshHtip();
+}
+
+/* 刷新底部常驻提示条的文案。
+   htip 的内容会随「是否开镜」变化（f_ui.js 里会改写），
+   所以统一走这里生成，避免两处文案不一致。 */
+function refreshHtip(){
+  if(typeof document==='undefined') return;
+  const el=document.getElementById('htip');
+  if(!el) return;
+  /* 记住当前是哪种状态（开镜 / 普通），而不是记住已经翻好的文字 */
+  let st=el.getAttribute('data-htip-state');
+  if(!st){
+    /* 首次：从现有文本推断 */
+    st = /开镜/.test(el.textContent||'') ? 'aim' : 'normal';
+    el.setAttribute('data-htip-state', st);
+  }
+  if(typeof P!=='undefined' && P && P.aim) st='aim';
+  el.setAttribute('data-htip-state', st);
+  el.textContent = st==='aim'
+    ? T('🔭 开镜中 · 再点一次退出')
+    : T('📱 右半屏拖动转视角 · 左摇杆移动 · 射击/跳/换弹/拾取在右下 · 靠近门按 E 开门');
+}
+
+/* ---------- 商店 / 背包 / 仓库 的静态标题 ----------
+   这三个面板整体由 buildXXX() 生成，内容里的物品名/描述
+   在 SHOP_ITEMS 里，由 f_ui.js 的 T() 包住。
+   这里只补面板级文案（标题、关闭按钮）。 */
+function i18nPaintPanels(){
+  if(typeof document==='undefined') return;
+  ['shop','bag','stash'].forEach(function(id){
+    const p=document.getElementById(id);
+    if(!p) return;
+    p.querySelectorAll('[data-i18n]').forEach(function(n){
+      n.textContent=T(n.getAttribute('data-i18n'));
+    });
+  });
+}
+
+/* ---------- 挂语言切换按钮 ----------
+   放在主菜单最后一行按钮组里（⊃ 返回原版 右侧），
+   不额外占行，也不会跟底部武器条打架。 */
+function i18nMountMenuButton(){
+  if(typeof document==='undefined') return null;
+  /* 已有就复用 */
+  let btn=document.getElementById('langBtn');
+  if(btn){ i18nPaintLangBtn(btn); return btn; }
+
+  const menu=document.getElementById('menu');
+  if(!menu){ return null; }
+  const box=menu.querySelector('.box');
+  /* 挂在最后一行 .row 里 */
+  const rows=box ? box.querySelectorAll('.row') : [];
+  const host=rows.length ? rows[rows.length-1] : box;
+  if(!host) return null;
+
+  btn=document.createElement('button');
+  btn.id='langBtn';
+  btn.type='button';
+  btn.className='btn ghost small';  /* 跟同排按钮完全一致的外观 */
+  host.appendChild(btn);
+  btn.onclick=function(ev){
+    if(ev) ev.stopPropagation();
+    i18nToggle(function(){ i18nRebuildAll(); });
+  };
+  i18nPaintLangBtn(btn);
+  return btn;
+}
+
+/* 语言按钮上的字：显示「点了会变成什么」，而不是当前语言。
+   这是国际化按钮的惯例（当前是中文就显示 English）。 */
+function i18nPaintLangBtn(btn){
+  if(!btn) return;
+  btn.textContent = I18N_LANG==='zh' ? '🌐 English' : '🌐 中文';
+  btn.setAttribute('title', T('切换语言'));
+  btn.setAttribute('aria-label', T('切换语言'));
+}
+
+/* ---------- 初始化 ---------- */
+function i18nInitUI(){
+  i18nLoad();          /* 必须先读，否则首帧就是错语言 */
+  i18nApplyDoc();
+  i18nMountMenuButton();
+  const run=function(){ try{ i18nRebuildAll(); }catch(e){} };
+  if(typeof requestAnimationFrame==='function') requestAnimationFrame(run);
+  else setTimeout(run, 0);
+  /* 再补一次：部分面板要等 init() 建完才存在 */
+  setTimeout(run, 150);
+}
+
 /* ============ z_render.js：渲染循环 + 启动 ============ */
 
 /* 安全调用：单个子系统抛错时只记一次日志，不中断整帧 */
@@ -3699,6 +4765,17 @@ window.__relayout=function(){
   }catch(e){}
 };
 window.addEventListener('resize',()=>{ if(typeof window.__relayout==='function') window.__relayout(); });
+
+/* 【国际化】读语言 + 挂切换按钮 + 首次重绘。
+   放在这里是刻意的：必须在所有分块都执行完（各 buildXXX 已定义）
+   之后才能跑，否则重绘时函数还不存在。
+   包 try 是因为即便国际化挂了，游戏本身也得能跑。 */
+try{ if(typeof i18nInitUI==='function') i18nInitUI(); }catch(e){ console.error('i18n init failed', e); }
+
+/* 【强制横屏】建遮罩 + 绑定转屏监听。
+   同样放最后：orientRefresh 里会调 window.__relayout，
+   那是上面刚定义的，必须已存在。 */
+try{ if(typeof orientInit==='function') orientInit(); }catch(e){ console.error('orient init failed', e); }
 
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

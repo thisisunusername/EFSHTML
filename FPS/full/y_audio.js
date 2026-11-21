@@ -1,13 +1,49 @@
 /* ============ y_audio.js：Web Audio 合成音效（零素材、零依赖） ============ */
 let AC=null, masterGain=null, sfxOn=true, noiseBuf=null;
 const VOL={ master:0.55, shot:0.42, reload:0.3, hit:0.35, hurt:0.4, pickup:0.35, step:0.12, ui:0.25, ambient:0.16 };
+/* ============================================================
+   全局音量（设置面板里的滑块）
+   VOL.master 是「出厂基准值」，玩家调的音量是它的百分比倍率。
+   为什么要把两者分开：音效各自的相对响度（枪声比脚步响）
+   是设计好的，玩家只应该整体缩放它们，不能把枪声调到比脚步小。
+   所以 masterGain 的最终值 = VOL.master × masterVol。
+   masterVol 存在 localStorage，跨会话保持。
+   ============================================================ */
+const MASTER_VOL_KEY='efs_master_vol_v1';
+let masterVol=1.0;
+function masterVolLoad(){
+  try{
+    const raw=localStorage.getItem(MASTER_VOL_KEY);
+    if(raw!==null){
+      const v=parseFloat(raw);
+      if(isFinite(v)) masterVol=Math.max(0,Math.min(1,v));
+    }
+  }catch(e){}
+  return masterVol;
+}
+function masterVolApply(){
+  try{
+    if(masterGain){
+      /* sfxOn 是「总开关」，关掉时直接静音，与音量滑块互不干扰 */
+      masterGain.gain.value = sfxOn ? (VOL.master*masterVol) : 0;
+    }
+  }catch(e){}
+  return masterVol;
+}
+function masterVolSet(v){
+  masterVol=Math.max(0,Math.min(1,Number(v)||0));
+  try{ localStorage.setItem(MASTER_VOL_KEY, String(masterVol)); }catch(e){}
+  masterVolApply();
+  return masterVol;
+}
 
 function audioInit(){
   if(AC) return AC;
   try{
     AC=new (window.AudioContext||window.webkitAudioContext)();
     masterGain=AC.createGain();
-    masterGain.gain.value=VOL.master;
+    masterVolLoad();
+    masterGain.gain.value=sfxOn?(VOL.master*masterVol):0;
     masterGain.connect(AC.destination);
     // 预生成 1 秒白噪声缓冲（枪声/脚步/爆炸复用）
     const len=AC.sampleRate;

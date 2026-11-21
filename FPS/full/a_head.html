@@ -531,6 +531,104 @@ html[data-lang="en"] #bagBtn span{
   .stashcol .grid{ max-height:34vh; overflow-y:auto; }
   .cell.lk2{ opacity:.5; }
 
+  /* ================= 设置面板 ================= */
+  #settings{ position:fixed; inset:0; z-index:210; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px); touch-action:auto; pointer-events:auto; }
+  #settings .box{ width:100%; max-width:600px; max-height:88vh;
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06);
+    touch-action:pan-y; }
+  #settings .box::-webkit-scrollbar{ width:8px; }
+  #settings .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  #settings .btn, #settings .tab{ pointer-events:auto; }
+  /* 单行设置项 */
+  .setrow{ display:flex; align-items:center; gap:10px; padding:11px 13px;
+    border-radius:12px; background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.09); margin-bottom:8px;
+    cursor:pointer; touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent; }
+  .setrow.on{ border-color:var(--accent); background:rgba(124,92,255,.16); }
+  .setrow:active{ transform:scale(.99); }
+  .setinfo{ flex:1; min-width:0; }
+  .setn{ font-size:13.5px; font-weight:700; }
+  .setd{ font-size:11px; opacity:.62; margin-top:2px; line-height:1.45; }
+  .setmark{ width:22px; text-align:center; font-weight:800; color:var(--accent2); font-size:16px; }
+  .setval{ font-size:13px; font-weight:800; color:var(--accent2); font-variant-numeric:tabular-nums; }
+  /* 音量滑块：默认样式在手机上太细，加粗一点才好拖 */
+  .volrange{ -webkit-appearance:none; appearance:none; width:100%; height:34px;
+    background:transparent; margin:2px 0 12px; touch-action:manipulation; }
+  .volrange::-webkit-slider-runnable-track{ height:8px; border-radius:5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+  .volrange::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none;
+    width:26px; height:26px; margin-top:-9px; border-radius:50%;
+    background:#fff; border:3px solid var(--accent);
+    box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  .volrange::-moz-range-track{ height:8px; border-radius:5px; background:var(--accent); }
+  .volrange::-moz-range-thumb{ width:22px; height:22px; border-radius:50%;
+    background:#fff; border:3px solid var(--accent); }
+  /* 512 色板 */
+  .setcurr{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+    border-radius:11px; background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.09); margin-bottom:10px; }
+  .setdot{ width:26px; height:26px; border-radius:8px;
+    box-shadow:0 0 0 2px rgba(255,255,255,.22); flex:0 0 auto; }
+  .setmono{ font-size:11.5px; font-family:ui-monospace,monospace; opacity:.85; }
+  .palwrap{ max-height:46vh; overflow-y:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+  .palrow{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .palfam{ flex:0 0 34px; font-size:11px; opacity:.7; text-align:center; }
+  .palgrid{ display:grid; grid-template-columns:repeat(8, 1fr); gap:3px; flex:1; }
+  .palcell{ aspect-ratio:1; border-radius:4px; cursor:pointer;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .palcell:active{ transform:scale(.85); }
+  .palcell.sel{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--accent); }
+  /* 调试日志区 */
+  .setlog{ max-height:40vh; overflow:auto; margin-top:10px;
+    padding:10px 11px; border-radius:11px;
+    background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.1);
+    font-family:ui-monospace,monospace; font-size:10.5px; line-height:1.55;
+    white-space:pre-wrap; word-break:break-word;
+    -webkit-user-select:text; user-select:text; touch-action:pan-y; }
+  /* 调试日志 HUD 徽标 */
+  #logBadge{ display:none; padding:2px 7px; border-radius:6px;
+    background:rgba(255,193,74,.9); color:#2a1a05;
+    font-size:9.5px; font-weight:800; letter-spacing:.03em; }
+
+  /* ================= Material 浅色主题 =================
+     只覆盖颜色变量与几个固定写成橄榄黑的块。
+     结构、尺寸、层级一概不动 —— 免得浅色主题把布局搞乱。 */
+  html[data-theme="material"] body{ background:#f4f2f7; color:#1d1b20; }
+  html[data-theme="material"] #menu{ background:rgba(244,242,247,.94); }
+  html[data-theme="material"] #menu .box{ border-color:rgba(0,0,0,.08); }
+  html[data-theme="material"] .pill{ color:#1d1b20; border-color:rgba(0,0,0,.1); }
+  html[data-theme="material"] .btn{ color:#fff; }
+  html[data-theme="material"] .btn.ghost{ color:var(--accent); border-color:var(--accent); background:rgba(124,92,255,.07); }
+  html[data-theme="material"] .keysbox{ background:rgba(0,0,0,.035); }
+  html[data-theme="material"] kbd{ background:rgba(0,0,0,.07); color:#1d1b20; border-color:rgba(0,0,0,.14); }
+  html[data-theme="material"] #htip{ background:rgba(255,255,255,.9); color:#3a3644; }
+  html[data-theme="material"] #mmLabel{ color:#1d1b20; background:rgba(255,255,255,.72); }
+  html[data-theme="material"] #death{ background:rgba(200,60,50,.55); }
+  html[data-theme="material"] .setlog{ background:rgba(0,0,0,.06); color:#1d1b20; border-color:rgba(0,0,0,.12); }
+  html[data-theme="material"] .setrow,
+  html[data-theme="material"] .setcurr{ background:rgba(0,0,0,.035); border-color:rgba(0,0,0,.08); }
+  /* 浅色主题下的设置面板：深色底会让正文看不见，逐个提亮 */
+  html[data-theme="material"] #settings{ background:rgba(240,238,245,.9); }
+  html[data-theme="material"] #settings .box{ background:#fff; border-color:rgba(0,0,0,.1); }
+  html[data-theme="material"] #settings .box::-webkit-scrollbar-thumb{ background:rgba(103,80,164,.55); }
+  html[data-theme="material"] #settings .tab{ color:#5f5b66; border-color:rgba(0,0,0,.12); }
+  html[data-theme="material"] #settings .tab.on{ color:#fff; }
+  html[data-theme="material"] .setn{ color:#1d1b20; }
+  html[data-theme="material"] .setd{ color:#5f5b66; }
+  html[data-theme="material"] .setmark{ color:var(--accent); }
+  html[data-theme="material"] .setval{ color:var(--accent); }
+  html[data-theme="material"] .palcell{ border-color:rgba(0,0,0,.14); }
+  html[data-theme="material"] .palfam{ color:#5f5b66; }
+  html[data-theme="material"] #settings .d{ color:#5f5b66; }
   /* ===== 仓库（按设计图：左装备栏 + 右格子区） ===== */
   .stk{ display:flex; gap:12px; width:100%; max-width:900px; height:100%;
         padding:10px; box-sizing:border-box; }
@@ -745,6 +843,9 @@ background:rgba(90,220,255,.03); cursor:default; }
          优先用胸挂里的（胸挂就是快速取用区），胸挂没有再翻背包。
          按钮上会显示当前可用药品的数量，没有药时自动变暗。 -->
     <div class="pill" id="medBtn" style="cursor:pointer">🩹 <span>治疗</span><b id="medBtnN" class="medn">0</b></div>
+    <!-- 调试日志徽标：只在设置里打开调试日志时出现，显示当前条数。
+         点一下直接打开设置面板的「调试」页签，省得去菜单里翻。 -->
+    <div class="pill" id="logBadge" style="cursor:pointer" title="调试日志">LOG 0</div>
   </div>
   <!-- 小地图：左上角固定，显示校园平面 + 玩家朝向 + 撤离点 -->
   <div id="mmWrap">
@@ -875,6 +976,7 @@ background:rgba(90,220,255,.03); cursor:default; }
       <button class="btn ghost" id="btnShop">🛒 商店</button>
       <button class="btn ghost" id="btnStash">🏠 仓库</button>
       <button class="btn ghost" id="btnGunsmith">🔧 改枪台</button>
+      <button class="btn ghost" id="btnSettings">⚙️ 设置</button>
     </div>
     <div class="row">
       <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
@@ -904,6 +1006,7 @@ background:rgba(90,220,255,.03); cursor:default; }
 <!-- 改枪台：结构与 shop/stash 同构，靠 JS 动态填充。单独一个容器是因为
      改枪和商店/仓库是三个互斥的全屏面板，复用一个容器会互相覆盖。 -->
 <div id="gunsmith" style="display:none"></div>
+<div id="settings" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
 <!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
@@ -956,21 +1059,64 @@ background:rgba(90,220,255,.03); cursor:default; }
      正常情况这段什么都不显示。 -->
 <script>
 (function(){
-  var shown=false;
-  function show(msg){
-    if(shown) return; shown=true;
+  /* 【统一弹窗函数】
+     kind: 'fatal' = 真的启动/运行时错误（红）
+           'probe' = 自检结果（橙）—— 以前自检也走 show()，
+                     所以屏幕上会印一行「⚠ 启动出错：按钮试跑失败」，
+                     而实际上模块跑得好好的。这不是启动出错，
+                     而且这个框没有关闭按钮，盖在菜单上很培心。 */
+  function panel(kind, msg){
     try{
+      /* 【用户关过就不再自弹】以前每次 panel() 都无条件重建，
+         玩家点 ✕ 关掉后再有自检/警告又把框顶回屏幕上，
+         看起来就是「这个红框关不掉」。
+         现在：关掉之后只允许 fatal 再弹（真出错必须让人看见），
+         probe（自检）永远不再骚扰。 */
+      if(kind!=='fatal' && window.__bootdiagClosed) return;
+      var old=document.getElementById('__bootdiag');
+      if(old && old.parentNode) old.parentNode.removeChild(old);
       var d=document.createElement('div');
       d.id='__bootdiag';
-      d.style.cssText='position:fixed;left:8px;top:8px;right:8px;z-index:99999;'
-        +'background:rgba(140,20,20,.96);color:#fff;font:12px/1.5 ui-monospace,monospace;'
-        +'padding:10px 12px;border-radius:10px;border:1px solid #ff6a5a;white-space:pre-wrap;'
-        +'max-height:60vh;overflow:auto;';
-      d.textContent='⚠ 启动出错：\n'+msg;
-      /* 盖个全局钩子，方便调试时在控制台看到同一串 */
-      try{ window.__bootdiagText=msg; }catch(e){}
+      var red = kind==='fatal';
+      d.style.cssText='position:fixed;left:8px;top:8px;right:56px;z-index:99999;'
+        +'background:'+(red?'rgba(140,20,20,.96)':'rgba(120,80,10,.96)')+';'
+        +'color:#fff;font:12px/1.5 ui-monospace,monospace;'
+        +'padding:10px 12px 10px;border-radius:10px;'
+        +'border:1px solid '+(red?'#ff6a5a':'#ffc14a')+';white-space:pre-wrap;'
+        +'max-height:60vh;overflow:auto;box-shadow:0 6px 24px rgba(0,0,0,.6);';
+      d.textContent=(red?'⚠ 运行出错：\n':'🔍 自检：\n')+msg;
+      /* 【关闭按钮】以前这个框没有关闭方式，盖住了整个主菜单，
+         而它很可能只是一条自检提示。现在右上角一个 ✕。 */
+      var x=document.createElement('button');
+      x.textContent='✕';
+      x.style.cssText='position:absolute;top:6px;right:6px;width:32px;height:32px;'
+        +'border-radius:8px;border:1px solid rgba(255,255,255,.5);'
+        +'background:rgba(0,0,0,.35);color:#fff;font-size:15px;font-weight:700;'
+        +'line-height:1;cursor:pointer;z-index:2;';
+      x.onclick=function(ev){
+        if(ev){ ev.stopPropagation(); if(ev.preventDefault) ev.preventDefault(); }
+        if(d.parentNode) d.parentNode.removeChild(d);
+        try{ window.__bootdiagClosed=true; }catch(e){}
+      };
+      d.appendChild(x);
       (document.body||document.documentElement).appendChild(d);
+      try{ window.__bootdiagText=msg; window.__bootdiagKind=kind; }catch(e){}
     }catch(e){}
+  }
+  /* 【show() 的语义】
+   旧版用 shown 把「整个会话只弹一次」锁死 —— 结果玩家点 ✕ 关掉之后，
+   后面再真的崩了，屏幕上什么都不会出现，等于把错误藏起来了。
+   对调试是灾难：你只会看到「上次那条旧信息」，看不到真正的新错误。
+   现在的策略：
+     · 每次新的 fatal 都重建面板（覆盖旧内容，不会叠一堆）
+     · 节流 800ms，避免同一帧里连抛十几个错误把 DOM 刷爆
+     · 关掉过就不再自动弹 probe（见 panel 顶部），但 fatal 永远弹 */
+  var lastFatal=0;
+  function show(msg){
+    var now=Date.now();
+    if(now-lastFatal < 800) return;
+    lastFatal=now;
+    panel('fatal', msg);
   }
   /* 1. 普通运行时错误 */
   window.addEventListener('error', function(e){
@@ -1008,52 +1154,70 @@ background:rgba(90,220,255,.03); cursor:default; }
        · 误报：委托生效时 onclick 也可能是空的，旧版会把好按钮列进 miss。
      新版改成「真的派发一次 click」，看面板有没有真的打开，
      再把面板恢复原状（同步执行，画面不闪）。 */
-  var PANEL_OF = { btnShop:'shop', btnStash:'stash', btnGunsmith:'gunsmith' };
+  var PANEL_OF = { btnShop:'shop', btnStash:'stash', btnGunsmith:'gunsmith', btnSettings:'settings' };
   function trialClick(){
+    /* 【为什么不再真的派发 click】
+       上一版为了「眼见为实」，对每个按钮 dispatchEvent 一次真的 click。
+       结果：自检自己把仓库面板打开了一遍 —— 而 buildStashNew 当时有 bug，
+       构建抛异常 → 异常在监听器里没人接 → 冒到 window 的 error 事件 →
+       被顶层的 show() 接住 → 屏幕上弹出「⚠ 启动出错」。
+       也就是说：那个红框是自检自己捅出来的，游戏根本没坏。
+       更糟的是自检还改动了真实状态（面板开关、DOM 重建）。
+       所以现在改成「无副作用探测」：
+         · 按钮存在吗（DOM 漏了会在这里暴露）
+         · 有没有绑定（onclick 或 __jsBound，两者有一个就行）
+         · 面板容器存在吗
+       真正的点击问题交给第 5 节的「真实点击监控」——
+       那是以玩家真实操作为准，比我模拟的更可信。 */
     var out={};
     var ids=Object.keys(PANEL_OF);
     for(var i=0;i<ids.length;i++){
       var id=ids[i], pid=PANEL_OF[id];
       var btn=document.getElementById(id);
-      var panel=document.getElementById(pid);
+      var pnlEl=document.getElementById(pid);
       if(!btn){ out[id]='NO_DOM'; continue; }
-      if(!panel){ out[id]='NO_PANEL'; continue; }
-      var before=panel.style.display||'';
-      var rec={ onclick: btn.onclick?'y':'n' };
-      try{
-        btn.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-      }catch(e){ out[id]='DISPATCH_ERR:'+e; continue; }
-      var after=panel.style.display||'';
-      try{ panel.style.display=before; }catch(e){}
-      rec.flip = (before!==after)?1:0;
-      rec.from = before;
-      rec.to   = after;
-      out[id]=rec;
+      if(!pnlEl){ out[id]='NO_PANEL'; continue; }
+      var bound = !!(btn.onclick || btn.__jsBound || (btn.dataset && btn.dataset.bound));
+      out[id]={
+        bound: bound?'y':'n',
+        via: btn.onclick?'onclick':(btn.__jsBound?'jsBound':'none'),
+        panel: pid
+      };
     }
     return out;
   }
   setTimeout(function(){
     if(!window.__moduleRan) return;
-    var r=null, bad=[];
+    var r=null;
     try{ r=trialClick(); }catch(e){ show('自检本身出错：'+e); return; }
     window.__btnProbe=r;
-    var allok=true;
+    var allok=true, nobind=[];
     for(var id in r){
       var v=r[id];
-      if(typeof v!=='object' || !v.flip){ allok=false; bad.push(id+' '+JSON.stringify(v)); }
+      /* 字符串表示 DOM/容器缺失；对象里 bound!=='y' 表示没绑上。
+         注意：这里不再看「面板有没有打开」—— 自检不点了，
+         所以用「有没有绑定」作为判据。 */
+      if(typeof v!=='object'){ allok=false; nobind.push(id+' '+v); }
+      else if(v.bound!=='y'){ allok=false; nobind.push(id+' '+JSON.stringify(v)); }
     }
     window.__btnProbeAll = allok ? 'ALL_OK' : 'FAIL';
     if(!allok){
-      show('按钮试跑失败（点了面板没打开）：\n'+bad.join('\n')
+      /* 【用橙色的 probe 面板，不是红色 fatal】
+         这不是启动错误 —— 模块明明跑完了。
+         再加上面板右上角有 ✕，随时可以关掉。 */
+      panel('probe', '有按钮没绑上（不影响游戏）：\n'+nobind.join('\n')
         +'\n\n__menuDelegated='+window.__menuDelegated
-        +'  __uiReady='+window.__uiReady);
+        +'  __uiReady='+window.__uiReady
+        +'\n__uiPhase='+(window.__uiPhase||'(未设置)'));
     }
   }, 2500);
-  /* 5. 【真实点击监控】第 4 步是程序模拟点，这一步抓玩家的真点击。
+  /* 5. 【真实点击监控】第 4 步是无副作用探测（不点），这一步抓玩家的真点击。
      同一个按钮连点 3 次都没反应，就把判据全打印出来 ——
      这几项足以区分「没绑上」「委托没启用」「模块没跑」「事件被吞」四种情况。
      用 click 而不是 touchstart：如果浏览器根本没合成 click，
-     那这条就永远不会进来 —— 这本身就是「touch-action:none 吃掉了 click」的铁证。 */
+     那这条就永远不会进来 —— 这本身就是「touch-action:none 吃掉了 click」的铁证。
+     注意：这条只有在玩家真的连点失败 3 次时才弹，而且弹的是橙色提示框，
+     右上角有 ✕，关掉之后不会再自己冒出来。 */
   var taps={};
   window.__menuTapLog={};
   document.addEventListener('click', function(e){
@@ -1077,7 +1241,8 @@ background:rgba(90,220,255,.03); cursor:default; }
     lines.push('onclick='+(t.onclick?'有':'无')+'  __jsBound='+(!!t.__jsBound)+'  __boundAt='+(t.__boundAt||0));
     lines.push('__menuDelegated='+window.__menuDelegated);
     lines.push('__moduleRan='+window.__moduleRan+'  __uiReady='+window.__uiReady);
-    show(lines.join('\n'));
+    lines.push('__uiPhase='+(window.__uiPhase||'(未设置)'));
+    panel('probe', lines.join('\n'));
   }, true);
 })();
 </script>

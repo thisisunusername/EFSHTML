@@ -531,6 +531,104 @@ html[data-lang="en"] #bagBtn span{
   .stashcol .grid{ max-height:34vh; overflow-y:auto; }
   .cell.lk2{ opacity:.5; }
 
+  /* ================= 设置面板 ================= */
+  #settings{ position:fixed; inset:0; z-index:210; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(4,6,11,.86); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px); touch-action:auto; pointer-events:auto; }
+  #settings .box{ width:100%; max-width:600px; max-height:88vh;
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--panel); border:1px solid rgba(255,255,255,.12);
+    border-radius:16px; padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06);
+    touch-action:pan-y; }
+  #settings .box::-webkit-scrollbar{ width:8px; }
+  #settings .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  #settings .btn, #settings .tab{ pointer-events:auto; }
+  /* 单行设置项 */
+  .setrow{ display:flex; align-items:center; gap:10px; padding:11px 13px;
+    border-radius:12px; background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.09); margin-bottom:8px;
+    cursor:pointer; touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent; }
+  .setrow.on{ border-color:var(--accent); background:rgba(124,92,255,.16); }
+  .setrow:active{ transform:scale(.99); }
+  .setinfo{ flex:1; min-width:0; }
+  .setn{ font-size:13.5px; font-weight:700; }
+  .setd{ font-size:11px; opacity:.62; margin-top:2px; line-height:1.45; }
+  .setmark{ width:22px; text-align:center; font-weight:800; color:var(--accent2); font-size:16px; }
+  .setval{ font-size:13px; font-weight:800; color:var(--accent2); font-variant-numeric:tabular-nums; }
+  /* 音量滑块：默认样式在手机上太细，加粗一点才好拖 */
+  .volrange{ -webkit-appearance:none; appearance:none; width:100%; height:34px;
+    background:transparent; margin:2px 0 12px; touch-action:manipulation; }
+  .volrange::-webkit-slider-runnable-track{ height:8px; border-radius:5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+  .volrange::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none;
+    width:26px; height:26px; margin-top:-9px; border-radius:50%;
+    background:#fff; border:3px solid var(--accent);
+    box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  .volrange::-moz-range-track{ height:8px; border-radius:5px; background:var(--accent); }
+  .volrange::-moz-range-thumb{ width:22px; height:22px; border-radius:50%;
+    background:#fff; border:3px solid var(--accent); }
+  /* 512 色板 */
+  .setcurr{ display:flex; align-items:center; gap:10px; padding:9px 12px;
+    border-radius:11px; background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.09); margin-bottom:10px; }
+  .setdot{ width:26px; height:26px; border-radius:8px;
+    box-shadow:0 0 0 2px rgba(255,255,255,.22); flex:0 0 auto; }
+  .setmono{ font-size:11.5px; font-family:ui-monospace,monospace; opacity:.85; }
+  .palwrap{ max-height:46vh; overflow-y:auto; overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+  .palrow{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .palfam{ flex:0 0 34px; font-size:11px; opacity:.7; text-align:center; }
+  .palgrid{ display:grid; grid-template-columns:repeat(8, 1fr); gap:3px; flex:1; }
+  .palcell{ aspect-ratio:1; border-radius:4px; cursor:pointer;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .palcell:active{ transform:scale(.85); }
+  .palcell.sel{ box-shadow:0 0 0 2px #fff, 0 0 0 4px var(--accent); }
+  /* 调试日志区 */
+  .setlog{ max-height:40vh; overflow:auto; margin-top:10px;
+    padding:10px 11px; border-radius:11px;
+    background:rgba(0,0,0,.34); border:1px solid rgba(255,255,255,.1);
+    font-family:ui-monospace,monospace; font-size:10.5px; line-height:1.55;
+    white-space:pre-wrap; word-break:break-word;
+    -webkit-user-select:text; user-select:text; touch-action:pan-y; }
+  /* 调试日志 HUD 徽标 */
+  #logBadge{ display:none; padding:2px 7px; border-radius:6px;
+    background:rgba(255,193,74,.9); color:#2a1a05;
+    font-size:9.5px; font-weight:800; letter-spacing:.03em; }
+
+  /* ================= Material 浅色主题 =================
+     只覆盖颜色变量与几个固定写成橄榄黑的块。
+     结构、尺寸、层级一概不动 —— 免得浅色主题把布局搞乱。 */
+  html[data-theme="material"] body{ background:#f4f2f7; color:#1d1b20; }
+  html[data-theme="material"] #menu{ background:rgba(244,242,247,.94); }
+  html[data-theme="material"] #menu .box{ border-color:rgba(0,0,0,.08); }
+  html[data-theme="material"] .pill{ color:#1d1b20; border-color:rgba(0,0,0,.1); }
+  html[data-theme="material"] .btn{ color:#fff; }
+  html[data-theme="material"] .btn.ghost{ color:var(--accent); border-color:var(--accent); background:rgba(124,92,255,.07); }
+  html[data-theme="material"] .keysbox{ background:rgba(0,0,0,.035); }
+  html[data-theme="material"] kbd{ background:rgba(0,0,0,.07); color:#1d1b20; border-color:rgba(0,0,0,.14); }
+  html[data-theme="material"] #htip{ background:rgba(255,255,255,.9); color:#3a3644; }
+  html[data-theme="material"] #mmLabel{ color:#1d1b20; background:rgba(255,255,255,.72); }
+  html[data-theme="material"] #death{ background:rgba(200,60,50,.55); }
+  html[data-theme="material"] .setlog{ background:rgba(0,0,0,.06); color:#1d1b20; border-color:rgba(0,0,0,.12); }
+  html[data-theme="material"] .setrow,
+  html[data-theme="material"] .setcurr{ background:rgba(0,0,0,.035); border-color:rgba(0,0,0,.08); }
+  /* 浅色主题下的设置面板：深色底会让正文看不见，逐个提亮 */
+  html[data-theme="material"] #settings{ background:rgba(240,238,245,.9); }
+  html[data-theme="material"] #settings .box{ background:#fff; border-color:rgba(0,0,0,.1); }
+  html[data-theme="material"] #settings .box::-webkit-scrollbar-thumb{ background:rgba(103,80,164,.55); }
+  html[data-theme="material"] #settings .tab{ color:#5f5b66; border-color:rgba(0,0,0,.12); }
+  html[data-theme="material"] #settings .tab.on{ color:#fff; }
+  html[data-theme="material"] .setn{ color:#1d1b20; }
+  html[data-theme="material"] .setd{ color:#5f5b66; }
+  html[data-theme="material"] .setmark{ color:var(--accent); }
+  html[data-theme="material"] .setval{ color:var(--accent); }
+  html[data-theme="material"] .palcell{ border-color:rgba(0,0,0,.14); }
+  html[data-theme="material"] .palfam{ color:#5f5b66; }
+  html[data-theme="material"] #settings .d{ color:#5f5b66; }
   /* ===== 仓库（按设计图：左装备栏 + 右格子区） ===== */
   .stk{ display:flex; gap:12px; width:100%; max-width:900px; height:100%;
         padding:10px; box-sizing:border-box; }
@@ -745,6 +843,9 @@ background:rgba(90,220,255,.03); cursor:default; }
          优先用胸挂里的（胸挂就是快速取用区），胸挂没有再翻背包。
          按钮上会显示当前可用药品的数量，没有药时自动变暗。 -->
     <div class="pill" id="medBtn" style="cursor:pointer">🩹 <span>治疗</span><b id="medBtnN" class="medn">0</b></div>
+    <!-- 调试日志徽标：只在设置里打开调试日志时出现，显示当前条数。
+         点一下直接打开设置面板的「调试」页签，省得去菜单里翻。 -->
+    <div class="pill" id="logBadge" style="cursor:pointer" title="调试日志">LOG 0</div>
   </div>
   <!-- 小地图：左上角固定，显示校园平面 + 玩家朝向 + 撤离点 -->
   <div id="mmWrap">
@@ -875,6 +976,7 @@ background:rgba(90,220,255,.03); cursor:default; }
       <button class="btn ghost" id="btnShop">🛒 商店</button>
       <button class="btn ghost" id="btnStash">🏠 仓库</button>
       <button class="btn ghost" id="btnGunsmith">🔧 改枪台</button>
+      <button class="btn ghost" id="btnSettings">⚙️ 设置</button>
     </div>
     <div class="row">
       <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
@@ -904,6 +1006,7 @@ background:rgba(90,220,255,.03); cursor:default; }
 <!-- 改枪台：结构与 shop/stash 同构，靠 JS 动态填充。单独一个容器是因为
      改枪和商店/仓库是三个互斥的全屏面板，复用一个容器会互相覆盖。 -->
 <div id="gunsmith" style="display:none"></div>
+<div id="settings" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
 <!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
@@ -956,21 +1059,64 @@ background:rgba(90,220,255,.03); cursor:default; }
      正常情况这段什么都不显示。 -->
 <script>
 (function(){
-  var shown=false;
-  function show(msg){
-    if(shown) return; shown=true;
+  /* 【统一弹窗函数】
+     kind: 'fatal' = 真的启动/运行时错误（红）
+           'probe' = 自检结果（橙）—— 以前自检也走 show()，
+                     所以屏幕上会印一行「⚠ 启动出错：按钮试跑失败」，
+                     而实际上模块跑得好好的。这不是启动出错，
+                     而且这个框没有关闭按钮，盖在菜单上很培心。 */
+  function panel(kind, msg){
     try{
+      /* 【用户关过就不再自弹】以前每次 panel() 都无条件重建，
+         玩家点 ✕ 关掉后再有自检/警告又把框顶回屏幕上，
+         看起来就是「这个红框关不掉」。
+         现在：关掉之后只允许 fatal 再弹（真出错必须让人看见），
+         probe（自检）永远不再骚扰。 */
+      if(kind!=='fatal' && window.__bootdiagClosed) return;
+      var old=document.getElementById('__bootdiag');
+      if(old && old.parentNode) old.parentNode.removeChild(old);
       var d=document.createElement('div');
       d.id='__bootdiag';
-      d.style.cssText='position:fixed;left:8px;top:8px;right:8px;z-index:99999;'
-        +'background:rgba(140,20,20,.96);color:#fff;font:12px/1.5 ui-monospace,monospace;'
-        +'padding:10px 12px;border-radius:10px;border:1px solid #ff6a5a;white-space:pre-wrap;'
-        +'max-height:60vh;overflow:auto;';
-      d.textContent='⚠ 启动出错：\n'+msg;
-      /* 盖个全局钩子，方便调试时在控制台看到同一串 */
-      try{ window.__bootdiagText=msg; }catch(e){}
+      var red = kind==='fatal';
+      d.style.cssText='position:fixed;left:8px;top:8px;right:56px;z-index:99999;'
+        +'background:'+(red?'rgba(140,20,20,.96)':'rgba(120,80,10,.96)')+';'
+        +'color:#fff;font:12px/1.5 ui-monospace,monospace;'
+        +'padding:10px 12px 10px;border-radius:10px;'
+        +'border:1px solid '+(red?'#ff6a5a':'#ffc14a')+';white-space:pre-wrap;'
+        +'max-height:60vh;overflow:auto;box-shadow:0 6px 24px rgba(0,0,0,.6);';
+      d.textContent=(red?'⚠ 运行出错：\n':'🔍 自检：\n')+msg;
+      /* 【关闭按钮】以前这个框没有关闭方式，盖住了整个主菜单，
+         而它很可能只是一条自检提示。现在右上角一个 ✕。 */
+      var x=document.createElement('button');
+      x.textContent='✕';
+      x.style.cssText='position:absolute;top:6px;right:6px;width:32px;height:32px;'
+        +'border-radius:8px;border:1px solid rgba(255,255,255,.5);'
+        +'background:rgba(0,0,0,.35);color:#fff;font-size:15px;font-weight:700;'
+        +'line-height:1;cursor:pointer;z-index:2;';
+      x.onclick=function(ev){
+        if(ev){ ev.stopPropagation(); if(ev.preventDefault) ev.preventDefault(); }
+        if(d.parentNode) d.parentNode.removeChild(d);
+        try{ window.__bootdiagClosed=true; }catch(e){}
+      };
+      d.appendChild(x);
       (document.body||document.documentElement).appendChild(d);
+      try{ window.__bootdiagText=msg; window.__bootdiagKind=kind; }catch(e){}
     }catch(e){}
+  }
+  /* 【show() 的语义】
+   旧版用 shown 把「整个会话只弹一次」锁死 —— 结果玩家点 ✕ 关掉之后，
+   后面再真的崩了，屏幕上什么都不会出现，等于把错误藏起来了。
+   对调试是灾难：你只会看到「上次那条旧信息」，看不到真正的新错误。
+   现在的策略：
+     · 每次新的 fatal 都重建面板（覆盖旧内容，不会叠一堆）
+     · 节流 800ms，避免同一帧里连抛十几个错误把 DOM 刷爆
+     · 关掉过就不再自动弹 probe（见 panel 顶部），但 fatal 永远弹 */
+  var lastFatal=0;
+  function show(msg){
+    var now=Date.now();
+    if(now-lastFatal < 800) return;
+    lastFatal=now;
+    panel('fatal', msg);
   }
   /* 1. 普通运行时错误 */
   window.addEventListener('error', function(e){
@@ -1008,52 +1154,70 @@ background:rgba(90,220,255,.03); cursor:default; }
        · 误报：委托生效时 onclick 也可能是空的，旧版会把好按钮列进 miss。
      新版改成「真的派发一次 click」，看面板有没有真的打开，
      再把面板恢复原状（同步执行，画面不闪）。 */
-  var PANEL_OF = { btnShop:'shop', btnStash:'stash', btnGunsmith:'gunsmith' };
+  var PANEL_OF = { btnShop:'shop', btnStash:'stash', btnGunsmith:'gunsmith', btnSettings:'settings' };
   function trialClick(){
+    /* 【为什么不再真的派发 click】
+       上一版为了「眼见为实」，对每个按钮 dispatchEvent 一次真的 click。
+       结果：自检自己把仓库面板打开了一遍 —— 而 buildStashNew 当时有 bug，
+       构建抛异常 → 异常在监听器里没人接 → 冒到 window 的 error 事件 →
+       被顶层的 show() 接住 → 屏幕上弹出「⚠ 启动出错」。
+       也就是说：那个红框是自检自己捅出来的，游戏根本没坏。
+       更糟的是自检还改动了真实状态（面板开关、DOM 重建）。
+       所以现在改成「无副作用探测」：
+         · 按钮存在吗（DOM 漏了会在这里暴露）
+         · 有没有绑定（onclick 或 __jsBound，两者有一个就行）
+         · 面板容器存在吗
+       真正的点击问题交给第 5 节的「真实点击监控」——
+       那是以玩家真实操作为准，比我模拟的更可信。 */
     var out={};
     var ids=Object.keys(PANEL_OF);
     for(var i=0;i<ids.length;i++){
       var id=ids[i], pid=PANEL_OF[id];
       var btn=document.getElementById(id);
-      var panel=document.getElementById(pid);
+      var pnlEl=document.getElementById(pid);
       if(!btn){ out[id]='NO_DOM'; continue; }
-      if(!panel){ out[id]='NO_PANEL'; continue; }
-      var before=panel.style.display||'';
-      var rec={ onclick: btn.onclick?'y':'n' };
-      try{
-        btn.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
-      }catch(e){ out[id]='DISPATCH_ERR:'+e; continue; }
-      var after=panel.style.display||'';
-      try{ panel.style.display=before; }catch(e){}
-      rec.flip = (before!==after)?1:0;
-      rec.from = before;
-      rec.to   = after;
-      out[id]=rec;
+      if(!pnlEl){ out[id]='NO_PANEL'; continue; }
+      var bound = !!(btn.onclick || btn.__jsBound || (btn.dataset && btn.dataset.bound));
+      out[id]={
+        bound: bound?'y':'n',
+        via: btn.onclick?'onclick':(btn.__jsBound?'jsBound':'none'),
+        panel: pid
+      };
     }
     return out;
   }
   setTimeout(function(){
     if(!window.__moduleRan) return;
-    var r=null, bad=[];
+    var r=null;
     try{ r=trialClick(); }catch(e){ show('自检本身出错：'+e); return; }
     window.__btnProbe=r;
-    var allok=true;
+    var allok=true, nobind=[];
     for(var id in r){
       var v=r[id];
-      if(typeof v!=='object' || !v.flip){ allok=false; bad.push(id+' '+JSON.stringify(v)); }
+      /* 字符串表示 DOM/容器缺失；对象里 bound!=='y' 表示没绑上。
+         注意：这里不再看「面板有没有打开」—— 自检不点了，
+         所以用「有没有绑定」作为判据。 */
+      if(typeof v!=='object'){ allok=false; nobind.push(id+' '+v); }
+      else if(v.bound!=='y'){ allok=false; nobind.push(id+' '+JSON.stringify(v)); }
     }
     window.__btnProbeAll = allok ? 'ALL_OK' : 'FAIL';
     if(!allok){
-      show('按钮试跑失败（点了面板没打开）：\n'+bad.join('\n')
+      /* 【用橙色的 probe 面板，不是红色 fatal】
+         这不是启动错误 —— 模块明明跑完了。
+         再加上面板右上角有 ✕，随时可以关掉。 */
+      panel('probe', '有按钮没绑上（不影响游戏）：\n'+nobind.join('\n')
         +'\n\n__menuDelegated='+window.__menuDelegated
-        +'  __uiReady='+window.__uiReady);
+        +'  __uiReady='+window.__uiReady
+        +'\n__uiPhase='+(window.__uiPhase||'(未设置)'));
     }
   }, 2500);
-  /* 5. 【真实点击监控】第 4 步是程序模拟点，这一步抓玩家的真点击。
+  /* 5. 【真实点击监控】第 4 步是无副作用探测（不点），这一步抓玩家的真点击。
      同一个按钮连点 3 次都没反应，就把判据全打印出来 ——
      这几项足以区分「没绑上」「委托没启用」「模块没跑」「事件被吞」四种情况。
      用 click 而不是 touchstart：如果浏览器根本没合成 click，
-     那这条就永远不会进来 —— 这本身就是「touch-action:none 吃掉了 click」的铁证。 */
+     那这条就永远不会进来 —— 这本身就是「touch-action:none 吃掉了 click」的铁证。
+     注意：这条只有在玩家真的连点失败 3 次时才弹，而且弹的是橙色提示框，
+     右上角有 ✕，关掉之后不会再自己冒出来。 */
   var taps={};
   window.__menuTapLog={};
   document.addEventListener('click', function(e){
@@ -1077,7 +1241,8 @@ background:rgba(90,220,255,.03); cursor:default; }
     lines.push('onclick='+(t.onclick?'有':'无')+'  __jsBound='+(!!t.__jsBound)+'  __boundAt='+(t.__boundAt||0));
     lines.push('__menuDelegated='+window.__menuDelegated);
     lines.push('__moduleRan='+window.__moduleRan+'  __uiReady='+window.__uiReady);
-    show(lines.join('\n'));
+    lines.push('__uiPhase='+(window.__uiPhase||'(未设置)'));
+    panel('probe', lines.join('\n'));
   }, true);
 })();
 </script>
@@ -1705,6 +1870,43 @@ const I18N_EN = {
   '校门口': 'School Gate',
   '操场': 'Sports Field',
   '北场地': 'North Field',
+  /* ---- 设置面板：外观 / 512 色 / 声音 / 调试日志 ---- */
+  '外观': 'Appearance',
+  '主题色': 'Accent color',
+  '声音': 'Sound',
+  '调试': 'Debug',
+  '暗夜（原版）': 'Night (original)',
+  'Material 浅色': 'Material light',
+  '选择界面主题。浅色主题适合白天，暗夜主题对比更强。':
+    'Pick an interface theme. Light suits daytime; Night has stronger contrast.',
+  '主色共 512 档：8 个色系 × 64 个深浅。点一格立即生效。':
+    '512 accent shades: 8 families × 64 steps. Tap one to apply instantly.',
+  '紫': 'Purple',
+  '蓝': 'Blue',
+  '青': 'Cyan',
+  '绿': 'Green',
+  '琥珀': 'Amber',
+  '橙': 'Orange',
+  '红': 'Red',
+  '粉': 'Pink',
+  '全局音量': 'Master volume',
+  '对所有音效整体缩放，不影响各音效的相对响度':
+    'Scales all sound effects together without changing their relative loudness',
+  '音效开关': 'Sound effects',
+  '完全静音，倍率保留': 'Mute everything, keep the volume level',
+  '调试日志': 'Debug log',
+  '记录警告与错误，方便排查问题': 'Records warnings and errors to help diagnose problems',
+  '（暂无日志）': '(no log entries yet)',
+  '刷新': 'Refresh',
+  '复制全部': 'Copy all',
+  '共 {0} 条 · 最多保留 300 条': '{0} entries · keeps the latest 300',
+  '日志已复制': 'Log copied',
+  '复制失败，请手动选择': 'Copy failed, please select manually',
+  '复制失败': 'Copy failed',
+  '调试日志已开启': 'Debug log enabled',
+  /* ---- 仓库格子空状态 ---- */
+  '空（点击仓库物品放入）': 'Empty (tap a stash item to put it in)',
+  '空（局内放入医疗/弹药）': 'Empty (put meds/ammo in during a raid)',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */
@@ -4183,7 +4385,7 @@ let touchMoveX=0, touchMoveY=0;
    用 closest 向上找，所以点在图标/文字上（svg、span）也算命中父按钮。 */
 const UI_SELECTOR=[
   '#topbar','#actZone','#joyZone','#viewLayer','#wpnBar',
-  '#menu','#shop','#bag','#stash','#gunsmith','#death','#lootBox',
+  '#menu','#shop','#bag','#stash','#gunsmith','#settings','#death','#lootBox',
   '#gmPanel','#orientMask','#saveRow','#__bootdiag','button'
 ].join(',');
 function isUIEvent(e){
@@ -4564,6 +4766,16 @@ function bindUI(){
     try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
     try{ toggleGunsmith(); }catch(e){ console.error('gunsmith', e); }
   });
+  /* 【设置入口】和改枪台一样面板互斥：先把其它全屏浮层收干净。
+     设置面板里改的是主题/色板/音量/日志，都是立即生效的，
+     所以不需要「确定/取消」，关掉就算保存。 */
+  tapAction('btnSettings', ()=>{
+    try{ sfxUI(); }catch(e){}
+    try{ closeShop(); }catch(e){}
+    try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
+    try{ const gs=document.getElementById('gunsmith'); if(gs) gs.style.display='none'; }catch(e){}
+    try{ toggleSettings(); }catch(e){ console.error('settings', e); }
+  });
 
   /* ---- 局内背包 / 吃药 / 音效 ----
      【为什么不用 onclick】这套 UI 在手机上走的是触摸：
@@ -4598,11 +4810,29 @@ function bindUI(){
      连点不会出错：medQuickUse 内部会重新判满血/无药。 */
   const medBtn=document.getElementById('medBtn');
   tapBtn(medBtn, ()=>{ try{ sfxUI(); }catch(e){} medQuickUse(); });
+  /* 【调试日志徽标】点一下直接打开设置面板的「调试」页签。
+     徽标只在日志开启时显示（updateLogBadge 负责），所以它本身就是
+     「日志正在记录」的指示灯，顺手点进去就能看内容。 */
+  const logBadge=document.getElementById('logBadge');
+  tapBtn(logBadge, ()=>{
+    try{ sfxUI(); }catch(e){}
+    try{
+      if(typeof setTab!=='undefined') setTab='debug';
+      if(typeof toggleSettings==='function'){
+        const s=document.getElementById('settings');
+        if(s && s.style.display==='flex') buildSettings();
+        else toggleSettings();
+      }
+    }catch(e){ console.error('logBadge', e); }
+  });
   // 音效开关
   const sndBtn=document.getElementById('sndBtn');
   tapBtn(sndBtn, ()=>{
     sfxOn=!sfxOn;
-    if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
+    /* 【走统一入口】以前直接写 VOL.master，会把设置里的音量倍率抹掉 ——
+       玩家把音量拉到 30%，点一下 HUD 静音再取消，音量就回到 100%。 */
+    if(typeof masterVolApply==='function') masterVolApply();
+    else if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
     const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
     if(sndBtn.firstChild) sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
     if(sfxOn){ try{ sfxUI(); }catch(e){} }
@@ -5557,6 +5787,7 @@ function toggleGunsmith(){
        现在样式补上了，这里再把「先 visible 后填充」的保险也加上。 */
     s.style.display='flex';
     closeShop(); closeBag(); closeStash();
+    try{ window.__uiPhase='gunsmith:opening'; }catch(e){}
     try{
       const list=ownedWeapons();
       if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
@@ -5697,6 +5928,7 @@ function toggleShop(){
        不会再出现「按了没动静」这种完全无从下手的状态。 */
     s.style.display='flex';
     closeBag(); closeStash(); closeGunsmith();
+    try{ window.__uiPhase='shop:opening'; }catch(e){}
     try{ buildShop(); }
     catch(e){ console.error('buildShop failed', e);
       s.innerHTML='<div class="box"><h1>商店</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
@@ -5876,6 +6108,12 @@ function toggleStash(){
   if(opening){
     el.style.display='flex';
     closeShop(); closeBag(); closeGunsmith();
+    /* 【诊断锚点】把当前阶段写到 window 上。
+       自检试跑里如果 buildStashNew 抛了未命名异常，
+       try/catch 己经接住并把错误画到面板里了；但如果是
+       closeShop 之类前置步骤抛的，面板会是空的。
+       有这个锚点，屏幕上就能直接看出卡在哪一步。 */
+    try{ window.__uiPhase='stash:opening'; }catch(e){}
     /* 每次打开仓库顺手修一次 looted 账本（见 clampLooted 注释），
        并重置卖出模式 —— 否则上次点开卖出没确认就退出，
        下次进来还是选择模式，点格子不装备，玩家会以为仓库坏了。 */
@@ -6051,6 +6289,23 @@ function buildStashNew(){
   }
   if(!np) h+='<div class="stkempty2">空（点击仓库物品放入）</div>';
   h+='</div></div>';
+  /* ---------- 胸挂格子（和出击背包并列，点胸挂槽展开） ----------
+     【为什么必须加】胸挂格子 P.chestPouch 之前只在局内背包里可见。
+     撤离成功时 settleExfil 会把 chestPouch 里的东西合回 stash，
+     但玩家一开局、还没撤离，胸挂里的东西就完全隐身：
+     仓库看不到、局外也拿不出来，看起来就是「东西丢了」。 */
+  h+='<div class="stkpouch" id="stkChestBox" style="display:none">';
+  h+='<div class="stkph">🦺 '+T('胸挂')+' <span class="stkcap">'+chestUsed()+'/'+chestCapOf()+'</span></div>';
+  h+='<div class="stkpgrid">';
+  let nc=0;
+  for(const id in P.chestPouch){
+    if(!(P.chestPouch[id]>0)) continue;
+    const it=SHOP_ITEMS[id]; if(!it) continue;
+    nc++;
+    h+='<div class="stkpi" data-chest="'+id+'" title="'+it.name+'">'+it.icon+'<b>'+P.chestPouch[id]+'</b></div>';
+  }
+  if(!nc) h+='<div class="stkempty2">'+T('空（局内放入医疗/弹药）')+'</div>';
+  h+='</div></div>';
 
   h+='</div>';   /* 左栏结束 */
 
@@ -6148,6 +6403,24 @@ function buildStashNew(){
           const show=box.style.display==='none';
           box.style.display=show?'':'none';
         }
+        /* 【同时展开胸挂格子】以前只有背包可展开，胸挂格子（chestPouch）
+           是局内才可见的，局外仓库完全看不到 —— 玩家撤离带回的医疗/弹药
+           进了 chestPouch 之后，在仓库里既看不见也拿不出来，
+           看起来就像「东西丢了」。两者一起开关。 */
+        const cbox=$('stkChestBox');
+        if(cbox){
+          const show2=cbox.style.display==='none';
+          cbox.style.display=show2?'':'none';
+          $('stkPouchBox') && ($('stkPouchBox').style.display=show2?'':'none');
+        }
+        return;
+      }
+      if(k==='chest'){
+        const cbox=$('stkChestBox');
+        if(cbox){
+          const show=cbox.style.display==='none';
+          cbox.style.display=show?'':'none';
+        }
         return;
       }
       /* 其它槽：点一下卸下到仓库 */
@@ -6212,6 +6485,21 @@ function buildStashNew(){
     node.onclick=()=>{
       const id=node.dataset.pouch;
       if(bagTake(id,1)) stashAdd(id,1);
+      buildStashNew(); refreshHUD();
+    };
+  });
+  /* 【胸挂格子在仓库里也能拿回】一模一样的行为：点一下退回仓库。
+     不加这个的话，胸挂区在仓库里就只是个只读展示，
+     玩家看着东西却拿不出来，反而更困惑。 */
+  el.querySelectorAll('[data-chest]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.chest;
+      if(!(P.chestPouch[id]>0)) return;
+      P.chestPouch[id]--;
+      if(P.chestPouch[id]<=0) delete P.chestPouch[id];
+      stashAdd(id,1);
+      try{ sfxUI(); }catch(e){}
+      saveTick();
       buildStashNew(); refreshHUD();
     };
   });
@@ -6879,6 +7167,11 @@ function __bindMenuFallback(){
         case 'btnGunsmith':  try{ sfxUI(); closeShop();
                                    const st=$('stash'); if(st) st.style.display='none';
                                    toggleGunsmith(); }catch(x){ console.error(x); } break;
+        case 'btnSettings':  try{ sfxUI(); closeShop();
+                                   const st2=$('stash'); if(st2) st2.style.display='none';
+                                   const gs2=$('gunsmith'); if(gs2) gs2.style.display='none';
+                                   toggleSettings(); }catch(x){ console.error(x); } break;
+
         case 'btnExport':    exportSave(); break;
         case 'btnImport': {
           const row=$('saveRow'), f=$('saveFile');
@@ -6946,6 +7239,17 @@ function __bindMenuFallback(){
       catch(e){ console.error(e); }
     };
     gsBtn.__jsBound=true;
+  }
+  const setBtn=$('btnSettings');
+  if(setBtn && !setBtn.onclick){
+    setBtn.onclick=()=>{
+      try{ sfxUI(); closeShop();
+           const st=$('stash'); if(st) st.style.display='none';
+           const gs=$('gunsmith'); if(gs) gs.style.display='none';
+           toggleSettings(); }
+      catch(e){ console.error(e); }
+    };
+    setBtn.__jsBound=true;
   }
   const exportBtn=$('btnExport');
   if(exportBtn && !exportBtn.onclick){ exportBtn.onclick=exportSave; exportBtn.__jsBound=true; }
@@ -8848,13 +9152,49 @@ function weaponKick(){ wRecoil=Math.min(1.2,wRecoil+0.85); }
 /* ============ y_audio.js：Web Audio 合成音效（零素材、零依赖） ============ */
 let AC=null, masterGain=null, sfxOn=true, noiseBuf=null;
 const VOL={ master:0.55, shot:0.42, reload:0.3, hit:0.35, hurt:0.4, pickup:0.35, step:0.12, ui:0.25, ambient:0.16 };
+/* ============================================================
+   全局音量（设置面板里的滑块）
+   VOL.master 是「出厂基准值」，玩家调的音量是它的百分比倍率。
+   为什么要把两者分开：音效各自的相对响度（枪声比脚步响）
+   是设计好的，玩家只应该整体缩放它们，不能把枪声调到比脚步小。
+   所以 masterGain 的最终值 = VOL.master × masterVol。
+   masterVol 存在 localStorage，跨会话保持。
+   ============================================================ */
+const MASTER_VOL_KEY='efs_master_vol_v1';
+let masterVol=1.0;
+function masterVolLoad(){
+  try{
+    const raw=localStorage.getItem(MASTER_VOL_KEY);
+    if(raw!==null){
+      const v=parseFloat(raw);
+      if(isFinite(v)) masterVol=Math.max(0,Math.min(1,v));
+    }
+  }catch(e){}
+  return masterVol;
+}
+function masterVolApply(){
+  try{
+    if(masterGain){
+      /* sfxOn 是「总开关」，关掉时直接静音，与音量滑块互不干扰 */
+      masterGain.gain.value = sfxOn ? (VOL.master*masterVol) : 0;
+    }
+  }catch(e){}
+  return masterVol;
+}
+function masterVolSet(v){
+  masterVol=Math.max(0,Math.min(1,Number(v)||0));
+  try{ localStorage.setItem(MASTER_VOL_KEY, String(masterVol)); }catch(e){}
+  masterVolApply();
+  return masterVol;
+}
 
 function audioInit(){
   if(AC) return AC;
   try{
     AC=new (window.AudioContext||window.webkitAudioContext)();
     masterGain=AC.createGain();
-    masterGain.gain.value=VOL.master;
+    masterVolLoad();
+    masterGain.gain.value=sfxOn?(VOL.master*masterVol):0;
     masterGain.connect(AC.destination);
     // 预生成 1 秒白噪声缓冲（枪声/脚步/爆炸复用）
     const len=AC.sampleRate;
@@ -9500,6 +9840,523 @@ function i18nInitUI(){
   setTimeout(run, 150);
 }
 
+/* ============================================================
+   s_theme.js —— Material 主题 · 512 色板 · 设置项存储 · 调试日志
+
+   为什么单独一个文件：这些东西全局被引用（CSS 变量、面板渲染、
+   音效、日志），如果塞进 f_ui.js 会和 UI 逻辑缠在一起。
+   放在 u_i18n.js 之后加载，因为设置面板要调 T()。
+
+   三个子系统：
+     1) 主题：默认盐线暗调 / Material You 亮调两套 CSS 变量
+     2) 512 色：指主色（accent）可调，512 = 8 组 × 64 色
+     3) 调试日志：环缓冲记录，设置面板里可查看/导出
+   ============================================================ */
+
+/* ---------- 存储 key ---------- */
+const THEME_KEY      = 'efs_theme_v1';
+const ACCENT_KEY     = 'efs_accent_v1';
+const DEBUGLOG_KEY   = 'efs_debuglog_v1';   /* 是否开启调试日志 */
+
+/* ============================================================
+   1) 主题
+   两套主题只靠 <html data-theme="..."> 切换，变量名一致，
+   这样所有既有 CSS 不需要改一行 —— 它们早就在用 var(--accent) 了。
+   ============================================================ */
+const THEMES = {
+  dark: { id:'dark',  get name(){ return T('暗夜（原版）'); },  desc:'Saltline 暗色 · 对比强' },
+  material: { id:'material', get name(){ return T('Material 浅色'); }, desc:'Material You 亮调 · 白天友好' }
+};
+let curTheme = 'dark';
+
+/* Material 主题的变量表。
+   只改颜色，不改尺寸 —— 否则布局会跟着变，风险太大。 */
+const MATERIAL_VARS = {
+  '--bg'      : '#f4f2f7',
+  '--panel'   : 'rgba(255,255,255,.92)',
+  '--accent'  : '#6750a4',
+  '--accent2' : '#8b6fd1',
+  '--fg'      : '#1d1b20',
+  '--fg-dim'  : '#5f5b66'
+};
+
+function themeLoad(){
+  try{
+    const v = localStorage.getItem(THEME_KEY);
+    if(v && THEMES[v]) curTheme = v;
+    else if(v==='material') curTheme='material';
+  }catch(e){}
+  return curTheme;
+}
+function themeApply(){
+  try{
+    const el = document.documentElement;
+    if(!el) return curTheme;
+    el.setAttribute('data-theme', curTheme);
+    if(curTheme==='material'){
+      for(const k in MATERIAL_VARS) el.style.setProperty(k, MATERIAL_VARS[k]);
+      /* 浅色主题下正文颜色变深，否则白底白字看不见 */
+      el.style.setProperty('color-scheme','light');
+    }else{
+      for(const k in MATERIAL_VARS) el.style.removeProperty(k);
+      el.style.removeProperty('color-scheme');
+    }
+    /* 3D 场景背景也跟着走：浅色主题下暗背景很刺眼 */
+    try{
+      if(typeof scene!=='undefined' && scene && scene.background && scene.background.isColor){
+        scene.background.set(curTheme==='material' ? 0xcfd8e3 : 0x0b0e14);
+      }
+    }catch(e){}
+  }catch(e){}
+  return curTheme;
+}
+function themeSet(id){
+  if(!THEMES[id]) return curTheme;
+  curTheme = id;
+  try{ localStorage.setItem(THEME_KEY, id); }catch(e){}
+  themeApply();
+  /* 【必须补一次 accentApply】
+     themeApply 在切回 dark 时会 removeProperty 清掉 MATERIAL_VARS，
+     而 --accent 就在那张表里 —— 于是玩家自定义的主色被一起剥掉，
+     界面变回默认紫。这里把玩家选的颜色写回去。
+     顺序和 themeInit 一致：先主题、后 accent。 */
+  try{ if(typeof accentApply==='function') accentApply(); }catch(e){}
+  return curTheme;
+}
+
+/* ============================================================
+   2) 512 色板
+   「512 color」理解为主色可选范围：8 个色相家族 × 64 个明度/饱和度档位。
+   为什么不直接用 HSL 滑条：玩家在手机上拉滑条很难拉准，
+   而且没参照物。这里直接给一个 8×64 的网格，点哪算哪，
+   还能一眼看完所有可选颜色。
+   ============================================================ */
+const ACCENT_FAMILIES = [
+  { id:'purple', get name(){ return T('紫'); } },
+  { id:'blue',   get name(){ return T('蓝'); } },
+  { id:'cyan',   get name(){ return T('青'); } },
+  { id:'green',  get name(){ return T('绿'); } },
+  { id:'amber',  get name(){ return T('琥珀'); } },
+  { id:'orange', get name(){ return T('橙'); } },
+  { id:'red',    get name(){ return T('红'); } },
+  { id:'pink',   get name(){ return T('粉'); } }
+];
+/* 每个家族的基准色相 */
+const ACCENT_HUE = {
+  purple:265, blue:215, cyan:188, green:142,
+  amber:45,  orange:22, red:358, pink:330
+};
+/* 64 档 = 8 饱和度 × 8 明度，形成深浅梯度 */
+const ACCENT_SATS = [0.28,0.40,0.52,0.64,0.76,0.88,0.96,1.00];
+const ACCENT_LIGS = [0.86,0.76,0.68,0.60,0.52,0.44,0.36,0.28];
+const ACCENT_STEPS = 64;   /* 8*8 */
+let accentIdx = 0;         /* 0..511 */
+
+/* 下标 -> {h,s,l} */
+function accentOf(idx){
+  idx = ((idx|0) % 512 + 512) % 512;
+  const fam = Math.floor(idx / ACCENT_STEPS);
+  const sub = idx % ACCENT_STEPS;
+  const si = sub % 8;
+  const li = Math.floor(sub / 8) % 8;
+  const fid = ACCENT_FAMILIES[fam] ? ACCENT_FAMILIES[fam].id : 'purple';
+  return {
+    hue: ACCENT_HUE[fid] || 265,
+    s: ACCENT_SATS[si],
+    l: ACCENT_LIGS[li],
+    fam: fid
+  };
+}
+function accentCss(idx){
+  const a = accentOf(idx);
+  return 'hsl('+a.hue+','+Math.round(a.s*100)+'%,'+Math.round(a.l*100)+'%)';
+}
+function accentCss2(idx){
+  /* 辅助色：同色相，抬高 8% 亮度 */
+  const a = accentOf(idx);
+  const l2 = Math.min(0.92, a.l+0.10);
+  return 'hsl('+a.hue+','+Math.round(a.s*100)+'%,'+Math.round(l2*100)+'%)';
+}
+function accentLoad(){
+  try{
+    const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
+    if(isFinite(v)) accentIdx = ((v%512)+512)%512;
+  }catch(e){}
+  return accentIdx;
+}
+function accentApply(){
+  try{
+    const el = document.documentElement;
+    if(!el) return accentIdx;
+    el.style.setProperty('--accent', accentCss(accentIdx));
+    el.style.setProperty('--accent2', accentCss2(accentIdx));
+  }catch(e){}
+  return accentIdx;
+}
+function accentSet(idx){
+  accentIdx = ((Number(idx)|0)%512+512)%512;
+  try{ localStorage.setItem(ACCENT_KEY, String(accentIdx)); }catch(e){}
+  accentApply();
+  return accentIdx;
+}
+
+/* ============================================================
+   3) 调试日志
+   两件事：
+     · 一个环缓冲（最近 300 条），不依赖控制台 —— 手机上没控制台
+     · 一个开关，关掉时不记录，避免影响帧率
+   console.error / console.warn 也会被抄一份进来。
+   ============================================================ */
+const LOG_MAX = 300;
+let logOn = false;
+let logBuf = [];
+let logHookInstaled = false;
+
+function logStamp(){
+  const d = new Date();
+  const p = n=> (n<10?'0':'')+n;
+  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function logPush(level, args){
+  if(!logOn) return;
+  try{
+    let msg = '';
+    for(let i=0;i<args.length;i++){
+      const a = args[i];
+      if(a instanceof Error) msg += (a.stack||a.message||String(a));
+      else if(typeof a === 'object'){
+        try{ msg += JSON.stringify(a); }catch(e){ msg += String(a); }
+      } else msg += String(a);
+      if(i<args.length-1) msg += ' ';
+    }
+    logBuf.push({ t:logStamp(), lv:level||'info', m:msg.slice(0,500) });
+    if(logBuf.length > LOG_MAX) logBuf.splice(0, logBuf.length-LOG_MAX);
+    updateLogBadge();
+  }catch(e){}
+}
+function dlog(){ logPush('log', arguments); }
+function dwarn(){ logPush('warn', arguments); }
+function derr(){ logPush('error', arguments); }
+
+/* 【钩住原生 console】只做旁路拷贝，不改原本行为。
+   钩一次就行，重复钩会导致同一条日志被记录多份。 */
+function logHookConsole(){
+  if(logHookInstaled) return;
+  logHookInstaled = true;
+  try{
+    const ow = console.warn, oe = console.error;
+    console.warn = function(){ try{ if(logOn) logPush('warn', arguments); }catch(e){} return ow.apply(console, arguments); };
+    console.error= function(){ try{ if(logOn) logPush('error', arguments); }catch(e){} return oe.apply(console, arguments); };
+  }catch(e){}
+  /* 未捕获异常也进日志 */
+  try{
+    window.addEventListener('error', function(e){
+      try{
+        if(e && e.target && e.target.tagName==='SCRIPT') return;
+        logPush('error', [(e&&e.message)||'未知错误','@'+((e&&e.filename)||'')+':'+((e&&e.lineno)||'')]);
+      }catch(x){}
+    }, true);
+    window.addEventListener('unhandledrejection', function(e){
+      const r=e && e.reason;
+      logPush('error', ['Promise 未捕获：'+((r&&(r.stack||r.message))||String(r))]);
+    });
+  }catch(e){}
+}
+function logLoad(){
+  try{ logOn = localStorage.getItem(DEBUGLOG_KEY)==='1'; }catch(e){ logOn=false; }
+  return logOn;
+}
+function logSet(on){
+  logOn = !!on;
+  try{ localStorage.setItem(DEBUGLOG_KEY, logOn?'1':'0'); }catch(e){}
+  updateLogBadge();
+  if(logOn) logPush('info', ['调试日志已开启']);
+  return logOn;
+}
+function logClear(){ logBuf=[]; updateLogBadge(); return 0; }
+function logText(){
+  const out=[];
+  for(let i=0;i<logBuf.length;i++){
+    const r=logBuf[i];
+    out.push('['+r.t+'] ['+r.lv+'] '+r.m);
+  }
+  return out.join('\n');
+}
+/* 把开关状态同步到 HUD 那个小徽标（有就更新，没有就跳过） */
+function updateLogBadge(){
+  try{
+    const b=document.getElementById('logBadge');
+    if(!b) return;
+    if(!logOn){ b.textContent=''; b.style.display='none'; return; }
+    b.style.display='inline-block';
+    b.textContent='LOG '+logBuf.length;
+  }catch(e){}
+}
+
+/* ============================================================
+   初始化：必须在 DOM 就绪后调，且在所有分块定义之后。
+   ============================================================ */
+function themeInit(){
+  themeLoad();
+  accentLoad();
+  logLoad();
+  logHookConsole();
+  /* 【两层都要上】
+     themeApply 会清掉 MATERIAL_VARS，accentApply 会盖 --accent。
+     顺序不能反：先主题（可能清 accent），再 accent（写回玩家选的颜色）。 */
+  themeApply();
+  accentApply();
+  dlog('theme init', curTheme, 'accent', accentIdx);
+}
+
+/* ============================================================
+   t_settings.js —— 设置面板
+
+   包含四块：
+     1) 外观：主题（暗夜 / Material 浅色）
+     2) 主题色：512 色网格
+     3) 声音：全局音量滑块 + 总开关
+     4) 调试：调试日志开关 / 查看 / 复制 / 清空
+
+   结构上和 shop/stash/gunsmith 同构（一个 #settings 全屏浮层），
+   但内容全部在这里生成，不往 f_ui.js 里搎。
+   ============================================================ */
+
+/* 当前设置页签 */
+let setTab = 'look';
+
+function closeSettings(){
+  const s=document.getElementById('settings');
+  if(s) s.style.display='none';
+}
+
+function toggleSettings(){
+  const s=document.getElementById('settings');
+  if(!s) return;
+  const opening = s.style.display!=='flex';
+  if(opening){
+    s.style.display='flex';
+    /* 和商店/仓库/改枪台互斥，四选一 */
+    try{ if(typeof closeShop==='function') closeShop(); }catch(e){}
+    try{ if(typeof closeStash==='function') closeStash(); }catch(e){}
+    try{ if(typeof closeGunsmith==='function') closeGunsmith(); }catch(e){}
+    try{ if(typeof closeBag==='function') closeBag(); }catch(e){}
+    buildSettings();
+  } else s.style.display='none';
+}
+
+function buildSettings(){
+  const el=document.getElementById('settings');
+  if(!el) return;
+  let h='<div class="box" style="max-width:600px">';
+  /* 标题行 */
+  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px">'
+    +'<h1 style="margin:0">⚙️ '+T('设置')+'</h1>'
+    +'<button class="btn ghost small" id="setClose">'+T('关闭')+'</button></div>';
+  /* 页签 */
+  const TABS=[
+    {id:'look',  get n(){ return T('外观'); }},
+    {id:'color', get n(){ return T('主题色'); }},
+    {id:'sound', get n(){ return T('声音'); }},
+    {id:'debug', get n(){ return T('调试'); }}
+  ];
+  h+='<div class="tabs">';
+  for(const t of TABS){
+    h+='<button class="tab'+(setTab===t.id?' on':'')+'" data-set-tab="'+t.id+'">'+t.n+'</button>';
+  }
+  h+='</div>';
+
+  /* ---------- 外观 ---------- */
+  if(setTab==='look'){
+    h+='<div class="d" style="margin:10px 0 6px">'+T('选择界面主题。浅色主题适合白天，暗夜主题对比更强。')+'</div>';
+    for(const id in THEMES){
+      const th=THEMES[id];
+      const on = (typeof curTheme!=='undefined') && curTheme===id;
+      h+='<div class="setrow'+(on?' on':'')+'" data-theme-pick="'+id+'">'
+        +'<div class="setinfo"><div class="setn">'+th.name+'</div>'
+        +'<div class="setd">'+(th.desc||'')+'</div></div>'
+        +'<div class="setmark">'+(on?'✓':'')+'</div>'
+        +'</div>';
+    }
+  }
+
+  /* ---------- 512 色 ---------- */
+  if(setTab==='color'){
+    h+='<div class="d" style="margin:10px 0 6px">'
+      +T('主色共 512 档：8 个色系 × 64 个深浅。点一格立即生效。')
+      +'</div>';
+    /* 当前色预览 */
+    h+='<div class="setcurr">'
+      +'<span class="setdot" style="background:'+accentCss(accentIdx)+'"></span>'
+      +'<span class="setmono">#'+String(accentIdx).padStart(3,'0')+' / 512</span>'
+      +'<span class="setmono" style="opacity:.6">'+accentCss(accentIdx)+'</span>'
+      +'</div>';
+    h+='<div class="palwrap">';
+    for(let f=0; f<ACCENT_FAMILIES.length; f++){
+      const fam=ACCENT_FAMILIES[f];
+      h+='<div class="palrow">';
+      h+='<div class="palfam">'+fam.name+'</div>';
+      h+='<div class="palgrid">';
+      for(let s=0; s<ACCENT_STEPS; s++){
+        const idx=f*ACCENT_STEPS+s;
+        const sel = (idx===accentIdx)?' sel':'';
+        h+='<div class="palcell'+sel+'" data-accent="'+idx+'"'
+          +' style="background:'+accentCss(idx)+'"'
+          +' title="'+idx+'"></div>';
+      }
+      h+='</div></div>';
+    }
+    h+='</div>';
+  }
+
+  /* ---------- 声音 ---------- */
+  if(setTab==='sound'){
+    const pct = Math.round((typeof masterVol==='number'?masterVol:1)*100);
+    h+='<div class="setrow">'
+      +'<div class="setinfo"><div class="setn">'+T('全局音量')+'</div>'
+      +'<div class="setd">'+T('对所有音效整体缩放，不影响各音效的相对响度')+'</div></div>'
+      +'<div class="setval">'+pct+'%</div></div>';
+    h+='<input id="volRange" class="volrange" type="range" min="0" max="100" step="1" value="'+pct+'">';
+    const on = (typeof sfxOn!=='undefined') && sfxOn;
+    h+='<div class="setrow'+(on?' on':'')+'" data-sfx-toggle="1">'
+      +'<div class="setinfo"><div class="setn">'+T('音效开关')+'</div>'
+      +'<div class="setd">'+T('完全静音，倍率保留')+'</div></div>'
+      +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+  }
+
+  /* ---------- 调试 ---------- */
+  if(setTab==='debug'){
+    const on = (typeof logOn!=='undefined') && logOn;
+    h+='<div class="setrow'+(on?' on':'')+'" data-log-toggle="1">'
+      +'<div class="setinfo"><div class="setn">'+T('调试日志')+'</div>'
+      +'<div class="setd">'+T('记录警告与错误，方便排查问题')+'</div></div>'
+      +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+    /* 【日志内容区】以前错误只能看控制台，手机上根本看不到。
+       这里直接把环缓冲打印出来，还能一键复制。 */
+    const txt = logText();
+    h+='<div class="setlog">'+(txt? escapeHtml(txt) : T('（暂无日志）'))+'</div>';
+    h+='<div class="row" style="margin-top:8px;gap:8px">'
+      +'<button class="btn ghost small" id="logRefresh">'+T('刷新')+'</button>'
+      +'<button class="btn ghost small" id="logCopy">'+T('复制全部')+'</button>'
+      +'<button class="btn danger small" id="logClear">'+T('清空')+'</button>'
+      +'</div>';
+    h+='<div class="d" style="margin-top:8px">'+T('共 {0} 条 · 最多保留 300 条', logBuf.length)+'</div>';
+  }
+
+  h+='</div>';
+  el.innerHTML=h;
+  bindSettings();
+}
+
+/* 避免把日志里的 < > 当 HTML 渲染 */
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function bindSettings(){
+  const el=document.getElementById('settings');
+  if(!el) return;
+  const cs=document.getElementById('setClose');
+  if(cs) cs.onclick=()=>{ try{ sfxUI(); }catch(e){} closeSettings(); };
+  /* 页签 */
+  el.querySelectorAll('[data-set-tab]').forEach(b=>{
+    b.onclick=()=>{ setTab=b.getAttribute('data-set-tab'); try{ sfxUI(); }catch(e){} buildSettings(); };
+  });
+  /* 主题 */
+  el.querySelectorAll('[data-theme-pick]').forEach(b=>{
+    b.onclick=()=>{
+      themeSet(b.getAttribute('data-theme-pick'));
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  });
+  /* 512 色 */
+  el.querySelectorAll('[data-accent]').forEach(b=>{
+    b.onclick=()=>{
+      accentSet(parseInt(b.getAttribute('data-accent'),10));
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  });
+  /* 音量滑块 */
+  const vr=document.getElementById('volRange');
+  if(vr){
+    const onInput=()=>{
+      const v=parseInt(vr.value,10)||0;
+      /* 【必须先把 AudioContext 跑起来】主菜单时 AC 还是 null，
+         不 init 的话滑块只是改了变量，听不到任何变化。 */
+      try{ if(typeof audioInit==='function'){ audioInit(); audioResume(); } }catch(e){}
+      masterVolSet(v/100);
+      masterVolApply();
+      /* 只改显示，不重建面板 —— 重建会让滑块失去拖动焦点，
+         手指一拖就断。 */
+      const row=vr.previousElementSibling;
+      if(row){
+        const vv=row.querySelector('.setval');
+        if(vv) vv.textContent=v+'%';
+      }
+    };
+    vr.oninput=onInput;
+    vr.onchange=onInput;
+  }
+  /* 音效总开关 */
+  const st=el.querySelector('[data-sfx-toggle]');
+  if(st){
+    st.onclick=()=>{
+      if(typeof sfxOn==='boolean') sfxOn=!sfxOn;
+      masterVolApply();
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  }
+  /* 调试日志开关 */
+  const lg=el.querySelector('[data-log-toggle]');
+  if(lg){
+    lg.onclick=()=>{
+      logSet(!logOn);
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  }
+  const lr=document.getElementById('logRefresh');
+  if(lr) lr.onclick=()=>{ buildSettings(); };
+  const lc=document.getElementById('logClear');
+  if(lc) lc.onclick=()=>{ logClear(); buildSettings(); };
+  const lcp=document.getElementById('logCopy');
+  if(lcp) lcp.onclick=()=>{
+    const txt=logText()||T('（暂无日志）');
+    copyText(txt);
+  };
+}
+
+/* 复制文本：先试 navigator.clipboard，不行退回 textarea + execCommand。
+   后者在 file:// 下依旧可用，而 clipboard API 需要安全上下文。 */
+function copyText(txt){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){
+        try{ toast(T('日志已复制')); }catch(e){}
+      }).catch(function(){ legacyCopy(txt); });
+      return;
+    }
+  }catch(e){}
+  legacyCopy(txt);
+}
+function legacyCopy(txt){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=txt;
+    ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    try{ toast(ok?T('日志已复制'):T('复制失败，请手动选择')); }catch(e){}
+  }catch(e){
+    try{ toast(T('复制失败')); }catch(x){}
+  }
+}
+
 /* ============ z_render.js：渲染循环 + 启动 ============ */
 
 /* 安全调用：单个子系统抛错时只记一次日志，不中断整帧 */
@@ -9643,6 +10500,12 @@ try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init 
    否则读到的钱和仓库不会显示在菜单上（菜单是读档前画的）。
    autoSaveLoad 内部对每个字段都做了存在性校验，坏档一律当新档。 */
 try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.error('autosave load failed', e); }
+/* 【主题 / 色板 / 调试日志初始化】
+   必须排在最后：themeInit 会读写 document.documentElement 的 CSS 变量，
+   还会去碰 scene.background，所以 scene 必须先建好。
+   顺序也重要 —— themeApply 先清 MATERIAL_VARS，accentApply 再把玩家
+   选的颜色写回去，反过来的话玩家自定义色会被主题默认值覆盖。 */
+try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('theme init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);
 </script>

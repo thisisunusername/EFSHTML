@@ -13,7 +13,7 @@ let touchMoveX=0, touchMoveY=0;
    用 closest 向上找，所以点在图标/文字上（svg、span）也算命中父按钮。 */
 const UI_SELECTOR=[
   '#topbar','#actZone','#joyZone','#viewLayer','#wpnBar',
-  '#menu','#shop','#bag','#stash','#gunsmith','#death','#lootBox',
+  '#menu','#shop','#bag','#stash','#gunsmith','#settings','#death','#lootBox',
   '#gmPanel','#orientMask','#saveRow','#__bootdiag','button'
 ].join(',');
 function isUIEvent(e){
@@ -394,6 +394,16 @@ function bindUI(){
     try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
     try{ toggleGunsmith(); }catch(e){ console.error('gunsmith', e); }
   });
+  /* 【设置入口】和改枪台一样面板互斥：先把其它全屏浮层收干净。
+     设置面板里改的是主题/色板/音量/日志，都是立即生效的，
+     所以不需要「确定/取消」，关掉就算保存。 */
+  tapAction('btnSettings', ()=>{
+    try{ sfxUI(); }catch(e){}
+    try{ closeShop(); }catch(e){}
+    try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
+    try{ const gs=document.getElementById('gunsmith'); if(gs) gs.style.display='none'; }catch(e){}
+    try{ toggleSettings(); }catch(e){ console.error('settings', e); }
+  });
 
   /* ---- 局内背包 / 吃药 / 音效 ----
      【为什么不用 onclick】这套 UI 在手机上走的是触摸：
@@ -428,11 +438,29 @@ function bindUI(){
      连点不会出错：medQuickUse 内部会重新判满血/无药。 */
   const medBtn=document.getElementById('medBtn');
   tapBtn(medBtn, ()=>{ try{ sfxUI(); }catch(e){} medQuickUse(); });
+  /* 【调试日志徽标】点一下直接打开设置面板的「调试」页签。
+     徽标只在日志开启时显示（updateLogBadge 负责），所以它本身就是
+     「日志正在记录」的指示灯，顺手点进去就能看内容。 */
+  const logBadge=document.getElementById('logBadge');
+  tapBtn(logBadge, ()=>{
+    try{ sfxUI(); }catch(e){}
+    try{
+      if(typeof setTab!=='undefined') setTab='debug';
+      if(typeof toggleSettings==='function'){
+        const s=document.getElementById('settings');
+        if(s && s.style.display==='flex') buildSettings();
+        else toggleSettings();
+      }
+    }catch(e){ console.error('logBadge', e); }
+  });
   // 音效开关
   const sndBtn=document.getElementById('sndBtn');
   tapBtn(sndBtn, ()=>{
     sfxOn=!sfxOn;
-    if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
+    /* 【走统一入口】以前直接写 VOL.master，会把设置里的音量倍率抹掉 ——
+       玩家把音量拉到 30%，点一下 HUD 静音再取消，音量就回到 100%。 */
+    if(typeof masterVolApply==='function') masterVolApply();
+    else if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
     const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
     if(sndBtn.firstChild) sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
     if(sfxOn){ try{ sfxUI(); }catch(e){} }
@@ -1387,6 +1415,7 @@ function toggleGunsmith(){
        现在样式补上了，这里再把「先 visible 后填充」的保险也加上。 */
     s.style.display='flex';
     closeShop(); closeBag(); closeStash();
+    try{ window.__uiPhase='gunsmith:opening'; }catch(e){}
     try{
       const list=ownedWeapons();
       if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
@@ -1527,6 +1556,7 @@ function toggleShop(){
        不会再出现「按了没动静」这种完全无从下手的状态。 */
     s.style.display='flex';
     closeBag(); closeStash(); closeGunsmith();
+    try{ window.__uiPhase='shop:opening'; }catch(e){}
     try{ buildShop(); }
     catch(e){ console.error('buildShop failed', e);
       s.innerHTML='<div class="box"><h1>商店</h1><div class="d">加载失败：'+(e&&e.message||e)+'</div></div>'; }
@@ -1706,6 +1736,12 @@ function toggleStash(){
   if(opening){
     el.style.display='flex';
     closeShop(); closeBag(); closeGunsmith();
+    /* 【诊断锚点】把当前阶段写到 window 上。
+       自检试跑里如果 buildStashNew 抛了未命名异常，
+       try/catch 己经接住并把错误画到面板里了；但如果是
+       closeShop 之类前置步骤抛的，面板会是空的。
+       有这个锚点，屏幕上就能直接看出卡在哪一步。 */
+    try{ window.__uiPhase='stash:opening'; }catch(e){}
     /* 每次打开仓库顺手修一次 looted 账本（见 clampLooted 注释），
        并重置卖出模式 —— 否则上次点开卖出没确认就退出，
        下次进来还是选择模式，点格子不装备，玩家会以为仓库坏了。 */
@@ -1881,6 +1917,23 @@ function buildStashNew(){
   }
   if(!np) h+='<div class="stkempty2">空（点击仓库物品放入）</div>';
   h+='</div></div>';
+  /* ---------- 胸挂格子（和出击背包并列，点胸挂槽展开） ----------
+     【为什么必须加】胸挂格子 P.chestPouch 之前只在局内背包里可见。
+     撤离成功时 settleExfil 会把 chestPouch 里的东西合回 stash，
+     但玩家一开局、还没撤离，胸挂里的东西就完全隐身：
+     仓库看不到、局外也拿不出来，看起来就是「东西丢了」。 */
+  h+='<div class="stkpouch" id="stkChestBox" style="display:none">';
+  h+='<div class="stkph">🦺 '+T('胸挂')+' <span class="stkcap">'+chestUsed()+'/'+chestCapOf()+'</span></div>';
+  h+='<div class="stkpgrid">';
+  let nc=0;
+  for(const id in P.chestPouch){
+    if(!(P.chestPouch[id]>0)) continue;
+    const it=SHOP_ITEMS[id]; if(!it) continue;
+    nc++;
+    h+='<div class="stkpi" data-chest="'+id+'" title="'+it.name+'">'+it.icon+'<b>'+P.chestPouch[id]+'</b></div>';
+  }
+  if(!nc) h+='<div class="stkempty2">'+T('空（局内放入医疗/弹药）')+'</div>';
+  h+='</div></div>';
 
   h+='</div>';   /* 左栏结束 */
 
@@ -1978,6 +2031,24 @@ function buildStashNew(){
           const show=box.style.display==='none';
           box.style.display=show?'':'none';
         }
+        /* 【同时展开胸挂格子】以前只有背包可展开，胸挂格子（chestPouch）
+           是局内才可见的，局外仓库完全看不到 —— 玩家撤离带回的医疗/弹药
+           进了 chestPouch 之后，在仓库里既看不见也拿不出来，
+           看起来就像「东西丢了」。两者一起开关。 */
+        const cbox=$('stkChestBox');
+        if(cbox){
+          const show2=cbox.style.display==='none';
+          cbox.style.display=show2?'':'none';
+          $('stkPouchBox') && ($('stkPouchBox').style.display=show2?'':'none');
+        }
+        return;
+      }
+      if(k==='chest'){
+        const cbox=$('stkChestBox');
+        if(cbox){
+          const show=cbox.style.display==='none';
+          cbox.style.display=show?'':'none';
+        }
         return;
       }
       /* 其它槽：点一下卸下到仓库 */
@@ -2042,6 +2113,21 @@ function buildStashNew(){
     node.onclick=()=>{
       const id=node.dataset.pouch;
       if(bagTake(id,1)) stashAdd(id,1);
+      buildStashNew(); refreshHUD();
+    };
+  });
+  /* 【胸挂格子在仓库里也能拿回】一模一样的行为：点一下退回仓库。
+     不加这个的话，胸挂区在仓库里就只是个只读展示，
+     玩家看着东西却拿不出来，反而更困惑。 */
+  el.querySelectorAll('[data-chest]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.chest;
+      if(!(P.chestPouch[id]>0)) return;
+      P.chestPouch[id]--;
+      if(P.chestPouch[id]<=0) delete P.chestPouch[id];
+      stashAdd(id,1);
+      try{ sfxUI(); }catch(e){}
+      saveTick();
       buildStashNew(); refreshHUD();
     };
   });
@@ -2709,6 +2795,11 @@ function __bindMenuFallback(){
         case 'btnGunsmith':  try{ sfxUI(); closeShop();
                                    const st=$('stash'); if(st) st.style.display='none';
                                    toggleGunsmith(); }catch(x){ console.error(x); } break;
+        case 'btnSettings':  try{ sfxUI(); closeShop();
+                                   const st2=$('stash'); if(st2) st2.style.display='none';
+                                   const gs2=$('gunsmith'); if(gs2) gs2.style.display='none';
+                                   toggleSettings(); }catch(x){ console.error(x); } break;
+
         case 'btnExport':    exportSave(); break;
         case 'btnImport': {
           const row=$('saveRow'), f=$('saveFile');
@@ -2776,6 +2867,17 @@ function __bindMenuFallback(){
       catch(e){ console.error(e); }
     };
     gsBtn.__jsBound=true;
+  }
+  const setBtn=$('btnSettings');
+  if(setBtn && !setBtn.onclick){
+    setBtn.onclick=()=>{
+      try{ sfxUI(); closeShop();
+           const st=$('stash'); if(st) st.style.display='none';
+           const gs=$('gunsmith'); if(gs) gs.style.display='none';
+           toggleSettings(); }
+      catch(e){ console.error(e); }
+    };
+    setBtn.__jsBound=true;
   }
   const exportBtn=$('btnExport');
   if(exportBtn && !exportBtn.onclick){ exportBtn.onclick=exportSave; exportBtn.__jsBound=true; }

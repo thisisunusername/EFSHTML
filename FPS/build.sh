@@ -26,7 +26,11 @@ OUT=index.html
   # 强制横屏：依赖 T()（遮罩文案），必须在 i18n_core 之后
   cat full/_orient.js;   printf '\n'
   # 国际化接入层：要调 buildShop/buildBagNew 等，必须排在 f_ui 之后
-  cat full/u_i18n.js;    printf '\n'
+cat full/u_i18n.js;    printf '\n'
+  # 主题 / 512 色板 / 调试日志：纯工具层，被 f_ui 和 t_settings 共同调用
+  cat full/s_theme.js;   printf '\n'
+  # 设置面板 UI：依赖 s_theme 的 themeSet / accentSet / masterVolSet
+  cat full/t_settings.js; printf '\n'
   cat full/z_render.js
   printf '\n</script>\n'
   printf '</body>\n'

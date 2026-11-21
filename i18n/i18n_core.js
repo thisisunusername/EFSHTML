@@ -619,6 +619,43 @@ const I18N_EN = {
   '校门口': 'School Gate',
   '操场': 'Sports Field',
   '北场地': 'North Field',
+  /* ---- 设置面板：外观 / 512 色 / 声音 / 调试日志 ---- */
+  '外观': 'Appearance',
+  '主题色': 'Accent color',
+  '声音': 'Sound',
+  '调试': 'Debug',
+  '暗夜（原版）': 'Night (original)',
+  'Material 浅色': 'Material light',
+  '选择界面主题。浅色主题适合白天，暗夜主题对比更强。':
+    'Pick an interface theme. Light suits daytime; Night has stronger contrast.',
+  '主色共 512 档：8 个色系 × 64 个深浅。点一格立即生效。':
+    '512 accent shades: 8 families × 64 steps. Tap one to apply instantly.',
+  '紫': 'Purple',
+  '蓝': 'Blue',
+  '青': 'Cyan',
+  '绿': 'Green',
+  '琥珀': 'Amber',
+  '橙': 'Orange',
+  '红': 'Red',
+  '粉': 'Pink',
+  '全局音量': 'Master volume',
+  '对所有音效整体缩放，不影响各音效的相对响度':
+    'Scales all sound effects together without changing their relative loudness',
+  '音效开关': 'Sound effects',
+  '完全静音，倍率保留': 'Mute everything, keep the volume level',
+  '调试日志': 'Debug log',
+  '记录警告与错误，方便排查问题': 'Records warnings and errors to help diagnose problems',
+  '（暂无日志）': '(no log entries yet)',
+  '刷新': 'Refresh',
+  '复制全部': 'Copy all',
+  '共 {0} 条 · 最多保留 300 条': '{0} entries · keeps the latest 300',
+  '日志已复制': 'Log copied',
+  '复制失败，请手动选择': 'Copy failed, please select manually',
+  '复制失败': 'Copy failed',
+  '调试日志已开启': 'Debug log enabled',
+  /* ---- 仓库格子空状态 ---- */
+  '空（点击仓库物品放入）': 'Empty (tap a stash item to put it in)',
+  '空（局内放入医疗/弹药）': 'Empty (put meds/ammo in during a raid)',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */

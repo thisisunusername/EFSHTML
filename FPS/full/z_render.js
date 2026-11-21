@@ -141,5 +141,11 @@ try{ if(typeof initGM==='function') initGM(); }catch(e){ console.error('GM init 
    否则读到的钱和仓库不会显示在菜单上（菜单是读档前画的）。
    autoSaveLoad 内部对每个字段都做了存在性校验，坏档一律当新档。 */
 try{ if(typeof autoSaveLoad==='function') autoSaveLoad(); }catch(e){ console.error('autosave load failed', e); }
+/* 【主题 / 色板 / 调试日志初始化】
+   必须排在最后：themeInit 会读写 document.documentElement 的 CSS 变量，
+   还会去碰 scene.background，所以 scene 必须先建好。
+   顺序也重要 —— themeApply 先清 MATERIAL_VARS，accentApply 再把玩家
+   选的颜色写回去，反过来的话玩家自定义色会被主题默认值覆盖。 */
+try{ if(typeof themeInit==='function') themeInit(); }catch(e){ console.error('theme init failed', e); }
 // 启动：渲染循环立即开始（init 成功后 ready=true 才会真正渲染）
 requestAnimationFrame(animate);

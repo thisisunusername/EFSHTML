@@ -1125,7 +1125,7 @@ const I18N_EN = {
   '射速 +25% · 后坐力略增': 'Fire rate +25% · a bit more recoil',
 
   /* ---------- 通用 / 按钮 ---------- */
-  '关闭': 'Close',
+  '关闭': 'OFF',
   '完成': 'Done',
   '返回': 'Back',
   '取消': 'Cancel',
@@ -1216,6 +1216,48 @@ const I18N_EN = {
   '楼层': 'Floor',
   '回合': 'Turn',
   '经典': 'Classic',
+  /* ---------- 2D GM 面板 ---------- */
+  '已开': 'ON',
+  '关闭': 'OFF',
+  '已给': 'Given',
+  '给予': 'Give',
+  '已拥有': 'Owned',
+  '功能': 'Features',
+  '快速加入地图': 'Quick-join map',
+  '一键跳楼层': 'Jump to floor',
+  'DevTest · 成就': 'DevTest · Achievements',
+  '数据清理（都要确认两次）': 'Data cleanup (double confirm)',
+  '道具（逐个开关）': 'Items (toggle each)',
+  '穿墙': 'No Clip',
+  '无视墙壁，直接走过去': 'Walk straight through walls',
+  '无视伤害': 'Invincible',
+  '老师 / 保安 / 监控都抓不到你': 'No teacher / guard / camera can catch you',
+  '加速移动': 'Speed Boost',
+  '移动速度 ×2（可乐可叠加）': 'Movement ×2 (stacks with Cola)',
+  '全局手电': 'Global Flashlight',
+  '所有地下层都亮，随时可用': 'Every underground level is lit, usable anytime',
+  '一键拉闸': 'Pull All Breakers',
+  '三个电闸一次全部拉下、打开电子门': 'Pull all three breakers at once and power the electronic door',
+  '全部拉闸': 'Pull All',
+  '终端主题开局': 'Start · Terminal theme',
+  'Material 开局': 'Start · Material',
+  '原版开局': 'Start · Classic',
+  '一键全成就': 'Unlock All Achievements',
+  '立即解锁全部成就（含炫彩），次数记 1': 'Unlock every achievement (including rainbow), counted once',
+  '全部解锁': 'Unlock All',
+  '清除存档数据': 'Wipe Save Data',
+  '昵称、GM 标记、结局解锁等 cookie 全清': 'Clears the nickname, GM flag, ending unlocks and all cookies',
+  '清除数据': 'Wipe Data',
+  '清除成就': 'Wipe Achievements',
+  '成就解锁状态与累计次数全部归零': 'Reset unlock state and total counts to zero',
+  '清除排行榜': 'Wipe Leaderboard',
+  '本机排行榜记录全部删除': 'Delete every leaderboard record on this device',
+  '清除排行': 'Wipe Board',
+  '⚠ 开启作弊会关闭排行榜：成绩和成就都不记录。': '⚠ Cheats disable the leaderboard: scores and achievements are not recorded.',
+  '本页面只能触发一次，刷新后需重新连点标题。': 'This can only be triggered once per page — refresh and tap the title again.',
+  '再点一次': 'Tap',
+  '确认': 'again to confirm',
+  'GM 菜单': 'GM Menu',
   /* ---------- 2D 成就表 + 成就面板 ---------- */
   '逃出去了': 'Escaped',
   '任意难度通关一次': 'Clear the game on any difficulty',
@@ -1694,7 +1736,7 @@ const I18N_EN = {
   '获得 ': 'Obtained ',
   '收回：': 'Taken back: ',
   '给予：': 'Given: ',
-  '已开': 'OPEN',
+  '已开': 'ON',
   '关闭': 'Close',
   '需要钥匙': 'A key is required',
   '需要黑钥匙': 'Requires the Black Key',
@@ -4121,7 +4163,7 @@ var pendingWipe = {};        /* {key:true} 记录哪个操作已经被点过一�
 function wipeConfirm(key, label, action){
   if(!pendingWipe[key]){
     pendingWipe[key]=true;
-    toast('⚠ 再点一次「'+label+'」确认');
+    toast('⚠ '+TF('再点一次')+'「'+label+'」'+TF('确认'));
     cheatRenderBox();
     setTimeout(function(){
       if(pendingWipe[key]){ pendingWipe[key]=false; if(typeof cheatRenderBox==='function') cheatRenderBox(); }
@@ -4253,70 +4295,70 @@ function cheatRenderBox(){
   function sw(key,label,on,desc){
     return '<div class="crow"><div><b>'+label+'</b><br>'+
       '<span class="cdesc">'+desc+'</span></div>'+
-      '<button data-ck="'+key+'" class="'+(on?'on':'')+'">'+(on?'已开':'关闭')+'</button></div>';
+      '<button data-ck="'+key+'" class="'+(on?'on':'')+'">'+(on?TF('已开'):TF('关闭'))+'</button></div>';
   }
 
-  var html='<div class="csec">功能</div>';
-  html+=sw('noClip','穿墙',CHEAT.noClip,'无视墙壁，直接走过去');
-  html+=sw('god','无视伤害',CHEAT.god,'老师 / 保安 / 监控都抓不到你');
-  html+=sw('fast','加速移动',CHEAT.fast,'移动速度 ×2（可乐可叠加）');
-  html+=sw('torchAll','全局手电',CHEAT.torchAll,'所有地下层都亮，随时可用');
-  html+='<div class="crow"><div><b>一键拉闸</b><br>'+
-    '<span class="cdesc">三个电闸一次全部拉下、打开电子门</span></div>'+
-    '<button data-ca="gates">全部拉闸</button></div>';
+  var html='<div class="csec">'+TF('功能')+'</div>';
+  html+=sw('noClip',TF('穿墙'),CHEAT.noClip,TF('无视墙壁，直接走过去'));
+  html+=sw('god',TF('无视伤害'),CHEAT.god,TF('老师 / 保安 / 监控都抓不到你'));
+  html+=sw('fast',TF('加速移动'),CHEAT.fast,TF('移动速度 ×2（可乐可叠加）'));
+  html+=sw('torchAll',TF('全局手电'),CHEAT.torchAll,TF('所有地下层都亮，随时可用'));
+  html+='<div class="crow"><div><b>'+TF('一键拉闸')+'</b><br>'+
+    '<span class="cdesc">'+TF('三个电闸一次全部拉下、打开电子门')+'</span></div>'+
+    '<button data-ca="gates">'+TF('全部拉闸')+'</button></div>';
 
   /* 快速加入地图（joinmap 快捷入口） */
-  html+='<div class="csec">快速加入地图</div>';
+  html+='<div class="csec">'+TF('快速加入地图')+'</div>';
   html+='<div class="ctele">';
-  var jmDiffs=[['easy','简单'],['normal','普通'],['hard','困难'],['hell','地狱']];
+  var jmDiffs=[['easy',TF('简单')],['normal',TF('普通')],['hard',TF('困难')],['hell',TF('地狱')]];
   for(var jd=0;jd<jmDiffs.length;jd++){
     html+='<button data-cj="diff='+jmDiffs[jd][0]+'">'+jmDiffs[jd][1]+'</button>';
   }
   html+='</div>';
   html+='<div class="ctele">';
-  html+='<button data-cj="style=terminal color=terminal">终端主题开局</button>';
-  html+='<button data-cj="style=material">Material 开局</button>';
-  html+='<button data-cj="style=classic">原版开局</button>';
+  html+='<button data-cj="style=terminal color=terminal">'+TF('终端主题开局')+'</button>';
+  html+='<button data-cj="style=material">'+TF('Material 开局')+'</button>';
+  html+='<button data-cj="style=classic">'+TF('原版开局')+'</button>';
   html+='</div>';
   /* 一键跳楼层 */
-  html+='<div class="csec">一键跳楼层</div>';
+  html+='<div class="csec">'+TF('一键跳楼层')+'</div>';
   html+='<div class="ctele">';
   for(var fi=0;fi<FLOOR_CHAIN.length;fi++){
     var fk=FLOOR_CHAIN[fi];
     var cur=(S.floor===fk);
     html+='<button data-cf="'+fk+'" class="'+(cur?'on':'')+'">'+
-      (W[fk]? W[fk].name : fk)+'</button>';
+      TF(W[fk]? W[fk].name : fk)+'</button>';
   }
   html+='</div>';
 
   /* DevTest 解锁的额外功能 */
   if(DEV.achPanel){
-    html+='<div class="csec">DevTest · 成就</div>';
-    html+='<div class="crow"><div><b>一键全成就</b><br>'+
-      '<span class="cdesc">立即解锁全部成就（含炫彩），次数记 1</span></div>'+
-      '<button data-ca="allach">全部解锁</button></div>';
+    html+='<div class="csec">'+TF('DevTest · 成就')+'</div>';
+    html+='<div class="crow"><div><b>'+TF('一键全成就')+'</b><br>'+
+      '<span class="cdesc">'+TF('立即解锁全部成就（含炫彩），次数记 1')+'</span></div>'+
+      '<button data-ca="allach">'+TF('全部解锁')+'</button></div>';
   }
 
-  html+='<div class="csec">数据清理（都要确认两次）</div>';
-  html+='<div class="crow"><div><b>清除存档数据</b><br>'+
-    '<span class="cdesc">昵称、GM 标记、结局解锁等 cookie 全清</span></div>'+
-    '<button data-ca="wipedata" class="danger">清除数据</button></div>';
-  html+='<div class="crow"><div><b>清除成就</b><br>'+
-    '<span class="cdesc">成就解锁状态与累计次数全部归零</span></div>'+
-    '<button data-ca="wipeach" class="danger">清除成就</button></div>';
-  html+='<div class="crow"><div><b>清除排行榜</b><br>'+
-    '<span class="cdesc">本机排行榜记录全部删除</span></div>'+
-    '<button data-ca="wipeboard" class="danger">清除排行</button></div>';
+  html+='<div class="csec">'+TF('数据清理（都要确认两次）')+'</div>';
+  html+='<div class="crow"><div><b>'+TF('清除存档数据')+'</b><br>'+
+    '<span class="cdesc">'+TF('昵称、GM 标记、结局解锁等 cookie 全清')+'</span></div>'+
+    '<button data-ca="wipedata" class="danger">'+TF('清除数据')+'</button></div>';
+  html+='<div class="crow"><div><b>'+TF('清除成就')+'</b><br>'+
+    '<span class="cdesc">'+TF('成就解锁状态与累计次数全部归零')+'</span></div>'+
+    '<button data-ca="wipeach" class="danger">'+TF('清除成就')+'</button></div>';
+  html+='<div class="crow"><div><b>'+TF('清除排行榜')+'</b><br>'+
+    '<span class="cdesc">'+TF('本机排行榜记录全部删除')+'</span></div>'+
+    '<button data-ca="wipeboard" class="danger">'+TF('清除排行')+'</button></div>';
 
-  html+='<div class="csec">道具（逐个开关）</div>';
+  html+='<div class="csec">'+TF('道具（逐个开关）')+'</div>';
   for(var i=0;i<CHEAT_ITEMS.length;i++){
     var id=CHEAT_ITEMS[i];
     var has=!!(S.inv && S.inv[id]);
-    html+='<div class="crow"><div>'+ITEM[id].icon+' <b>'+ITEM[id].name+'</b></div>'+
-      '<button data-ci="'+id+'" class="'+(has?'on':'')+'">'+(has?'已给':'给予')+'</button></div>';
+    html+='<div class="crow"><div>'+ITEM[id].icon+' <b>'+TF(ITEM[id].name)+'</b></div>'+
+      '<button data-ci="'+id+'" class="'+(has?'on':'')+'">'+(has?TF('已给'):TF('给予'))+'</button></div>';
   }
 
-  html+='<div class="cwarn">⚠ 开启作弊会关闭排行榜：成绩和成就都不记录。<br>本页面只能触发一次，刷新后需重新连点标题。</div>';
+  html+='<div class="cwarn">'+TF('⚠ 开启作弊会关闭排行榜：成绩和成就都不记录。')+'<br>'+TF('本页面只能触发一次，刷新后需重新连点标题。')+'</div>';
   body.innerHTML=html;
 
   var bs=body.querySelectorAll('button');

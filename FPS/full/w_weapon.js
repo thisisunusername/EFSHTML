@@ -58,48 +58,334 @@ function buildPistol(PAL){
   return g;
 }
 
-function buildRifle(PAL){
-  const g=new THREE.Group();
-  const C=PAL||{main:0x2e3238,dark:0x15171b,steel:0x646a74,poly:0x3a3f47};
-  const dark=mat(C.main,0.5,0.85);
-  const black=mat(C.dark,0.62,0.8);
-  const steel=mat(C.steel,0.3,0.95);
-  const poly=mat(C.poly,0.8,0.25);
+/* ================= PAC-9 Longshore 步枪建模（移植自 Saltline） =================
+   【来源】Saltline（saltline.games，Felix Rieseberg）的 PAC-9 观感舰步枪。
+   它的枪不是 box 拼的简模，而是用「多边形轮廓 + 沿轮廓扫掠成 3D 实体」
+   的方式程序化生成，所以侧面轮廓、倒角、导气孔、皮卡汀尼导轨的齿
+   都是真实几何，远处看也不会像几块积木。
 
-  // 上机匣
-  const upper=new THREE.Mesh(new THREE.BoxGeometry(0.078,0.08,0.40), dark);
-  upper.position.set(0,0.045,-0.10); g.add(upper);
-  // 下机匣
-  const lower=new THREE.Mesh(new THREE.BoxGeometry(0.070,0.075,0.26), black);
-  lower.position.set(0,-0.025,-0.04); g.add(lower);
-  // 护木
-  const hand=new THREE.Mesh(new THREE.BoxGeometry(0.062,0.062,0.30), poly);
-  hand.position.set(0,0.040,-0.42); g.add(hand);
-  // 枪管
-  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.019,0.019,0.42,12), steel);
-  barrel.rotation.x=Math.PI/2; barrel.position.set(0,0.040,-0.62); g.add(barrel);
-  // 消焰器
-  const comp=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.024,0.075,10), black);
-  comp.rotation.x=Math.PI/2; comp.position.set(0,0.040,-0.85); g.add(comp);
-  // 弹匣（弯的）
-  const mag=new THREE.Mesh(new THREE.BoxGeometry(0.048,0.20,0.085), black);
-  mag.position.set(0,-0.14,0.01); mag.rotation.x=0.16; g.add(mag);
-  // 握把
-  const grip=new THREE.Mesh(new THREE.BoxGeometry(0.058,0.15,0.075), poly);
-  grip.position.set(0,-0.105,0.115); grip.rotation.x=-0.3; g.add(grip);
-  // 枪托
-  const stock=new THREE.Mesh(new THREE.BoxGeometry(0.058,0.085,0.24), poly);
-  stock.position.set(0,0.005,0.28); g.add(stock);
-  // 托底
-  const butt=new THREE.Mesh(new THREE.BoxGeometry(0.062,0.11,0.03), black);
-  butt.position.set(0,0.0,0.40); g.add(butt);
-  // 导轨 + 小瞄具
-  const rail=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.014,0.26), steel);
-  rail.position.set(0,0.092,-0.10); g.add(rail);
-  const scope=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.026,0.13,12), black);
-  scope.rotation.x=Math.PI/2; scope.position.set(0,0.125,-0.10); g.add(scope);
-  const apt=new THREE.Mesh(new THREE.BoxGeometry(0.038,0.014,0.014), steel);
-  apt.position.set(0,0.092,-0.225); g.add(apt);
+   【移植策略】原代码变量名全部单字母混淆（xr / Rt / Cn / qo / Fi / Dv / sm），
+   但底层只是三件事：
+     · ExtrudeGeometry ：把 2D 轮廓沿 z 拉伸成实体（带倒角）
+     · LatheGeometry   ：把剖面线旋转成回转体（枪管、消焰器）
+     · BoxGeometry     ：少量方块
+   所以这里把它的几何辅助函数用原生 THREE 重写一遍（保留同名语义），
+   再把它给 PAC-9 的那套尺寸数据原样搬过来。
+   这样得到的模型与 Saltline 里的是同一副几何，不是「模仿」而是「同一份数据」。 */
+
+/* 原版 sm()：给顶点写一张「颜色抖动表」+ 微凹凸，靠 vertexColors 让纯色材质也有脏感。
+   这里保留同样的算法（无贴图也能做出金属颗粒感）。 */
+function pac9Colorize(geo, base, wear, isEdgeFn){
+  try{
+    const pos = geo.attributes.position;
+    if(!pos) return geo;
+    const n = pos.count;
+    const arr = new Float32Array(n*3);
+    const nrm = geo.attributes.normal;
+    /* 无参哈希：决定这个顶点的磨损程度（0~1） */
+    function hsh(a,b,c){
+      let x = Math.sin(a*127.1 + b*311.7 + c*74.7) * 43758.5453;
+      return x - Math.floor(x);
+    }
+    for(let i=0;i<n;i++){
+      const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
+      let f = 0.9 + 0.2 * hsh(Math.round(x*70), Math.round(y*70), Math.round(z*70));
+      if(wear>0 && isEdgeFn && nrm){
+        if(isEdgeFn(nrm.getX(i), nrm.getY(i), nrm.getZ(i))){
+          const g = hsh(Math.round(x*300), Math.round(y*300), Math.round(z*300));
+          const d = Math.max(0, g-0.84)/0.16;
+          f *= 1 + wear*1.6*d*d;
+        }
+      }
+      arr[i*3]   = base[0]*f;
+      arr[i*3+1] = base[1]*f;
+      arr[i*3+2] = base[2]*f;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(arr,3));
+  }catch(e){}
+  return geo;
+}
+
+/* 边缘检测：法线两个分量都比较大 = 处在倒角上，用来加磨损高光 */
+function pac9IsEdge(x,y,z){
+  const ax=Math.abs(x), ay=Math.abs(y), az=Math.abs(z);
+  return ax>0.18 && ay>0.18 && az<0.95;
+}
+
+/* 从 2D 轮廓拉出一个实体：对应原版 __() + ex() */
+function pac9Extrude(pts, depth, bevel, holes){
+  const shape = new THREE.Shape();
+  for(let i=0;i<pts.length;i++){
+    const p = pts[i];
+    if(i===0) shape.moveTo(p[0], p[1]);
+    else shape.lineTo(p[0], p[1]);
+  }
+  shape.closePath();
+  if(holes && holes.length){
+    for(const h of holes){
+      const path = new THREE.Path();
+      for(let i=0;i<h.length;i++){
+        if(i===0) path.moveTo(h[i][0], h[i][1]);
+        else path.lineTo(h[i][0], h[i][1]);
+      }
+      path.closePath();
+      shape.holes.push(path);
+    }
+  }
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.0001, depth - 2*bevel),
+    bevelEnabled: bevel>0,
+    bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel,
+    bevelSegments: 1, steps: 1, curveSegments: 6
+  });
+  return g;
+}
+
+/* 把拉伸体的 z 两端面法线扶正（原版 M_()）
+   否则倒角会在端面留下错误的斜法线，反光很脏。 */
+function pac9FixNormals(g){
+  try{
+    g.computeBoundingBox();
+    const z0=g.boundingBox.min.z, z1=g.boundingBox.max.z;
+    const pos=g.attributes.position, nrm=g.attributes.normal;
+    if(!nrm) return g;
+    for(let i=0;i<pos.count;i++){
+      const nz=nrm.getZ(i), a=Math.abs(nz);
+      if(a<0.15 || a>0.95) continue;
+      const z=pos.getZ(i);
+      if(Math.abs(z-z0)<1e-6 || Math.abs(z-z1)<1e-6){
+        nrm.setXYZ(i,0,0,Math.sign(nz));
+      }else{
+        const l=Math.hypot(nrm.getX(i), nrm.getY(i)) || 1;
+        nrm.setXYZ(i, nrm.getX(i)/l, nrm.getY(i)/l, 0);
+      }
+    }
+  }catch(e){}
+  return g;
+}
+
+/* 圆角矩形轮廓（原版 Dv()）：给导气孔、散热槽用 */
+function pac9RoundRect(cx, cy, w, h, seg){
+  seg = seg===undefined ? 4 : seg;
+  const out=[];
+  const r=h/2, a=w/2-r;
+  for(let i=0;i<=seg;i++){
+    const t=-Math.PI/2 + i/seg*Math.PI;
+    out.push([cx+a+Math.cos(t)*r, cy+Math.sin(t)*r]);
+  }
+  for(let i=0;i<=seg;i++){
+    const t=Math.PI/2 + i/seg*Math.PI;
+    out.push([cx-a+Math.cos(t)*r, cy+Math.sin(t)*r]);
+  }
+  return out;
+}
+
+/* 带切角的矩形轮廓（原版 fC()） */
+function pac9Notched(x0,y0,x1,y1,s){
+  return [[x0+s,y0],[x1-s,y0],[x1,y0+s],[x1,y1-s],[x1-s,y1],[x0+s,y1],[x0,y1-s],[x0,y0+s]];
+}
+
+/* ---- 三种常用「拉伸 + 摆位」封装，名字对应原版 xr / qo / Rt ----
+/* 沿 Y 轴轮廓、沿 X 方向拉伸（枪身侧面件） */
+function pac9Side(pts, y0, y1, bevel, base, wear, holes){
+  const g = pac9Extrude(pts, y1-y0, bevel, holes);
+  pac9Colorize(g, base, wear||0, pac9IsEdge);
+  pac9FixNormals(g);
+  g.translate(0, 0, -(y1-y0)/2);
+  g.rotateY(Math.PI/2);
+  g.translate(0, (y0+y1)/2, 0);
+  return g;
+}
+/* 沿 X 轮廓、沿 Z 方向拉伸（机匣、弹匣） */
+function pac9Body(pts, z0, z1, bevel, base, wear, holes){
+  const g = pac9Extrude(pts, z1-z0, bevel, holes);
+  pac9Colorize(g, base, wear||0, pac9IsEdge);
+  pac9FixNormals(g);
+  g.translate(0,0,-z1);
+  g.translate(0, 0, z1 - (z1-z0)/2 + (z1-z0)/2 - z0);
+  return g;
+}
+/* 简单立方块（原版 Rt）：w,h,d 尺寸 + 中心位置 */
+function pac9Box(w, h, d, x, y, z, base, wear){
+  const g = new THREE.BoxGeometry(w, h, d);
+  pac9Colorize(g, base, wear||0, pac9IsEdge);
+  g.translate(x, y, z);
+  return g;
+}
+/* 回转体（原版 Cn）：把剖面线绕 Z 轴旋转 —— 枪管、消焰器、光学镜筒 */
+function pac9Lathe(profile, seg, base, wear, cx, cy){
+  const pts=[];
+  for(const p of profile) pts.push(new THREE.Vector2(p[0], p[1]));
+  const g = new THREE.LatheGeometry(pts, seg||12);
+  pac9Colorize(g, base, wear||0, null);
+  if(cx||cy) g.translate(cx||0, cy||0, 0);
+  /* Lathe 默认绕 Y 轴，枪管要绕 Z 轴，转一下 */
+  g.rotateX(Math.PI/2);
+  return g;
+}
+function buildRifle(PAL){
+  /* ================= PAC-9 Longshore（移植自 Saltline） =================
+     【为什么要换】原来的步枪是 12 个 BoxGeometry 拼的：上机匣、下机匣、
+     护木、枪管、弹匣……每一块都是方块，凑近看就是个积木枪。
+     Saltline 的 PAC-9 是用「侧面轮廓拉伸 + 回转体」建出来的，
+     轮廓有真实的弧度、倒角、导轨齿、导气孔，量级完全不一样。
+
+     【坐标约定】本函数返回的模型：
+       -z 是枪口方向（与旧模型一致，外部调用不用改）
+       +y 是向上，原点在机匣中心附近
+     Saltline 原模型的 z 正方向是枪口，所以下面所有 z 值都取反。 */
+  const g = new THREE.Group();
+  const C = PAL || {main:0x2e3238, dark:0x15171b, steel:0x646a74, poly:0x3a3f47};
+
+  /* ---- 配色（对应原版 pac9_anodised / phosphate / polymer） ----
+     原版用的是 0~1 浮点色，这里换算成 0~255。 */
+  /* 【皮肤兼容】这些常量原来是写死的黑灰配色，导致「换皮肤对步枪无效」——
+     buildRifle 拿到 PAL 却完全没用它。
+     现在改为：PAL 有值就从皮肤色派生，没有才用原厂默认。
+     派生方式：0~255 十六进制转 0~1 浮点，再统一压暗，
+     因为顶点色本身会再叠一层抖动，太亮就发白。 */
+  function hex01(v){
+    return [ ((v>>16)&255)/255, ((v>>8)&255)/255, (v&255)/255 ];
+  }
+  function darken(c, k){ return [c[0]*k, c[1]*k, c[2]*k]; }
+  const _palMain  = (PAL&&PAL.main!==undefined)  ? hex01(PAL.main)  : [0.180,0.196,0.220];
+  const _palDark  = (PAL&&PAL.dark!==undefined)  ? hex01(PAL.dark)  : [0.082,0.090,0.102];
+  const _palSteel = (PAL&&PAL.steel!==undefined) ? hex01(PAL.steel) : [0.392,0.416,0.455];
+  const _palPoly  = (PAL&&PAL.poly!==undefined)  ? hex01(PAL.poly)  : [0.227,0.247,0.278];
+  const MAT_ANO  = darken(_palMain, 0.42);   /* 机匣：皮肤主色压暗 */
+  const MAT_PHOS = darken(_palDark, 0.55);   /* 磷化 / 散热槽 */
+  const MAT_POLY = darken(_palPoly, 0.42);   /* 握把 / 枪托 */
+  const MAT_TAN  = [0.1050, 0.0800, 0.0500]; /* 沙色聚合物（备用） */
+  const MAT_STEEL= _palSteel;                /* 枪管 / 钢件 */
+
+  /* 所有顶点颜色都偏暗，材质本身给个亮点，靠 vertexColors 出脏感 */
+  function mkMat(base, rough, metal){
+    return new THREE.MeshStandardMaterial({
+      /* 原来的 3.2 倍提亮是为「近黑的原厂色」调的，
+         换成亮色皮肤（黄金/霓虹）后会把颜色洗成白。
+         这里改成：暗色系数大、亮色系数小，两头都保住色相。 */
+      color: new THREE.Color(
+        Math.min(1, base[0]*(base[0]>0.35?1.15:3.2)+0.03),
+        Math.min(1, base[1]*(base[1]>0.35?1.15:3.2)+0.03),
+        Math.min(1, base[2]*(base[2]>0.35?1.15:3.2)+0.035)),
+      roughness: rough, metalness: metal, vertexColors: true
+    });
+  }
+  const mAno   = mkMat(MAT_ANO,  0.40, 0.45);
+  const mPhos  = mkMat(MAT_PHOS, 0.50, 0.70);
+  const mPoly  = mkMat(MAT_POLY, 0.62, 0.00);
+  const mTan   = mkMat(MAT_TAN,  0.62, 0.00);
+  const mSteel = mkMat(MAT_STEEL,0.35, 0.95);
+
+  const parts = [];
+  function add(geo, mat, pos, rot){
+    if(!geo) return null;
+    const m = new THREE.Mesh(geo, mat);
+    if(pos) m.position.set(pos[0], pos[1], pos[2]);
+    if(rot) m.rotation.set(rot[0], rot[1], rot[2]);
+    m.castShadow = false; m.receiveShadow = true;
+    g.add(m); parts.push(m);
+    return m;
+  }
+
+  /* ================= 1) 下机匣主体 =================
+     原版数据：y 从 -0.021 到 0.034 的轮廓，x 厚度 ±0.0205。 */
+  const receiverPts = [[-0.1,-0.021],[0.099,-0.021],[0.101,-0.03],[0.098,-0.088],
+                       [0.036,-0.082],[0.031,-0.058],[-0.03,-0.058],[-0.04,-0.066],
+                       [-0.078,-0.055],[-0.1,-0.044]];
+  add(pac9Side(receiverPts, -0.019, 0.019, 0.0014, MAT_ANO, 0.6),
+      mAno, [0,0,0], [0, Math.PI, 0]);
+
+  /* ================= 2) 上机匣顶盖 =================
+     原版 g = 上部轮廓，y 0.0205、x ±0.0205。 */
+  const topPts = [[-0.1,-0.02],[0.1,-0.02],[0.1,0.027],[0.093,0.034],[-0.088,0.034],[-0.1,0.024]];
+  add(pac9Side(topPts, 0, 0.0205, 0.0014, MAT_ANO, 0.6), mAno, [0,0,0], [0, Math.PI, 0]);
+  /* 顶部另一半（镜像），合起来就是完整的上机匣 */
+  add(pac9Side(topPts, -0.0205, 0, 0.0014, MAT_ANO, 0.6), mAno, [0,0,0], [0, Math.PI, 0]);
+
+  /* ================= 3) 皮卡汀尼导轨（带真实的齿） =================
+     原版：用 49 段 qo() 拼出齿形，x 从 0.1012 到 0.3978。
+     每个齿是一个带切角的矩形轮廓，沿 x 拉伸。 */
+  const toothPts = [[-0.0102,0.0398],[0.0102,0.0398],[0.0106,0.0408],
+                    [0.0160,0.0435],[-0.0160,0.0435],[-0.0106,0.0408]];
+  for(let i=0;i<46;i++){
+    const zz = -0.094 + i*0.01;   /* 原版 +z，取反 */
+    add(pac9Side(toothPts, zz, zz+0.0048, 0.0008, MAT_ANO, 0.5), mAno);
+  }
+  /* 导轨底座 */
+  const railBase = [[-0.0078,0.0335],[0.0078,0.0335],[0.0106,0.0402],[-0.0106,0.0402]];
+  add(pac9Side(railBase, -0.096, 0.397, 0.0005, MAT_ANO, 0.4), mAno);
+
+  /* ================= 4) 护木 + 散热孔 =================
+     原版：8 个绕轴旋转的扇形块，每块上有导气孔轮廓。 */
+  const hgR = 0.021;          /* handguardR */
+  const hgZ0 = 0.101, hgZ1 = 0.398;
+  for(let i=0;i<8;i++){
+    const grp = new THREE.Group();
+    /* 护木扇块本体 */
+    const cardPts = [[-hgR*0.68,0],[hgR*0.68,0],[hgR,0.006],[hgR,0.9*hgR],[0.68*hgR,hgR],[-0.68*hgR,hgR],[-hgR,0.9*hgR],[-hgR,0.006]];
+    const seg = pac9Side(cardPts, -hgZ1, -hgZ0, 0.0009, MAT_ANO, 0.7);
+    add(seg, mAno);
+    /* 散热槽：沿轴向一排小凹槽 */
+    if(i!==2){
+      for(let k=0;k<9;k++){
+        const z = -0.124 - k*0.027;
+        if(i===3 && k>5) continue;
+        add(pac9Side(pac9RoundRect(0, 0, 0.013, 0.0052, 3), z-0.0065, z+0.0065, 0.0004, MAT_PHOS, 0.3), mPhos);
+      }
+    }
+    grp.rotation.z = i*Math.PI/4;
+    g.add(grp);
+    grp.add(seg);
+  }
+
+  /* ================= 5) 枪管 + 消焰器 =================
+     原版：护木前端往前走一段，末端是喇叭形消焰器。 */
+  add(pac9Lathe([[0,-0.292+0.29],[0.0142,-0.002],[0.0148,0.0005],[0.0148,0.192]], 20, MAT_STEEL, 0.3),
+      mSteel, [0, 0.0, -0.29]);
+  /* 消焰器 */
+  add(pac9Lathe([[0.0148,0],[0.0185,0],[0.0195,0.0015],[0.0195,0.0105],[0.0185,0.012],[0.0148,0.012]], 12, MAT_STEEL, 0.4),
+      mSteel, [0, 0.0, -0.53]);
+
+  /* ================= 6) 弹匣 =================
+     原版用两段轮廓 + 前端圆弧。弹匣略向前弯（真枪特征）。 */
+  const magPts = [[0.033,-0.056],[0.033,-0.093],[0.024,-0.1005],[-0.031,-0.1005],[-0.041,-0.09],[-0.041,-0.06]];
+  add(pac9Side(magPts, -0.0085, 0.0085, 0.0008, MAT_ANO, 0.4), mAno, [0,0,-0.01]);
+  /* 弹匣底板 */
+  add(pac9Box(0.037, 0.12, 0.011, 0, -0.101, -0.005, MAT_ANO, 0.3), mAno);
+
+  /* ================= 7) 握把 =================
+     原版：一个带拇指台的斜面轮廓。 */
+  const gripPts = [[-0.038,-0.05],[-0.045,-0.074],[-0.049,-0.086],[-0.049,-0.1],
+                   [-0.054,-0.112],[-0.057,-0.13],[-0.064,-0.158],[-0.11,-0.152],
+                   [-0.102,-0.112],[-0.096,-0.082],[-0.095,-0.064],[-0.103,-0.046],[-0.08,-0.044]];
+  add(pac9Side(gripPts, -0.0165, 0.0165, 0.005, MAT_POLY, 0.3), mPoly, [0,0,0.01]);
+  /* 握把防滑纹（9 条） */
+  for(let i=0;i<9;i++){
+    const z = -0.078 - i*0.0082;
+    add(pac9Box(0.0345, 0.0028, 0.03, 0, -0.073 + (0.078+ (0))*0, z, MAT_POLY, 0.2), mPoly);
+  }
+
+  /* ================= 8) 枪托 =================
+     原版：后面一个梯形尾撑 + 橡胶托底板。 */
+  const stockPts = [[-0.146,0.024],[-0.3,0.024],[-0.331,0.014],[-0.334,-0.086],
+                    [-0.318,-0.101],[-0.29,-0.096],[-0.232,-0.04],[-0.146,-0.024]];
+  add(pac9Side(stockPts, -0.019, 0.019, 0.004, MAT_ANO, 0.5), mAno);
+  /* 托底垫 */
+  add(pac9Box(0.033, 0.016, 0.118, 0, 0.031, 0.232, MAT_POLY, 0.2), mPoly);
+
+  /* ================= 9) 拉机柄 / 抛壳窗 / 扳机 ================= */
+  add(pac9Box(0.004, 0.006, 0.024, 0.0228, -0.036, 0.036, MAT_STEEL, 0.3), mSteel);
+  add(pac9Box(0.0045, 0.024, 0.013, -0.0212, -0.03, -0.022, MAT_ANO, 0.3), mAno);
+  /* 弹匣释放按钮 */
+  add(pac9Box(0.009, 0.02, 0.018, 0.0225, 0.004, 0.026, MAT_ANO, 0.4), mAno);
+
+  /* ================= 10) 小准星（机瞄） =================
+     原版导轨前端有个小柱状准星，保留。 */
+  add(pac9Box(0.003, 0.034, 0.009, 0, -0.15, -0.085, MAT_ANO, 0.3), mAno);
+
+  /* 整枪居中一点，让外部相机的取景不变 */
+  g.position.y = 0;
   return g;
 }
 

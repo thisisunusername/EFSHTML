@@ -34,6 +34,12 @@ const P={
   shootCd:0, sprinting:false, joyX:0, joyY:0, alive:true,
   aiming:false,    /* 开镜状态（按住开镜键） */
   aimT:0,          /* 开镜过渡插值 0~1，用于平滑 FOV */
+  /* 【趴下】eyeH 是当前眼睛离地高度，standH 是站立高度。
+     趴下时眼睛降到 0.55 米，移动速度砍到 35%，且不能跳。
+     moveAndCollide 用它算身体碰撞区间，所以「趴着能钻矮门洞」
+     这类行为是自然成立的，不需要额外的特判。 */
+  prone:false,
+  eyeH:1.6, standH:1.6, proneH:0.55,
   keys:{},
 };
 const LOCK_TURN=false; // 手机端陀螺仪可后续接入
@@ -58,17 +64,56 @@ function lookDir(){
 function doJump(){
   if(!P.alive) return;
   if(!P.onGround) return;   // 空中不能跳
+  if(P.prone) return;       // 趴着不能跳，得先站起来
   P.vel.y=7;
   P.onGround=false;
   sfxStep();
 }
 
+/* 趴下开关：切换状态，站起时如果头顶有障碍就先不起来。
+   检查方式：把眼睛抬到站立高度，看身体区间是否与某个碰撞盒相交；
+   相交就说明上面有东西压着，保持趴着并提示。 */
+function toggleProne(){
+  if(!P.alive) return;
+  if(P.prone){
+    /* 试着站起来：临时按站立高度算一次碰撞 */
+    const standFeet = P.pos.y - P.standH;
+    const standHead = P.pos.y - P.eyeH + P.standH;
+    let blocked=false;
+    for(const m of colliders){
+      if(!m.geometry) continue;
+      if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const bb=m.geometry.boundingBox; if(!bb) continue;
+      const hw=(bb.max.x-bb.min.x)/2, hd=(bb.max.z-bb.min.z)/2, hh=(bb.max.y-bb.min.y)/2;
+      const top=m.position.y+hh, bot=m.position.y-hh;
+      if(bot>standHead || top<standFeet+0.05) continue;
+      /* 顶面低于脚下 35cm 的（地板/台阶）不算障碍 */
+      if(top < standFeet+0.35) continue;
+      if(P.pos.x>m.position.x-hw-0.4 && P.pos.x<m.position.x+hw+0.4 &&
+         P.pos.z>m.position.z-hd-0.4 && P.pos.z<m.position.z+hd+0.4){ blocked=true; break; }
+    }
+    if(blocked){ toast('上面太低，站不起来'); sfxDeny(); return; }
+    P.prone=false;
+  }else{
+    P.prone=true;
+  }
+  sfxUI();
+  refreshHUD();
+}
+
 /* ---- 玩家移动（重力 + 键盘/摇杆输入） ---- */
 function updP(dt){
   // 鼠标/触控视角在 e_io/e_ui 里通过 pointer 事件直接改 P.yaw/P.pitch
+  /* 【趴下过渡】眼睛高度在站立(1.6)和趴下(0.55)之间平滑插值，
+     直接跳变会让画面像瞬移，很难受。 */
+  const wantH = P.prone ? P.proneH : P.standH;
+  P.eyeH += (wantH - P.eyeH) * Math.min(1, dt*10);
+  if(Math.abs(P.eyeH-wantH)<0.002) P.eyeH=wantH;
+
   const f=P.keys['KeyW'], b=P.keys['KeyS'], l=P.keys['KeyA'], r=P.keys['KeyD'];
-  const sprint=P.keys['ShiftLeft']||P.keys['ShiftRight']||P.sprinting;
-  const spd=sprint?P.sprint:P.speed;
+  /* 趴下时不能冲刺，且速度只有步行的 35% */
+  const sprint=!P.prone && (P.keys['ShiftLeft']||P.keys['ShiftRight']||P.sprinting);
+  const spd=(sprint?P.sprint:P.speed) * (P.prone?0.35:1);
 
   let mx=0,mz=0;
   if(f)mz-=1; if(b)mz+=1; if(l)mx-=1; if(r)mx+=1;
@@ -155,10 +200,14 @@ function moveAndCollide(dt){
      所以身体占 [ny-1.6, ny] 这一段，而不是 [ny, ny+1.6]。
      以前写成 ny+1.6，等于把判定盒整段抬到头顶以上，
      站在地面板上时永远和「地面」这个碰撞体相交。 */
-  const feetY=ny-1.6, headY=ny;
+  /* 【可站立高度】P.pos.y 就是眼睛高度，而眼睛高度会随趴下变化，
+     所以这里必须用 P.eyeH 而不是写死的 1.6 —— 否则趴下之后
+     身体判定区间还是站立的尺寸，钻不过矮处也躲不掉子弹。 */
+  const eyeH = P.eyeH;
+  const feetY=ny-eyeH, headY=ny;
   // 地面
   P.onGround=false;              // 先假设离地，落地时再置 true
-  if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
+  if(ny<eyeH){ ny=eyeH; P.vel.y=0; P.onGround=true; }
   const canBlock=(m)=>{
     if(!m.geometry) return false;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();

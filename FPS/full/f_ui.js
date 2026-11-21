@@ -64,6 +64,7 @@ function bindUI(){
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
+  initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
 
@@ -114,7 +115,15 @@ if(window.__uiBound) return; window.__uiBound=true;
   window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
   window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
   relayout();
-  const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
+  const start=$('btnPlay'); if(start) start.onclick=()=>{
+    $('menu').style.display='none';
+    audioInit(); audioResume(); sfxUI();
+    /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
+       注意 init() 必须保留 —— 它负责建场景、生成敌人和武器。 */
+    window.__inGame=true;
+    init();
+    applyInputMode(inputMode, true);
+  };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
   const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
@@ -137,9 +146,33 @@ if(window.__uiBound) return; window.__uiBound=true;
   const resetBtn=$('btnReset'); if(resetBtn) resetBtn.onclick=()=>{ if(confirm('确认重置所有数据？')) location.reload(); };
   const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
 
-  // 键盘
+  /* ===== 键盘映射（按用户指定）=====
+       W A S D    移动
+       E          互动 / 开门
+       鼠标左键    开火        （在下面的 mousedown 里）
+       鼠标右键    瞄准        （在下面的 mousedown/mouseup 里）
+       Shift      趴下        （左右 Shift 都可以）
+       右 Shift   趴下        （同上）
+       Space      跳跃
+       Ctrl+W     奔跑
+       R          换弹
+       B / Tab    背包
+       Q          商店
+       Esc        关闭面板
+   ============================== */
   addEventListener('keydown',e=>{
     P.keys[e.code]=true;
+
+    /* Ctrl+W 奔跑：以前 Ctrl 被拿来做「趴下」，和奔跑冲突；
+       现在趴下给 Shift，Ctrl 只负责奔跑。
+       注意浏览器里 Ctrl+W 是关闭标签页的快捷键，这里必须 preventDefault
+       拦下来，否则玩家一按就把页面关了。 */
+    if(e.code==='KeyW' && (e.ctrlKey||e.metaKey)){
+      e.preventDefault();
+      P.sprinting=true;
+      return;
+    }
+
     if(e.code==='Space'||e.code==='KeyR'||e.code==='KeyQ'||e.code==='KeyE'||e.code==='KeyB'||e.code==='Tab') e.preventDefault();
     if(e.code==='KeyR') startReload();
     if(e.code==='KeyQ') toggleShop();
@@ -147,9 +180,21 @@ if(window.__uiBound) return; window.__uiBound=true;
     /* 背包：B 或 Tab 打开/关闭 */
     if(e.code==='KeyB'||e.code==='Tab'){ if(!e.repeat) toggleBag(); }
     if(e.code==='Space'&&!e.repeat) doJump();
+    /* 趴下：Shift（左右都行），切换式 */
+    if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat) toggleProne();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
   });
-  addEventListener('keyup',e=>{ P.keys[e.code]=false; });
+  addEventListener('keyup',e=>{
+    P.keys[e.code]=false;
+    /* 松开 W 或 Ctrl 就停止奔跑 */
+    if(e.code==='KeyW'||e.code==='ControlLeft'||e.code==='ControlRight') P.sprinting=false;
+  });
+  /* 失焦时清空所有按键，否则切出去再回来会「自己一直走」 */
+  addEventListener('blur',()=>{
+    P.keys={};
+    P.sprinting=false;
+    if(typeof endJoy==='function'){ try{ endJoy(); }catch(err){} }
+  });
   addEventListener('mousedown',e=>{
     if(e.button===0 && ready) fire();
   });
@@ -355,6 +400,12 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     sprintBtn.addEventListener('touchstart',e=>{ P.sprinting=true; e.preventDefault(); });
     sprintBtn.addEventListener('touchend',()=>{ P.sprinting=false; });
   }
+  /* 趴下：点一下切换（不是按住），和跳跃一样是瞬时动作 */
+  const proneBtn=$('btnProne'); if(proneBtn){
+    const tap=(e)=>{ e.preventDefault(); e.stopPropagation(); toggleProne(); };
+    proneBtn.addEventListener('touchstart',tap,{passive:false});
+    proneBtn.addEventListener('click',tap);
+  }
   const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
 /* 开镜：改成「切换」模式。
      以前是按住生效，手机上一个手指要一直压着开镜键，
@@ -384,7 +435,15 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   }
   window.__setAim=setAim;
   // 键盘右键也可开镜（桌面端，按住式）
-  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ if(window.__setAim) window.__setAim(true); } });
+  /* 右键瞄准：按住开镜，松开还原。
+     必须同时屏蔽浏览器右键菜单，否则一按右键先弹出一个菜单，
+     瞄准根本没法用。只在画布上屏蔽，不影响其它区域。 */
+  addEventListener('contextmenu',e=>{
+    if(e.target && (e.target.tagName==='CANVAS' || e.target.id==='viewLayer')){
+      e.preventDefault();
+    }
+  });
+  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ e.preventDefault(); if(window.__setAim) window.__setAim(true); } });
   addEventListener('mouseup',e=>{ if(e.button===2){ if(window.__setAim) window.__setAim(false); } });
 
   // 触屏视角拖拽（屏幕右半区，整屏监听，不依赖按钮）
@@ -901,54 +960,92 @@ function buildStashNew(){
 function toggleBag(){
   const b=$('bag'); if(!b) return;
   const opening = b.style.display!=='flex';
-  if(opening){ buildBag(); b.style.display='flex'; }
+  if(opening){ buildBagNew(); b.style.display='flex'; }
   else b.style.display='none';
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }
 
-function buildBag(){
-  const b=$('bag'); if(!b) return;
-  let h='<div class="box" style="max-width:600px">';
-  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
-    +'<h1 style="margin:0">🎒 背包</h1>'
-    +'<div class="d">'+pouchUsed()+'/'+P.bagCap+' 格</div></div>';
+/* ============ 局内背包（布局与仓库一模一样） ============ */
+/* 用户要求「局内背包就是仓库的左边，一模一样就行」。
+   所以这里直接复用仓库那套 .stk / .stkleft / .stkright / .stkgrid
+   的视觉结构，保证两个界面看起来是同一个系统，只是数据源不同：
 
-  /* 身上装备（局内可查看，不能更换） */
-  h+='<div class="tabs"><span class="tab on" style="cursor:default">装备中</span></div>';
-  h+='<div class="grid">';
-  h+=cellOf(P.equip.helmet, '头盔', '🪖');
-  h+=cellOf(P.equip.armorVest, '护甲', '🦺');
-  h+=cellOf(P.equip.backpack, '背包', '🎒');
-  h+='</div>';
+     仓库（局外）：左装备槽 + 右 P.stash（无限，死亡不掉）
+     背包（局内）：左装备槽 + 右 P.pouch（有限格子，死亡全丢）
 
-  /* 局内只有 pouch 里的东西 */
-  h+='<div class="tabs" style="margin-top:10px"><span class="tab on" style="cursor:default">携带物品</span></div>';
-  h+='<div class="grid">';
-  let cnt=0;
-  for(const id in P.pouch){
-    if(!(P.pouch[id]>0)) continue;
-    const it=SHOP_ITEMS[id]; if(!it) continue;
-    cnt++;
-    const usable = (it.heal || id==='grenade' || id==='flashbang' || id==='smoke');
-    h+='<div class="cell'+(usable?'':' lk2')+'" data-use="'+id+'">'
-      +'<div class="ci">'+it.icon+'</div>'
-      +'<div class="cn">'+it.name+'</div>'
-      +'<div class="cq">×'+P.pouch[id]+'</div>'
+   区别只有交互：
+     仓库里点物品 = 装备 / 装包
+     背包里点物品 = 直接使用（医疗、手雷等），装备只是展示不能换 */
+function buildBagNew(){
+  const el=$('bag'); if(!el) return;
+  let h='<div class="stk">';
+
+  /* ---------- 左侧：返回 + 标题 + 装备槽（只读） ---------- */
+  h+='<div class="stkleft">';
+  h+='<button class="stkback" id="bagBack">←</button>';
+  h+='<div class="stktitle">背包</div>';
+
+  h+='<div class="stkslots">';
+  for(const s of SLOTS){
+    const id=P.equip[s.key];
+    const it=id?SHOP_ITEMS[id]:null;
+    let extra='';
+    if(s.key==='backpack'){
+      extra='<span class="stkcap">'+pouchUsed()+'/'+P.bagCap+'</span>';
+    }
+    h+='<div class="stkslot'+(it?' on':'')+'" data-ro="'+s.key+'">'
+      +'<span class="stksi">'+(it?it.icon:s.fb)+'</span>'
+      +'<span class="stksn">'+(it?it.name:s.label)+'</span>'
+      +extra
       +'</div>';
   }
-  if(!cnt) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:14px">背包是空的（仓库里塞点东西再出击）</div>';
   h+='</div>';
+  h+='</div>';   /* 左栏结束 */
 
-  h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
-    +'<div class="d">点击使用 · 撤离才能带回仓库</div>'
-    +'<button class="btn ghost" id="closeBag">关闭</button></div>';
+  /* ---------- 右侧：体力/负重位 + 格子 ---------- */
+  h+='<div class="stkright">';
+  /* 局内没有钱的概念（现金是撤离后结算的），这里显示剩余空间 */
+  const free=Math.max(0, P.bagCap-pouchUsed());
+  h+='<div class="stkcash">'+free+' 格空位</div>';
+
+  h+='<div class="stkgrid" id="bagGrid">';
+  const owned=[];
+  for(const id in P.pouch){
+    if(!(P.pouch[id]>0)) continue;
+    if(!SHOP_ITEMS[id]) continue;
+    owned.push(id);
+  }
+  const cellTotal=Math.max(48, P.bagCap>0?P.bagCap:48);
+  for(const id of owned){
+    const it=SHOP_ITEMS[id];
+    /* 可用的（回血/投掷）高亮，不可用的置灰——但依然能点，点了给提示 */
+    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke');
+    h+='<div class="stkg'+(usable?'':' dim')+'" data-use="'+id+'">'
+      +'<span class="stkgi">'+it.icon+'</span>'
+      +'<b class="stkgq">'+P.pouch[id]+'</b>'
+      +'</div>';
+  }
+  for(let i=owned.length;i<cellTotal;i++){
+    h+='<div class="stkg"></div>';
+  }
   h+='</div>';
-  b.innerHTML=h;
+  h+='</div>';   /* 右栏结束 */
 
-  b.querySelectorAll('[data-use]').forEach(el=>{
-    el.onclick=()=>{ useItem(el.getAttribute('data-use')); };
+  h+='</div>';
+  el.innerHTML=h;
+
+  /* 返回 */
+  const bk=$('bagBack');
+  if(bk) bk.onclick=()=>{ toggleBag(); };
+
+  /* 点物品 = 使用 */
+  el.querySelectorAll('[data-use]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.use;
+      useItem(id);
+      buildBagNew();
+    };
   });
-  const cb=$('closeBag'); if(cb) cb.onclick=()=>{ sfxUI(); closeBag(); };
 }
 
 function cellOf(id, label, fb){
@@ -971,11 +1068,11 @@ function useItem(id){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
     P.hp=Math.min(100,P.hp+it.heal);
     sfxPickup(); toast(it.name+' +'+it.heal+' HP');
-    refreshHUD(); buildBag(); return;
+    refreshHUD(); buildBagNew(); return;
   }
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
-    sfxPickup(); toast('已投掷 '+it.name); buildBag(); return;
+    sfxPickup(); toast('已投掷 '+it.name); buildBagNew(); return;
   }
   toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
@@ -1008,4 +1105,110 @@ function settleDeath(){
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindUI);
-else bindUI();
+else bindUI();/* ============ 输入方式自适应 ============
+   需求：
+     · 检测到键盘 -> 隐藏触摸按键（摇杆 + 右侧按钮）
+     · 检测到触摸  -> 重新显示
+     · 键盘映射：
+         W A S D    移动
+         E          互动（开门）
+         鼠标左键    开火
+         鼠标右键    瞄准（按住开镜）
+         Shift      趴下（切换）
+         Space      跳跃
+         Ctrl+W     奔跑
+         右 Shift   趴下
+
+   实现要点：
+     纯「有触摸就显示」会误判：带触摸屏的笔记本一碰就跳回触摸模式；
+     纯「按平台判断」也不准：平板接了键盘照样摸屏幕。
+     所以用「最近一次真实输入来源」为准，并给个冷却时间，
+     避免鼠标微动和触摸抖动来回切。 */
+
+let inputMode='touch';       // 'touch' | 'keyboard'
+let lastSwitchAt=0;
+const MODE_COOLDOWN=400;     // 切模式后 400ms 内不再切，防抖
+
+function applyInputMode(mode, force){
+  const now=Date.now();
+  if(!force && mode===inputMode) return;
+  if(!force && now-lastSwitchAt<MODE_COOLDOWN) return;
+  inputMode=mode;
+  lastSwitchAt=now;
+  window.__inputMode=mode;
+
+  const jz=$('joyZone'), az=$('actZone');
+  if(mode==='keyboard'){
+    /* 键盘模式：整块触摸 UI 收起，画面干净 */
+    if(jz) jz.style.display='none';
+    if(az) az.style.display='none';
+    window.__joyEnabled=false;
+    if(window.__joyTouch) window.__joyTouch.active=false;
+    /* 正在拖摇杆的手指如果卡住了，一并清掉，避免人「自己一直往前走」 */
+    if(typeof endJoy==='function'){ try{ endJoy(); }catch(e){} }
+    const tip=$('htip');
+    if(tip){
+      tip.textContent='⌨️ WASD 移动 · E 互动 · 左键开火 · 右键瞄准 · Shift/右Shift 趴下 · Space 跳跃 · Ctrl+W 奔跑';
+      tip.classList.remove('hide');
+      setTimeout(()=>tip.classList.add('hide'), 9000);
+    }
+  }else{
+    /* 触摸模式：只有已经在局内才显示摇杆和按钮，
+       主菜单/结算界面保持隐藏（否则主界面上会浮着一个摇杆）。 */
+    if(window.__inGame){
+      if(jz) jz.style.display='block';
+      if(az) az.style.display='block';
+    }
+    window.__joyEnabled=true;
+    const tip=$('htip');
+    if(tip){
+      tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
+      tip.classList.remove('hide');
+      setTimeout(()=>tip.classList.add('hide'), 9000);
+    }
+  }
+}
+
+/* 检测到真实键盘按键 */
+function onKeyboardSignal(){ applyInputMode('keyboard'); }
+/* 检测到真实触摸 */
+function onTouchSignal(){ applyInputMode('touch'); }
+
+/* 启动检测：
+   · keydown 任何键 -> 键盘模式（排除纯修饰键连按造成的抖动由冷却兜住）
+   · touchstart -> 触摸模式
+   · mousemove 不算「键盘」也不算「触摸」，保持当前模式
+   · 鼠标点击 -> 有指针设备，按键盘模式处理（桌面用户不想要触摸按钮） */
+function initInputModeDetect(){
+  if(window.__inputDetectBound) return;
+  window.__inputDetectBound=true;
+
+  addEventListener('keydown', e=>{
+    /* 只认真实的字符/功能键，修饰键单独按不算（防止 Alt+Tab 之类误切） */
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Meta') return;
+    onKeyboardSignal();
+  }, {passive:true});
+
+  addEventListener('touchstart', ()=>{
+    onTouchSignal();
+  }, {passive:true});
+
+  addEventListener('mousedown', e=>{
+    /* 鼠标左键按下视为桌面用户 */
+    if(e.pointerType==='touch') { onTouchSignal(); return; }
+    onKeyboardSignal();
+  }, {passive:true});
+
+  /* 初始判定：有精确指针（鼠标）且没有粗指针（触摸）就是纯桌面。
+     用 try 包住是因为部分 WebView / 测试环境没有 matchMedia，
+     这种环境下一律按触摸处理（最保守，至少按钮能用）。 */
+  try{
+    const maxTouch = (typeof navigator!=='undefined' && navigator.maxTouchPoints) || 0;
+    const coarse = (typeof matchMedia==='function') && matchMedia('(pointer:coarse)').matches;
+    const hover  = (typeof matchMedia==='function') && matchMedia('(hover:hover)').matches;
+    const isTouch = maxTouch>0 || coarse;
+    applyInputMode((!isTouch || hover) ? 'keyboard' : 'touch', true);
+  }catch(e){
+    try{ applyInputMode('touch', true); }catch(e2){ /* 极端环境下直接放弃检测 */ }
+  }
+}

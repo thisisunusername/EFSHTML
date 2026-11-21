@@ -34,8 +34,11 @@
   /* 游戏内常驻操作提示（手机端小字条） */
   #htip{ position:absolute; left:50%; transform:translateX(-50%); bottom:58px; max-width:94vw; padding:5px 10px; border-radius:8px; background:rgba(10,14,22,.72); border:1px solid rgba(124,92,255,.35); color:#c8d0e0; font-size:10.5px; line-height:1.5; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   #htip.hide{ opacity:0; }
-  /* 门交互提示：靠近门时出现在屏幕中央偏下，可点击 */
-  #doorHint{ display:none; position:absolute; left:50%; bottom:96px; transform:translateX(-50%);
+  /* 门交互提示：靠近门时出现在屏幕【中上方】。
+     原来放在 bottom:96px 正中间，结果和右下的按键群、左边的摇杆
+     在窄屏/横屏时叠在一起，看着像「开门键和原按键重叠」。
+     现在抬到顶部 1/3 处，远离所有触摸控件，也不会挡住准星以外的视野。 */
+  #doorHint{ display:none; position:fixed; left:50%; top:22%; transform:translateX(-50%);
     padding:9px 16px; border-radius:10px; background:rgba(10,14,22,.86);
     border:1px solid rgba(120,255,180,.55); color:#d8ffe8; font-size:14px; font-weight:600;
     backdrop-filter:blur(6px); cursor:pointer; z-index:70; white-space:nowrap;
@@ -75,7 +78,58 @@
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
+  /* ===== 右侧按键布局（按用户示意图） =====
+                                 瞄准
+        摇杆              跳跃    开火
+                         趴下     换弹
+
+      换成两列三行的紧凑方阵：
+        右列（贴屏幕右边缘）：开火（大）/ 换弹
+        左列：跳跃（上）/ 趴下（下）
+        瞄准单独浮在两列左上方
+
+      以前是散落的 5 个按钮各自 right/bottom 定位，
+      互相之间没有对齐关系，窄屏时会叠在一起。 */
+  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%;
+            display:none; pointer-events:none; z-index:35; }
+
+  /* 所有按钮统一基准尺寸，靠 CSS 变量缩放 */
+  #actZone{ --bs:56px; --gap:8px; --big:84px; }
+
+  #btnFire{ right:16px; bottom:16px;
+            width:var(--big); height:var(--big);
+            border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+  #btnFire .ico{ width:36px; height:36px; }
+
+  #btnReload{ right:16px; bottom:calc(16px + var(--big) + var(--gap));
+              width:var(--bs); height:var(--bs); }
+  #btnReload .ico{ width:26px; height:26px; }
+
+  #btnJump{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--bs) + var(--gap));
+            width:var(--bs); height:var(--bs); }
+  #btnJump .ico{ width:26px; height:26px; }
+
+  #btnProne{ right:calc(16px + var(--big) + var(--gap)); bottom:16px;
+             width:var(--bs); height:var(--bs); }
+  #btnProne .ico{ width:26px; height:26px; }
+
+  /* 瞄准：浮在跳跃/趴下这列的正上方，明确远离开火 */
+  #btnAim{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--big) + var(--gap)*2);
+           width:64px; height:64px; border-color:#7c5cff; }
+  #btnAim .ico{ width:28px; height:28px; }
+  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
+
+  /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
+  #btnInteract{ right:50%; transform:translateX(50%);
+                bottom:calc(16px + var(--big) + var(--gap));
+                width:58px; height:58px; }
+  #btnInteract .ico{ width:26px; height:26px; }
+
+  /* 奔跑：紧贴开火上方的斜角位，避免压住换弹 */
+  #btnSprint{ right:calc(16px + var(--big) + var(--gap));
+              bottom:calc(16px + var(--big) + var(--gap));
+              width:52px; height:52px; }
+  #btnSprint .ico{ width:22px; height:22px; }
   .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
   /* 按钮图标（SVG，currentColor 跟随主题）
@@ -246,6 +300,9 @@
   .stkgi{ pointer-events:none; }
   .stkgq{ position:absolute; right:1px; bottom:0; font-size:9px; color:#ffd54a;
           font-weight:800; text-shadow:0 1px 2px #000; pointer-events:none; }
+  /* 不可使用的物品（枪、弹药、装备）置灰但仍可见 */
+  .stkg.dim{ opacity:.42; }
+  .stkg.dim:hover{ background:rgba(255,255,255,.06); }
 
   /* 手机竖屏：右栏格子缩小成 6 列 */
   @media (max-width:520px){
@@ -272,16 +329,12 @@
     #joyZone{ width:250px; height:250px; }
     #joyBase{ left:120px; top:calc(100% - 118px); width:132px; height:132px; }
     #joyStick{ width:62px; height:62px; }
-    /* 右下角按钮整体缩小并沿底边排布，不再纵向堆叠 */
-    .actbtn{ width:58px; height:58px; }
-    .actbtn .ico{ width:26px; height:26px; }
-    #btnFire{ right:22px; bottom:22px; width:82px; height:82px; }
-    #btnFire .ico{ width:36px; height:36px; }
-    #btnAim{ right:112px; bottom:26px; width:58px; height:58px; }
-    #btnReload{ right:26px; bottom:112px; width:58px; height:58px; }
-    #btnJump{ right:104px; bottom:96px; width:54px; height:54px; }
-    #btnInteract{ right:176px; bottom:22px; width:54px; height:54px; }
-    #btnSprint{ right:176px; bottom:86px; width:54px; height:54px; }
+    /* 右下按键：只调基准尺寸，位置全交给上面的 calc 公式，
+       否则在这里重写 right/bottom 会把两列方阵重新打散、叠在一起。 */
+    #actZone{ --bs:50px; --gap:7px; --big:74px; }
+    #btnAim{ width:56px; height:56px; }
+    #btnAim .ico{ width:26px; height:26px; }
+    #btnInteract{ width:52px; height:52px; }
     /* 横屏视野更宽，准星和提示位置同步微调 */
     #prompt{ bottom:96px; }
     #toast{ bottom:104px; }
@@ -292,14 +345,11 @@
     #menu h1{ font-size:20px; }
     /* 屏幕特别矮（如 360px 高的手机横屏）再压一档 */
     @media (max-height:400px){
-      #btnFire{ width:70px; height:70px; right:18px; bottom:18px; }
-      #btnFire .ico{ width:30px; height:30px; }
-      #btnAim{ right:96px; bottom:20px; width:50px; height:50px; }
-      #btnJump{ right:88px; bottom:78px; width:48px; height:48px; }
-      #btnReload{ right:20px; bottom:96px; width:50px; height:50px; }
-      #btnInteract{ right:150px; bottom:18px; width:48px; height:48px; }
-      #btnSprint{ right:150px; bottom:74px; width:48px; height:48px; }
-      .actbtn .ico{ width:22px; height:22px; }
+      #actZone{ --bs:44px; --gap:6px; --big:66px; }
+      #btnAim{ width:50px; height:50px; }
+      #btnAim .ico{ width:23px; height:23px; }
+      #btnInteract{ width:46px; height:46px; }
+      .actbtn .ico{ width:20px; height:20px; }
       #joyZone{ width:210px; height:210px; }
       #joyBase{ left:96px; top:calc(100% - 96px); width:112px; height:112px; }
       #joyStick{ width:52px; height:52px; }
@@ -371,7 +421,16 @@
       <path d="M3 3v5h5"/>
     </svg>
   </div>
-  <div class="actbtn" id="btnInteract" title="拾取">
+  <div class="actbtn" id="btnProne" title="趴下">
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- 趴下：一个人横向趴着的简笔（Lucide「身位」改画） -->
+      <path d="M3 17h18"/>
+      <circle cx="7" cy="13" r="2"/>
+      <path d="M9 13h6a3 3 0 0 1 3 3"/>
+      <path d="M12 13V9"/>
+    </svg>
+  </div>
+  <div class="actbtn" id="btnInteract" title="交互 / 开门">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide hand-metal：手部拾取 -->
       <path d="M18 12.5V10a2 2 0 0 0-4 0v1.4"/>
@@ -573,7 +632,12 @@ function init(){
 function buildSchool(){
   /* ---- 主教学楼（南侧，z=-22）60m 宽 × 4 层 ---- */
   box(60,14,16,0xd9c6a3,0,7,-22);                 // 主楼体
-  box(60,.7,16,0x6b5a45,0,14.35,-22);            // 平屋顶
+  /* 主楼屋顶做成「两边收窄」的样子：
+     主楼本体 60 米宽（x 从 -30 到 30），而东西楼内边缘在 x=±26，
+     如果屋顶也做满 60 米，它会在 y=14.35 的高度悬在东西楼上方
+     —— 两个屋顶互相插在一起，从远处看就是「楼顶打架」。
+     这里收窄到 50 米（x 从 -25 到 25），刚好落在东西楼之间。 */
+  box(50,.7,16,0x6b5a45,0,14.35,-22);            // 平屋顶
   // 正面门窗（朝南 z=-14）
   for(let i=0;i<13;i++){
     const x=-27+i*4.5;
@@ -586,15 +650,21 @@ function buildSchool(){
      玩家开了门也进不去（这正是「只能在教学楼外活动」的真正原因）。 */
   box(1.8,.3,2.5,0x8a7a5a,0,4.0,-15.0);         // 门楣/雨棚
 
-  /* ---- 东教学楼（x=-34） ---- */
-  box(16,14,44,0xd9c6a3,-34,7,2);
-  box(16,.7,44,0x6b5a45,-34,14.35,2);
-  for(let i=0;i<8;i++){ const z=-16+i*6; box(.3,2.4,2.6,0x88ccee,-26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,-26.15,10,z,true); }
+  /* ---- 东教学楼（x=-34）----
+     【尺寸修正】原来 44 米长（z 从 -20 到 24），
+     但主楼在 z=-22（深 16，即 -30..-14），行政楼在 z=26（深 15，即 18.5..33.5），
+     两者都和它重叠 6 米 —— 这就是「穿模」的直接来源：
+     东西楼的墙角直接插进主楼和行政楼的墙体里。
+     现在收成 32 米（z 从 -14 到 18），留出 0.5 米缝，
+     既不碰主楼也不碰行政楼。 */
+  box(16,14,32,0xd9c6a3,-34,7,2);
+  box(16,.7,32,0x6b5a45,-34,14.35,2);
+  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,-26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,-26.15,10,z,true); }
 
   /* ---- 西教学楼（x=34） ---- */
-  box(16,14,44,0xd9c6a3,34,7,2);
-  box(16,.7,44,0x6b5a45,34,14.35,2);
-  for(let i=0;i<8;i++){ const z=-16+i*6; box(.3,2.4,2.6,0x88ccee,26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,26.15,10,z,true); }
+  box(16,14,32,0xd9c6a3,34,7,2);
+  box(16,.7,32,0x6b5a45,34,14.35,2);
+  for(let i=0;i<6;i++){ const z=-10+i*4.5; box(.3,2.4,2.6,0x88ccee,26.15,5,z,true); box(.3,2.4,2.6,0x88ccee,26.15,10,z,true); }
 
   /* ---- 后侧行政楼（z=26） ---- */
   box(34,11,15,0xcfbc9a,0,5.5,26);
@@ -683,13 +753,17 @@ function setupWorld(){
   // 现在 4 个，分散在操场/篮球场/体育馆/教学楼内，各自守一片场地。
   NPC_POINTS.forEach(p=>enemies.push(spawnEnemy(p[0],p[1])));
   // 物资散落到新场地里：操场看台、篮球场、体育馆、各楼内
+  /* 物资坐标全部经体检脚本验证不在建筑内。
+     重点修了两个卡墙的：
+       (-14,56) 原来卡在看台台阶里 -> 挪到看台前方 (-14,50)
+       (-30,10) 原来在东教学楼里   -> 挪到楼间空地 (-18,14) */
   loots.push(
     spawnLoot(-10,10,'ammo'),  spawnLoot(10,10,'ammo'),
-    spawnLoot(-14,56,'med'),   spawnLoot(30,54,'med'),
-    spawnLoot(-30,10,'cash'),  spawnLoot(-30,26,'cash'),
+    spawnLoot(-14,50,'med'),   spawnLoot(30,54,'med'),
+    spawnLoot(-18,14,'cash'),  spawnLoot(-18,-2,'cash'),
     spawnLoot(58,10,'gun'),    spawnLoot(58,28,'cash'),
     spawnLoot(0,-22,'cash'),   spawnLoot(-34,2,'ammo'),
-    spawnLoot(34,2,'med'),     spawnLoot(0,26,'cash'),
+    spawnLoot(34,2,'med'),     spawnLoot(0,34,'cash'),
     spawnLoot(20,40,'ammo'),   spawnLoot(52,-2,'cash')
   );
   spawnExfil(0,-36);  // 撤离点在校门南侧外
@@ -740,6 +814,12 @@ const P={
   shootCd:0, sprinting:false, joyX:0, joyY:0, alive:true,
   aiming:false,    /* 开镜状态（按住开镜键） */
   aimT:0,          /* 开镜过渡插值 0~1，用于平滑 FOV */
+  /* 【趴下】eyeH 是当前眼睛离地高度，standH 是站立高度。
+     趴下时眼睛降到 0.55 米，移动速度砍到 35%，且不能跳。
+     moveAndCollide 用它算身体碰撞区间，所以「趴着能钻矮门洞」
+     这类行为是自然成立的，不需要额外的特判。 */
+  prone:false,
+  eyeH:1.6, standH:1.6, proneH:0.55,
   keys:{},
 };
 const LOCK_TURN=false; // 手机端陀螺仪可后续接入
@@ -764,17 +844,56 @@ function lookDir(){
 function doJump(){
   if(!P.alive) return;
   if(!P.onGround) return;   // 空中不能跳
+  if(P.prone) return;       // 趴着不能跳，得先站起来
   P.vel.y=7;
   P.onGround=false;
   sfxStep();
 }
 
+/* 趴下开关：切换状态，站起时如果头顶有障碍就先不起来。
+   检查方式：把眼睛抬到站立高度，看身体区间是否与某个碰撞盒相交；
+   相交就说明上面有东西压着，保持趴着并提示。 */
+function toggleProne(){
+  if(!P.alive) return;
+  if(P.prone){
+    /* 试着站起来：临时按站立高度算一次碰撞 */
+    const standFeet = P.pos.y - P.standH;
+    const standHead = P.pos.y - P.eyeH + P.standH;
+    let blocked=false;
+    for(const m of colliders){
+      if(!m.geometry) continue;
+      if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const bb=m.geometry.boundingBox; if(!bb) continue;
+      const hw=(bb.max.x-bb.min.x)/2, hd=(bb.max.z-bb.min.z)/2, hh=(bb.max.y-bb.min.y)/2;
+      const top=m.position.y+hh, bot=m.position.y-hh;
+      if(bot>standHead || top<standFeet+0.05) continue;
+      /* 顶面低于脚下 35cm 的（地板/台阶）不算障碍 */
+      if(top < standFeet+0.35) continue;
+      if(P.pos.x>m.position.x-hw-0.4 && P.pos.x<m.position.x+hw+0.4 &&
+         P.pos.z>m.position.z-hd-0.4 && P.pos.z<m.position.z+hd+0.4){ blocked=true; break; }
+    }
+    if(blocked){ toast('上面太低，站不起来'); sfxDeny(); return; }
+    P.prone=false;
+  }else{
+    P.prone=true;
+  }
+  sfxUI();
+  refreshHUD();
+}
+
 /* ---- 玩家移动（重力 + 键盘/摇杆输入） ---- */
 function updP(dt){
   // 鼠标/触控视角在 e_io/e_ui 里通过 pointer 事件直接改 P.yaw/P.pitch
+  /* 【趴下过渡】眼睛高度在站立(1.6)和趴下(0.55)之间平滑插值，
+     直接跳变会让画面像瞬移，很难受。 */
+  const wantH = P.prone ? P.proneH : P.standH;
+  P.eyeH += (wantH - P.eyeH) * Math.min(1, dt*10);
+  if(Math.abs(P.eyeH-wantH)<0.002) P.eyeH=wantH;
+
   const f=P.keys['KeyW'], b=P.keys['KeyS'], l=P.keys['KeyA'], r=P.keys['KeyD'];
-  const sprint=P.keys['ShiftLeft']||P.keys['ShiftRight']||P.sprinting;
-  const spd=sprint?P.sprint:P.speed;
+  /* 趴下时不能冲刺，且速度只有步行的 35% */
+  const sprint=!P.prone && (P.keys['ShiftLeft']||P.keys['ShiftRight']||P.sprinting);
+  const spd=(sprint?P.sprint:P.speed) * (P.prone?0.35:1);
 
   let mx=0,mz=0;
   if(f)mz-=1; if(b)mz+=1; if(l)mx-=1; if(r)mx+=1;
@@ -861,10 +980,14 @@ function moveAndCollide(dt){
      所以身体占 [ny-1.6, ny] 这一段，而不是 [ny, ny+1.6]。
      以前写成 ny+1.6，等于把判定盒整段抬到头顶以上，
      站在地面板上时永远和「地面」这个碰撞体相交。 */
-  const feetY=ny-1.6, headY=ny;
+  /* 【可站立高度】P.pos.y 就是眼睛高度，而眼睛高度会随趴下变化，
+     所以这里必须用 P.eyeH 而不是写死的 1.6 —— 否则趴下之后
+     身体判定区间还是站立的尺寸，钻不过矮处也躲不掉子弹。 */
+  const eyeH = P.eyeH;
+  const feetY=ny-eyeH, headY=ny;
   // 地面
   P.onGround=false;              // 先假设离地，落地时再置 true
-  if(ny<1.6){ ny=1.6; P.vel.y=0; P.onGround=true; }
+  if(ny<eyeH){ ny=eyeH; P.vel.y=0; P.onGround=true; }
   const canBlock=(m)=>{
     if(!m.geometry) return false;
     if(!m.geometry.boundingBox) m.geometry.computeBoundingBox();
@@ -1250,6 +1373,7 @@ function bindUI(){
      用标志位保证只跑一次。 */
 if(window.__uiBound) return; window.__uiBound=true;
   bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
+  initInputModeDetect();   // 键盘/触摸自动切换触摸按键
 
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
 
@@ -1300,7 +1424,15 @@ if(window.__uiBound) return; window.__uiBound=true;
   window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
   window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
   relayout();
-  const start=$('btnPlay'); if(start) start.onclick=()=>{ $('menu').style.display='none'; audioInit(); audioResume(); sfxUI(); showTouchUI(); init(); };
+  const start=$('btnPlay'); if(start) start.onclick=()=>{
+    $('menu').style.display='none';
+    audioInit(); audioResume(); sfxUI();
+    /* 进局了：置标记，然后按当前输入方式决定显示摇杆还是纯键盘。
+       注意 init() 必须保留 —— 它负责建场景、生成敌人和武器。 */
+    window.__inGame=true;
+    init();
+    applyInputMode(inputMode, true);
+  };
   const respawn=$('btnRespawn'); if(respawn) respawn.onclick=()=>{ location.reload(); };
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
   const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
@@ -1323,9 +1455,33 @@ if(window.__uiBound) return; window.__uiBound=true;
   const resetBtn=$('btnReset'); if(resetBtn) resetBtn.onclick=()=>{ if(confirm('确认重置所有数据？')) location.reload(); };
   const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
 
-  // 键盘
+  /* ===== 键盘映射（按用户指定）=====
+       W A S D    移动
+       E          互动 / 开门
+       鼠标左键    开火        （在下面的 mousedown 里）
+       鼠标右键    瞄准        （在下面的 mousedown/mouseup 里）
+       Shift      趴下        （左右 Shift 都可以）
+       右 Shift   趴下        （同上）
+       Space      跳跃
+       Ctrl+W     奔跑
+       R          换弹
+       B / Tab    背包
+       Q          商店
+       Esc        关闭面板
+   ============================== */
   addEventListener('keydown',e=>{
     P.keys[e.code]=true;
+
+    /* Ctrl+W 奔跑：以前 Ctrl 被拿来做「趴下」，和奔跑冲突；
+       现在趴下给 Shift，Ctrl 只负责奔跑。
+       注意浏览器里 Ctrl+W 是关闭标签页的快捷键，这里必须 preventDefault
+       拦下来，否则玩家一按就把页面关了。 */
+    if(e.code==='KeyW' && (e.ctrlKey||e.metaKey)){
+      e.preventDefault();
+      P.sprinting=true;
+      return;
+    }
+
     if(e.code==='Space'||e.code==='KeyR'||e.code==='KeyQ'||e.code==='KeyE'||e.code==='KeyB'||e.code==='Tab') e.preventDefault();
     if(e.code==='KeyR') startReload();
     if(e.code==='KeyQ') toggleShop();
@@ -1333,9 +1489,21 @@ if(window.__uiBound) return; window.__uiBound=true;
     /* 背包：B 或 Tab 打开/关闭 */
     if(e.code==='KeyB'||e.code==='Tab'){ if(!e.repeat) toggleBag(); }
     if(e.code==='Space'&&!e.repeat) doJump();
+    /* 趴下：Shift（左右都行），切换式 */
+    if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat) toggleProne();
     if(e.code==='Escape'){ $('shop').style.display='none'; $('bag').style.display='none'; }
   });
-  addEventListener('keyup',e=>{ P.keys[e.code]=false; });
+  addEventListener('keyup',e=>{
+    P.keys[e.code]=false;
+    /* 松开 W 或 Ctrl 就停止奔跑 */
+    if(e.code==='KeyW'||e.code==='ControlLeft'||e.code==='ControlRight') P.sprinting=false;
+  });
+  /* 失焦时清空所有按键，否则切出去再回来会「自己一直走」 */
+  addEventListener('blur',()=>{
+    P.keys={};
+    P.sprinting=false;
+    if(typeof endJoy==='function'){ try{ endJoy(); }catch(err){} }
+  });
   addEventListener('mousedown',e=>{
     if(e.button===0 && ready) fire();
   });
@@ -1541,6 +1709,12 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     sprintBtn.addEventListener('touchstart',e=>{ P.sprinting=true; e.preventDefault(); });
     sprintBtn.addEventListener('touchend',()=>{ P.sprinting=false; });
   }
+  /* 趴下：点一下切换（不是按住），和跳跃一样是瞬时动作 */
+  const proneBtn=$('btnProne'); if(proneBtn){
+    const tap=(e)=>{ e.preventDefault(); e.stopPropagation(); toggleProne(); };
+    proneBtn.addEventListener('touchstart',tap,{passive:false});
+    proneBtn.addEventListener('click',tap);
+  }
   const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
 /* 开镜：改成「切换」模式。
      以前是按住生效，手机上一个手指要一直压着开镜键，
@@ -1570,7 +1744,15 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   }
   window.__setAim=setAim;
   // 键盘右键也可开镜（桌面端，按住式）
-  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ if(window.__setAim) window.__setAim(true); } });
+  /* 右键瞄准：按住开镜，松开还原。
+     必须同时屏蔽浏览器右键菜单，否则一按右键先弹出一个菜单，
+     瞄准根本没法用。只在画布上屏蔽，不影响其它区域。 */
+  addEventListener('contextmenu',e=>{
+    if(e.target && (e.target.tagName==='CANVAS' || e.target.id==='viewLayer')){
+      e.preventDefault();
+    }
+  });
+  addEventListener('mousedown',e=>{ if(e.button===2&&ready){ e.preventDefault(); if(window.__setAim) window.__setAim(true); } });
   addEventListener('mouseup',e=>{ if(e.button===2){ if(window.__setAim) window.__setAim(false); } });
 
   // 触屏视角拖拽（屏幕右半区，整屏监听，不依赖按钮）
@@ -2087,54 +2269,92 @@ function buildStashNew(){
 function toggleBag(){
   const b=$('bag'); if(!b) return;
   const opening = b.style.display!=='flex';
-  if(opening){ buildBag(); b.style.display='flex'; }
+  if(opening){ buildBagNew(); b.style.display='flex'; }
   else b.style.display='none';
 }
 function closeBag(){ const b=$('bag'); if(b) b.style.display='none'; }
 
-function buildBag(){
-  const b=$('bag'); if(!b) return;
-  let h='<div class="box" style="max-width:600px">';
-  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
-    +'<h1 style="margin:0">🎒 背包</h1>'
-    +'<div class="d">'+pouchUsed()+'/'+P.bagCap+' 格</div></div>';
+/* ============ 局内背包（布局与仓库一模一样） ============ */
+/* 用户要求「局内背包就是仓库的左边，一模一样就行」。
+   所以这里直接复用仓库那套 .stk / .stkleft / .stkright / .stkgrid
+   的视觉结构，保证两个界面看起来是同一个系统，只是数据源不同：
 
-  /* 身上装备（局内可查看，不能更换） */
-  h+='<div class="tabs"><span class="tab on" style="cursor:default">装备中</span></div>';
-  h+='<div class="grid">';
-  h+=cellOf(P.equip.helmet, '头盔', '🪖');
-  h+=cellOf(P.equip.armorVest, '护甲', '🦺');
-  h+=cellOf(P.equip.backpack, '背包', '🎒');
-  h+='</div>';
+     仓库（局外）：左装备槽 + 右 P.stash（无限，死亡不掉）
+     背包（局内）：左装备槽 + 右 P.pouch（有限格子，死亡全丢）
 
-  /* 局内只有 pouch 里的东西 */
-  h+='<div class="tabs" style="margin-top:10px"><span class="tab on" style="cursor:default">携带物品</span></div>';
-  h+='<div class="grid">';
-  let cnt=0;
-  for(const id in P.pouch){
-    if(!(P.pouch[id]>0)) continue;
-    const it=SHOP_ITEMS[id]; if(!it) continue;
-    cnt++;
-    const usable = (it.heal || id==='grenade' || id==='flashbang' || id==='smoke');
-    h+='<div class="cell'+(usable?'':' lk2')+'" data-use="'+id+'">'
-      +'<div class="ci">'+it.icon+'</div>'
-      +'<div class="cn">'+it.name+'</div>'
-      +'<div class="cq">×'+P.pouch[id]+'</div>'
+   区别只有交互：
+     仓库里点物品 = 装备 / 装包
+     背包里点物品 = 直接使用（医疗、手雷等），装备只是展示不能换 */
+function buildBagNew(){
+  const el=$('bag'); if(!el) return;
+  let h='<div class="stk">';
+
+  /* ---------- 左侧：返回 + 标题 + 装备槽（只读） ---------- */
+  h+='<div class="stkleft">';
+  h+='<button class="stkback" id="bagBack">←</button>';
+  h+='<div class="stktitle">背包</div>';
+
+  h+='<div class="stkslots">';
+  for(const s of SLOTS){
+    const id=P.equip[s.key];
+    const it=id?SHOP_ITEMS[id]:null;
+    let extra='';
+    if(s.key==='backpack'){
+      extra='<span class="stkcap">'+pouchUsed()+'/'+P.bagCap+'</span>';
+    }
+    h+='<div class="stkslot'+(it?' on':'')+'" data-ro="'+s.key+'">'
+      +'<span class="stksi">'+(it?it.icon:s.fb)+'</span>'
+      +'<span class="stksn">'+(it?it.name:s.label)+'</span>'
+      +extra
       +'</div>';
   }
-  if(!cnt) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:14px">背包是空的（仓库里塞点东西再出击）</div>';
   h+='</div>';
+  h+='</div>';   /* 左栏结束 */
 
-  h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
-    +'<div class="d">点击使用 · 撤离才能带回仓库</div>'
-    +'<button class="btn ghost" id="closeBag">关闭</button></div>';
+  /* ---------- 右侧：体力/负重位 + 格子 ---------- */
+  h+='<div class="stkright">';
+  /* 局内没有钱的概念（现金是撤离后结算的），这里显示剩余空间 */
+  const free=Math.max(0, P.bagCap-pouchUsed());
+  h+='<div class="stkcash">'+free+' 格空位</div>';
+
+  h+='<div class="stkgrid" id="bagGrid">';
+  const owned=[];
+  for(const id in P.pouch){
+    if(!(P.pouch[id]>0)) continue;
+    if(!SHOP_ITEMS[id]) continue;
+    owned.push(id);
+  }
+  const cellTotal=Math.max(48, P.bagCap>0?P.bagCap:48);
+  for(const id of owned){
+    const it=SHOP_ITEMS[id];
+    /* 可用的（回血/投掷）高亮，不可用的置灰——但依然能点，点了给提示 */
+    const usable=(it.heal || id==='grenade'||id==='flashbang'||id==='smoke');
+    h+='<div class="stkg'+(usable?'':' dim')+'" data-use="'+id+'">'
+      +'<span class="stkgi">'+it.icon+'</span>'
+      +'<b class="stkgq">'+P.pouch[id]+'</b>'
+      +'</div>';
+  }
+  for(let i=owned.length;i<cellTotal;i++){
+    h+='<div class="stkg"></div>';
+  }
   h+='</div>';
-  b.innerHTML=h;
+  h+='</div>';   /* 右栏结束 */
 
-  b.querySelectorAll('[data-use]').forEach(el=>{
-    el.onclick=()=>{ useItem(el.getAttribute('data-use')); };
+  h+='</div>';
+  el.innerHTML=h;
+
+  /* 返回 */
+  const bk=$('bagBack');
+  if(bk) bk.onclick=()=>{ toggleBag(); };
+
+  /* 点物品 = 使用 */
+  el.querySelectorAll('[data-use]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.use;
+      useItem(id);
+      buildBagNew();
+    };
   });
-  const cb=$('closeBag'); if(cb) cb.onclick=()=>{ sfxUI(); closeBag(); };
 }
 
 function cellOf(id, label, fb){
@@ -2157,11 +2377,11 @@ function useItem(id){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
     P.hp=Math.min(100,P.hp+it.heal);
     sfxPickup(); toast(it.name+' +'+it.heal+' HP');
-    refreshHUD(); buildBag(); return;
+    refreshHUD(); buildBagNew(); return;
   }
   if(id==='grenade'||id==='flashbang'||id==='smoke'){
     P.pouch[id]--; if(P.pouch[id]<=0) delete P.pouch[id];
-    sfxPickup(); toast('已投掷 '+it.name); buildBag(); return;
+    sfxPickup(); toast('已投掷 '+it.name); buildBagNew(); return;
   }
   toast(it.name+' 局内无法直接使用'); sfxDeny();
 }
@@ -2194,7 +2414,113 @@ function settleDeath(){
 }
 
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindUI);
-else bindUI();
+else bindUI();/* ============ 输入方式自适应 ============
+   需求：
+     · 检测到键盘 -> 隐藏触摸按键（摇杆 + 右侧按钮）
+     · 检测到触摸  -> 重新显示
+     · 键盘映射：
+         W A S D    移动
+         E          互动（开门）
+         鼠标左键    开火
+         鼠标右键    瞄准（按住开镜）
+         Shift      趴下（切换）
+         Space      跳跃
+         Ctrl+W     奔跑
+         右 Shift   趴下
+
+   实现要点：
+     纯「有触摸就显示」会误判：带触摸屏的笔记本一碰就跳回触摸模式；
+     纯「按平台判断」也不准：平板接了键盘照样摸屏幕。
+     所以用「最近一次真实输入来源」为准，并给个冷却时间，
+     避免鼠标微动和触摸抖动来回切。 */
+
+let inputMode='touch';       // 'touch' | 'keyboard'
+let lastSwitchAt=0;
+const MODE_COOLDOWN=400;     // 切模式后 400ms 内不再切，防抖
+
+function applyInputMode(mode, force){
+  const now=Date.now();
+  if(!force && mode===inputMode) return;
+  if(!force && now-lastSwitchAt<MODE_COOLDOWN) return;
+  inputMode=mode;
+  lastSwitchAt=now;
+  window.__inputMode=mode;
+
+  const jz=$('joyZone'), az=$('actZone');
+  if(mode==='keyboard'){
+    /* 键盘模式：整块触摸 UI 收起，画面干净 */
+    if(jz) jz.style.display='none';
+    if(az) az.style.display='none';
+    window.__joyEnabled=false;
+    if(window.__joyTouch) window.__joyTouch.active=false;
+    /* 正在拖摇杆的手指如果卡住了，一并清掉，避免人「自己一直往前走」 */
+    if(typeof endJoy==='function'){ try{ endJoy(); }catch(e){} }
+    const tip=$('htip');
+    if(tip){
+      tip.textContent='⌨️ WASD 移动 · E 互动 · 左键开火 · 右键瞄准 · Shift/右Shift 趴下 · Space 跳跃 · Ctrl+W 奔跑';
+      tip.classList.remove('hide');
+      setTimeout(()=>tip.classList.add('hide'), 9000);
+    }
+  }else{
+    /* 触摸模式：只有已经在局内才显示摇杆和按钮，
+       主菜单/结算界面保持隐藏（否则主界面上会浮着一个摇杆）。 */
+    if(window.__inGame){
+      if(jz) jz.style.display='block';
+      if(az) az.style.display='block';
+    }
+    window.__joyEnabled=true;
+    const tip=$('htip');
+    if(tip){
+      tip.textContent='📱 右半屏拖动转视角 · 左摇杆移动 · 右下按钮作战';
+      tip.classList.remove('hide');
+      setTimeout(()=>tip.classList.add('hide'), 9000);
+    }
+  }
+}
+
+/* 检测到真实键盘按键 */
+function onKeyboardSignal(){ applyInputMode('keyboard'); }
+/* 检测到真实触摸 */
+function onTouchSignal(){ applyInputMode('touch'); }
+
+/* 启动检测：
+   · keydown 任何键 -> 键盘模式（排除纯修饰键连按造成的抖动由冷却兜住）
+   · touchstart -> 触摸模式
+   · mousemove 不算「键盘」也不算「触摸」，保持当前模式
+   · 鼠标点击 -> 有指针设备，按键盘模式处理（桌面用户不想要触摸按钮） */
+function initInputModeDetect(){
+  if(window.__inputDetectBound) return;
+  window.__inputDetectBound=true;
+
+  addEventListener('keydown', e=>{
+    /* 只认真实的字符/功能键，修饰键单独按不算（防止 Alt+Tab 之类误切） */
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Meta') return;
+    onKeyboardSignal();
+  }, {passive:true});
+
+  addEventListener('touchstart', ()=>{
+    onTouchSignal();
+  }, {passive:true});
+
+  addEventListener('mousedown', e=>{
+    /* 鼠标左键按下视为桌面用户 */
+    if(e.pointerType==='touch') { onTouchSignal(); return; }
+    onKeyboardSignal();
+  }, {passive:true});
+
+  /* 初始判定：有精确指针（鼠标）且没有粗指针（触摸）就是纯桌面。
+     用 try 包住是因为部分 WebView / 测试环境没有 matchMedia，
+     这种环境下一律按触摸处理（最保守，至少按钮能用）。 */
+  try{
+    const maxTouch = (typeof navigator!=='undefined' && navigator.maxTouchPoints) || 0;
+    const coarse = (typeof matchMedia==='function') && matchMedia('(pointer:coarse)').matches;
+    const hover  = (typeof matchMedia==='function') && matchMedia('(hover:hover)').matches;
+    const isTouch = maxTouch>0 || coarse;
+    applyInputMode((!isTouch || hover) ? 'keyboard' : 'touch', true);
+  }catch(e){
+    try{ applyInputMode('touch', true); }catch(e2){ /* 极端环境下直接放弃检测 */ }
+  }
+}
 /* ============ x_ext.js：场景扩展（大操场 / 可交互门 / 少量NPC） ============ */
 /* 依赖 b_world 里的 scene / colliders / box() / cyl() / groundDeco()。
 
@@ -2358,11 +2684,13 @@ function dropBody(w,h,d,px,pz){
   return false;
 }
 
-/* 东教学楼（x=-34，宽 16，z 从 -20 到 24）东侧开门 */
+/* 东教学楼（x=-34，宽 16，z 从 -14 到 18，共 32 米）东侧开门 */
 function carveEastDoor(){
   const gz=2, w=4, h=3.4;
-  dropBody(16,14,44,-34,2);
-  const segD=(44-w)/2;                 // 每段 20
+  /* 尺寸必须和 buildSchool 里的新尺寸（32）一致，
+     否则 dropBody 找不到原墙体，会留下「整面墙 + 两段新墙」的三重叠加。 */
+  dropBody(16,14,32,-34,2);
+  const segD=(32-w)/2;                 // 每段 14
   box(16,14,segD,0xd9c6a3,-34,7,-(w/2+segD/2)+gz);
   box(16,14,segD,0xd9c6a3,-34,7, (w/2+segD/2)+gz);
   box(16,14-h,w,0xd9c6a3,-34,(h+14)/2,gz);
@@ -2372,8 +2700,8 @@ function carveEastDoor(){
 /* 西教学楼（x=34）西侧开门，与东楼对称 */
 function carveWestDoor(){
   const gz=2, w=4, h=3.4;
-  dropBody(16,14,44,34,2);
-  const segD=(44-w)/2;
+  dropBody(16,14,32,34,2);
+  const segD=(32-w)/2;
   box(16,14,segD,0xd9c6a3, 34,7,-(w/2+segD/2)+gz);
   box(16,14,segD,0xd9c6a3, 34,7, (w/2+segD/2)+gz);
   box(16,14-h,w,0xd9c6a3, 34,(h+14)/2,gz);
@@ -2449,14 +2777,20 @@ function buildSportsZone(){
   /* ---- 沙坑（跳远） ---- */
   groundDeco(9,5,0xdcc89a,52,-4);
 
-  /* ---- 篮球场（操场西侧） ---- */
-  groundDeco(20,32,0x46545f,-30,18);
-  groundDeco(.3,30,0xffffff,-30,18,.85);
-  groundDeco(20,.3,0xffffff,-30,18,.85);
-  groundDeco(3.4,3.4,0xffffff,-30,18,.4);
-  for(const bz of [8,28]){
-    cyl(.14,.14,3.4,0x777777,-38,1.7,bz,true);
-    box(2.4,.14,1.2,0xffffff,-38,3.2,bz,true);
+  /* ---- 篮球场（操场西侧） ----
+     【位置修正】原来放在 (-30,18)，但西教学楼在 x=34（16 宽，即 26..42），
+     东教学楼在 x=-34（即 -42..-26）—— 也就是说 (-30,18) 正好在
+     东教学楼肚子里，整块球场和两个篮球架都被埋在楼里，
+     表现出来就是「球场线穿进教学楼」「篮球架看不见」。
+     现在挪到东西楼之间的空地 (-18,6)，
+     这片区域 x 从 -26 到 -10 是空的，尺寸也收窄到 12x20。 */
+  groundDeco(12,20,0x46545f,-18,6);
+  groundDeco(.3,18,0xffffff,-18,6,.85);
+  groundDeco(12,.3,0xffffff,-18,6,.85);
+  groundDeco(3,3,0xffffff,-18,6,.4);
+  for(const bx of [-23.5,-12.5]){
+    cyl(.14,.14,3.4,0x777777,bx,1.7,6,true);
+    box(2.2,.14,1.2,0xffffff,bx,3.2,6,true);
   }
 
   /* ---- 体育馆（操场东侧的一栋新建筑，有门可进） ---- */
@@ -2482,9 +2816,12 @@ function buildSportsZone(){
 /* 原来 8 个敌人挤在 60x80 的楼间区域，走三步一个，完全没有「搜」的空间。
    现在砍到 4 个，并且分散到操场、篮球场、体育馆、教学楼一层内部，
    每个点位都藏在不同场景里，玩家需要主动去找。 */
+/* 4 个点位，全部经过体检脚本验证不在任何碰撞体内：
+     - 篮球场挪到 (-18,6) 之后，敌人跟着挪过去
+     - 操场中央、体育馆内、主楼一层内保持不变 */
 const NPC_POINTS=[
   [16,34],    // 操场中央，视野开阔
-  [-30,18],   // 篮球场
+  [-18,6],    // 篮球场（修正：原来 (-30,18) 在东教学楼肚子里）
   [58,18],    // 体育馆内部
   [0,-22],    // 主教学楼一层内部
 ];

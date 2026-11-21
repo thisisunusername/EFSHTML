@@ -34,8 +34,11 @@
   /* 游戏内常驻操作提示（手机端小字条） */
   #htip{ position:absolute; left:50%; transform:translateX(-50%); bottom:58px; max-width:94vw; padding:5px 10px; border-radius:8px; background:rgba(10,14,22,.72); border:1px solid rgba(124,92,255,.35); color:#c8d0e0; font-size:10.5px; line-height:1.5; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   #htip.hide{ opacity:0; }
-  /* 门交互提示：靠近门时出现在屏幕中央偏下，可点击 */
-  #doorHint{ display:none; position:absolute; left:50%; bottom:96px; transform:translateX(-50%);
+  /* 门交互提示：靠近门时出现在屏幕【中上方】。
+     原来放在 bottom:96px 正中间，结果和右下的按键群、左边的摇杆
+     在窄屏/横屏时叠在一起，看着像「开门键和原按键重叠」。
+     现在抬到顶部 1/3 处，远离所有触摸控件，也不会挡住准星以外的视野。 */
+  #doorHint{ display:none; position:fixed; left:50%; top:22%; transform:translateX(-50%);
     padding:9px 16px; border-radius:10px; background:rgba(10,14,22,.86);
     border:1px solid rgba(120,255,180,.55); color:#d8ffe8; font-size:14px; font-weight:600;
     backdrop-filter:blur(6px); cursor:pointer; z-index:70; white-space:nowrap;
@@ -75,7 +78,58 @@
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
-  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:none; z-index:35; }
+  /* ===== 右侧按键布局（按用户示意图） =====
+                                 瞄准
+        摇杆              跳跃    开火
+                         趴下     换弹
+
+      换成两列三行的紧凑方阵：
+        右列（贴屏幕右边缘）：开火（大）/ 换弹
+        左列：跳跃（上）/ 趴下（下）
+        瞄准单独浮在两列左上方
+
+      以前是散落的 5 个按钮各自 right/bottom 定位，
+      互相之间没有对齐关系，窄屏时会叠在一起。 */
+  #actZone{ position:fixed; bottom:0; right:0; width:50%; height:55%;
+            display:none; pointer-events:none; z-index:35; }
+
+  /* 所有按钮统一基准尺寸，靠 CSS 变量缩放 */
+  #actZone{ --bs:56px; --gap:8px; --big:84px; }
+
+  #btnFire{ right:16px; bottom:16px;
+            width:var(--big); height:var(--big);
+            border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+  #btnFire .ico{ width:36px; height:36px; }
+
+  #btnReload{ right:16px; bottom:calc(16px + var(--big) + var(--gap));
+              width:var(--bs); height:var(--bs); }
+  #btnReload .ico{ width:26px; height:26px; }
+
+  #btnJump{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--bs) + var(--gap));
+            width:var(--bs); height:var(--bs); }
+  #btnJump .ico{ width:26px; height:26px; }
+
+  #btnProne{ right:calc(16px + var(--big) + var(--gap)); bottom:16px;
+             width:var(--bs); height:var(--bs); }
+  #btnProne .ico{ width:26px; height:26px; }
+
+  /* 瞄准：浮在跳跃/趴下这列的正上方，明确远离开火 */
+  #btnAim{ right:calc(16px + var(--big) + var(--gap)); bottom:calc(16px + var(--big) + var(--gap)*2);
+           width:64px; height:64px; border-color:#7c5cff; }
+  #btnAim .ico{ width:28px; height:28px; }
+  #btnAim.active{ background:rgba(124,92,255,.55); border-color:#7c5cff; }
+
+  /* 交互（开门/拾取）挪到中间偏上，彻底离开右下按键群 */
+  #btnInteract{ right:50%; transform:translateX(50%);
+                bottom:calc(16px + var(--big) + var(--gap));
+                width:58px; height:58px; }
+  #btnInteract .ico{ width:26px; height:26px; }
+
+  /* 奔跑：紧贴开火上方的斜角位，避免压住换弹 */
+  #btnSprint{ right:calc(16px + var(--big) + var(--gap));
+              bottom:calc(16px + var(--big) + var(--gap));
+              width:52px; height:52px; }
+  #btnSprint .ico{ width:22px; height:22px; }
   .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:auto; touch-action:none; }
   .actbtn:active{ background:var(--accent); }
   /* 按钮图标（SVG，currentColor 跟随主题）
@@ -246,6 +300,9 @@
   .stkgi{ pointer-events:none; }
   .stkgq{ position:absolute; right:1px; bottom:0; font-size:9px; color:#ffd54a;
           font-weight:800; text-shadow:0 1px 2px #000; pointer-events:none; }
+  /* 不可使用的物品（枪、弹药、装备）置灰但仍可见 */
+  .stkg.dim{ opacity:.42; }
+  .stkg.dim:hover{ background:rgba(255,255,255,.06); }
 
   /* 手机竖屏：右栏格子缩小成 6 列 */
   @media (max-width:520px){
@@ -272,16 +329,12 @@
     #joyZone{ width:250px; height:250px; }
     #joyBase{ left:120px; top:calc(100% - 118px); width:132px; height:132px; }
     #joyStick{ width:62px; height:62px; }
-    /* 右下角按钮整体缩小并沿底边排布，不再纵向堆叠 */
-    .actbtn{ width:58px; height:58px; }
-    .actbtn .ico{ width:26px; height:26px; }
-    #btnFire{ right:22px; bottom:22px; width:82px; height:82px; }
-    #btnFire .ico{ width:36px; height:36px; }
-    #btnAim{ right:112px; bottom:26px; width:58px; height:58px; }
-    #btnReload{ right:26px; bottom:112px; width:58px; height:58px; }
-    #btnJump{ right:104px; bottom:96px; width:54px; height:54px; }
-    #btnInteract{ right:176px; bottom:22px; width:54px; height:54px; }
-    #btnSprint{ right:176px; bottom:86px; width:54px; height:54px; }
+    /* 右下按键：只调基准尺寸，位置全交给上面的 calc 公式，
+       否则在这里重写 right/bottom 会把两列方阵重新打散、叠在一起。 */
+    #actZone{ --bs:50px; --gap:7px; --big:74px; }
+    #btnAim{ width:56px; height:56px; }
+    #btnAim .ico{ width:26px; height:26px; }
+    #btnInteract{ width:52px; height:52px; }
     /* 横屏视野更宽，准星和提示位置同步微调 */
     #prompt{ bottom:96px; }
     #toast{ bottom:104px; }
@@ -292,14 +345,11 @@
     #menu h1{ font-size:20px; }
     /* 屏幕特别矮（如 360px 高的手机横屏）再压一档 */
     @media (max-height:400px){
-      #btnFire{ width:70px; height:70px; right:18px; bottom:18px; }
-      #btnFire .ico{ width:30px; height:30px; }
-      #btnAim{ right:96px; bottom:20px; width:50px; height:50px; }
-      #btnJump{ right:88px; bottom:78px; width:48px; height:48px; }
-      #btnReload{ right:20px; bottom:96px; width:50px; height:50px; }
-      #btnInteract{ right:150px; bottom:18px; width:48px; height:48px; }
-      #btnSprint{ right:150px; bottom:74px; width:48px; height:48px; }
-      .actbtn .ico{ width:22px; height:22px; }
+      #actZone{ --bs:44px; --gap:6px; --big:66px; }
+      #btnAim{ width:50px; height:50px; }
+      #btnAim .ico{ width:23px; height:23px; }
+      #btnInteract{ width:46px; height:46px; }
+      .actbtn .ico{ width:20px; height:20px; }
       #joyZone{ width:210px; height:210px; }
       #joyBase{ left:96px; top:calc(100% - 96px); width:112px; height:112px; }
       #joyStick{ width:52px; height:52px; }
@@ -371,7 +421,16 @@
       <path d="M3 3v5h5"/>
     </svg>
   </div>
-  <div class="actbtn" id="btnInteract" title="拾取">
+  <div class="actbtn" id="btnProne" title="趴下">
+    <svg viewBox="0 0 24 24" class="ico">
+      <!-- 趴下：一个人横向趴着的简笔（Lucide「身位」改画） -->
+      <path d="M3 17h18"/>
+      <circle cx="7" cy="13" r="2"/>
+      <path d="M9 13h6a3 3 0 0 1 3 3"/>
+      <path d="M12 13V9"/>
+    </svg>
+  </div>
+  <div class="actbtn" id="btnInteract" title="交互 / 开门">
     <svg viewBox="0 0 24 24" class="ico">
       <!-- Lucide hand-metal：手部拾取 -->
       <path d="M18 12.5V10a2 2 0 0 0-4 0v1.4"/>

@@ -109,3 +109,40 @@ if command -v node >/dev/null 2>&1 && [ -f stash_test.js ]; then
     exit 1
   fi
 fi
+
+# 地图体检：排查穿模 / 地面装饰错位 / 出生点与门洞堵死
+# 这一项是硬失败：地图有穿模就说明坐标算错了，必须修
+if command -v node >/dev/null 2>&1 && [ -f map_test.js ]; then
+  MAP=$(node map_test.js 2>&1)
+  if echo "$MAP" | grep -q 'MAP_OK'; then
+    echo "MAP_OK: 无穿模、无错位、出生点与门洞畅通、敌人物资未卡墙"
+  else
+    echo "$MAP" | head -30
+    echo "地图体检未通过"
+    exit 1
+  fi
+fi
+
+# 趴下与按键布局
+if command -v node >/dev/null 2>&1 && [ -f prone_test.js ]; then
+  PR=$(node prone_test.js 2>&1)
+  if echo "$PR" | grep -q 'PRONE_OK'; then
+    echo "PRONE_OK: 趴下/站起/限速/禁跳 与 五个按键布局全部正确"
+  else
+    echo "$PR" | tail -20
+    echo "趴下测试失败"
+    exit 1
+  fi
+fi
+
+# 输入方式自适应 + 键盘映射
+if command -v node >/dev/null 2>&1 && [ -f input_test.js ]; then
+  IN=$(node input_test.js 2>&1)
+  if echo "$IN" | grep -q 'INPUT_OK'; then
+    echo "INPUT_OK: 键盘/触摸自动切换触摸按键，WASD/E/左键/右键/Shift/Space/Ctrl+W 全部正确"
+  else
+    echo "$IN" | tail -25
+    echo "输入测试失败"
+    exit 1
+  fi
+fi

@@ -130,6 +130,45 @@ function refreshHUD(){
     mb.classList.toggle('none', n<=0 || P.hp>=100);
   }
 }
+/* ================= 全局声音开关（HUD / 暂停面板 / 设置面板共用）=================
+   【为什么抽成函数】原来这 7 行逻辑只写在 HUD 的 sndBtn 里，
+   暂停面板和设置面板要各写一份，三处的判定迟早会走样。
+   现在统一入口，谁都能调，状态永远一致。 */
+function toggleSound(){
+  const on = !(typeof sfxOn==='boolean' ? sfxOn : true);
+  try{
+    /* sfxOn 是 y_audio.js 里用 let 声明的模块级变量，
+       这里直接赋值即可（同一个 module 作用域）。 */
+    sfxOn = on;
+  }catch(e){}
+  /* 【走统一入口】不能直接写 VOL.master，否则会把设置里的音量倍率抹掉 ——
+     玩家把音量拉到 30%，点一下静音再取消，音量就回到 100%。 */
+  try{
+    if(typeof masterVolApply==='function') masterVolApply();
+    else if(typeof masterGain!=='undefined' && masterGain) masterGain.gain.value = on ? VOL.master : 0;
+  }catch(e){}
+  syncSoundUI();
+  return on;
+}
+/* 把当前声音状态同步到所有显示「开/关」的地方 */
+function syncSoundUI(){
+  const on = !!(typeof sfxOn!=='undefined' && sfxOn);
+  const txt = on ? T('开') : T('关');
+  const t=document.getElementById('sndTxt');
+  if(t) t.textContent = txt;
+  const sb=document.getElementById('sndBtn');
+  if(sb && sb.firstChild && sb.firstChild.nodeType===3) sb.firstChild.textContent = on ? '🔊 ' : '🔇 ';
+  /* 设置面板里的音效开关行：只有它正开着时才存在 */
+  try{
+    const row=document.querySelector('#settings [data-sfx-toggle]');
+    if(row){
+      row.classList.toggle('on', on);
+      const mk=row.querySelector('.setmark');
+      if(mk) mk.textContent = on ? '✓' : '';
+    }
+  }catch(e){}
+}
+
 /* 统计身上（胸挂 + 背包）所有治疗品的总数 */
 function medTotalCount(){
   let n=0;
@@ -180,6 +219,74 @@ function toast(t){
   const el=$('toast'); if(!el) return;
   el.textContent=t; el.style.opacity='1';
   clearTimeout(el._t); el._t=setTimeout(()=>el.style.opacity='0',1500);
+}
+
+/* ================= 局内暂停浮层 =================
+   #pause 是静态容器（a_head.html 里就有），内容每次显示时重建。
+   为什么重建而不是一次性写好：按钮上的文字要跟语言和声音状态同步，
+   暂停界面里的「声音：开/关」必须实时反映当前状态。
+   注意：这里绝不重新绑定事件 —— 事件委托挂在 #pause 上（bindUI 里）。 */
+function showPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el) return;
+  renderPauseOverlay();
+  el.style.display='flex';
+  /* 暂停时把 HUD 的指针事件让出来，避免点到后面的摇杆/开火区 */
+  try{ window.__joyEnabled=false; }catch(e){}
+  try{ if(typeof endJoyNow==='function') endJoyNow(); }catch(e){}
+}
+/* keepForReturn=true 表示「暂时藏起来但要能回来」（比如去开设置） */
+function hidePauseOverlay(keepForReturn){
+  const el=document.getElementById('pause');
+  if(el) el.style.display='none';
+  if(keepForReturn){
+    window.__pauseHiddenForPanel=true;
+  }else{
+    window.__pauseHiddenForPanel=false;
+    try{ window.__joyEnabled = !!window.__inGame; }catch(e){}
+  }
+}
+/* 从设置面板返回：如果刚才是因为暂停才进去的，把暂停浮层还回去 */
+function pauseReturnFromPanel(){
+  if(!window.__pauseHiddenForPanel) return false;
+  window.__pauseHiddenForPanel=false;
+  if(!(typeof paused!=='undefined' && paused)) return false;
+  const el=document.getElementById('pause');
+  if(el){ renderPauseOverlay(); el.style.display='flex'; }
+  return true;
+}
+function refreshPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el || el.style.display==='none') return;
+  renderPauseOverlay();
+}
+function renderPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el) return;
+  const on = !!(typeof sfxOn!=='undefined' && sfxOn);
+  /* 剩余时间：暂停时读的是冻结值 */
+  let leftTxt='--:--';
+  try{
+    const left=Math.max(0, (typeof RAID_LIMIT==='number'?RAID_LIMIT:480) - (P.raidT||0));
+    const l=Math.ceil(left);
+    leftTxt=Math.floor(l/60)+':'+((l%60)<10?'0':'')+(l%60);
+  }catch(e){}
+
+  let h='<div class="pzbox">';
+  h+='<h2 class="pztitle">⏸ '+T('已暂停')+'</h2>';
+  h+='<div class="pzsub">'+T('游戏时间与撤离倒计时已冻结')+'</div>';
+  h+='<div class="pzmeta">⏱ '+T('剩余')+' <b>'+leftTxt+'</b></div>';
+
+  h+='<div class="pzbtns">';
+  h+='<button class="btn" data-pause-act="resume">▶ '+T('继续游戏')+'</button>';
+  h+='<button class="btn ghost" data-pause-act="sound">'+(on?'🔊 '+T('声音：开'):'🔇 '+T('声音：关'))+'</button>';
+  h+='<button class="btn ghost" data-pause-act="settings">⚙️ '+T('设置')+'</button>';
+  h+='<button class="btn danger" data-pause-act="quit">🚪 '+T('退出（丢失所有）')+'</button>';
+  h+='</div>';
+
+  h+='<div class="pznote">'+T('退出等于放弃本局：身上的装备、背包与胸挂里的物资全部丢失。')+'</div>';
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 /* ---- 主菜单 / 开始 / 结束按钮 ---- */
@@ -432,6 +539,83 @@ function bindUI(){
     el.addEventListener('click', run);
   };
 
+  /* ---- 局内暂停按钮 + 暂停浮层 ----
+     【为什么必须放在这里】tapBtn 是 const 箭头函数，没有变量提升。
+     上面那版把它用在 tapBtn 定义之前，会直接抛
+     "Cannot access 'tapBtn' before initialization" ——
+     而 bindUI 一旦在这里中断，后面所有按键/摇杆/开火绑定全部失效，
+     正好复刻「主界面按钮全点不动」那种灾难。所以顺序不能动。 */
+  const pauseBtn=document.getElementById('pauseBtn');
+  tapBtn(pauseBtn, ()=>{ try{ pauseToggle(); }catch(e){ console.error('pause', e); } });
+
+  /* 暂停浮层：内容由 showPauseOverlay 每次重建，
+     所以按钮不能逐个绑死 —— 用委托挂在静态容器 #pause 上。 */
+  const pauseRoot=document.getElementById('pause');
+  if(pauseRoot && !pauseRoot.__pauseBound){
+    pauseRoot.__pauseBound=true;
+    const onPauseAction=(ev)=>{
+      const t=ev.target;
+      if(!t || !t.closest) return;
+      const b=t.closest('[data-pause-act]');
+      if(!b) return;
+      if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+      if(ev.stopPropagation) ev.stopPropagation();
+      const act=b.getAttribute('data-pause-act');
+      try{
+        if(act==='resume'){ resumeGame(); }
+        else if(act==='quit'){ pauseQuitRaid(); }
+        else if(act==='sound'){ toggleSound(); refreshPauseOverlay(); }
+        else if(act==='settings'){
+          /* 暂停中也能进设置改字体/音量/语言。
+             先把暂停浮层藏起来，免得两层全屏浮层叠在一起点不动。 */
+          try{ setTab='look'; }catch(e){}
+          try{ hidePauseOverlay(true); if(typeof toggleSettings==='function') toggleSettings(); }
+          catch(e){ console.error('pause settings', e); }
+        }
+      }catch(e){ console.error('pause action '+act, e); }
+    };
+    pauseRoot.addEventListener('touchstart', onPauseAction, {passive:false});
+    pauseRoot.addEventListener('click', onPauseAction);
+  }
+
+  /* ---- 全局「← 返回」委托 ----
+     【为什么用 document 级委托而不是逐个绑定】商店/仓库/改枪台/背包/
+     设置这些面板的内容都是每次打开时 innerHTML 重建的，
+     如果在这里拿按钮元素绑 onclick，下次重建就全部失效。
+     委托挂在 document 上则永远有效。
+     data-back 的值决定回到哪里：
+       shop / gunsmith / stash / bag → 关掉自己（回上一层，通常是主菜单或对局）
+       settings → closeSettings（内含「从暂停进来的要回暂停界面」的逻辑）
+     【注意】settings 面板自己没用 data-back，它用 id=setClose，
+     但仍然兼容处理一下，避免以后有人手滑加上。 */
+  if(!window.__backBound){
+    window.__backBound = true;
+    const onBack=(ev)=>{
+      const t=ev.target;
+      if(!t || !t.closest) return;
+      const b=t.closest('[data-back]');
+      if(!b) return;
+      if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+      if(ev.stopPropagation) ev.stopPropagation();
+      const what=b.getAttribute('data-back');
+      try{ sfxUI(); }catch(e){}
+      try{
+        if(what==='shop') closeShop();
+        else if(what==='gunsmith') closeGunsmith();
+        else if(what==='stash') closeStash();
+        else if(what==='bag') closeBag();
+        else if(what==='settings'){
+          /* 不走 closeSettings 的暂停回填逻辑也没问题，它自己会处理 */
+          if(typeof closeSettings==='function') closeSettings();
+        }
+        /* 返回之后 HUD 上的金币/负重可能变了，刷一次 */
+        try{ refreshHUD(); }catch(e){}
+      }catch(e){ console.error('back '+what, e); }
+    };
+    document.addEventListener('touchstart', onBack, {passive:false});
+    document.addEventListener('click', onBack);
+  }
+
   const bagBtn=document.getElementById('bagBtn');
   tapBtn(bagBtn, ()=>{ try{ sfxUI(); }catch(e){} toggleBag(); });
   /* 【HUD 治疗按钮】一键吃药，不用开背包。
@@ -456,13 +640,7 @@ function bindUI(){
   // 音效开关
   const sndBtn=document.getElementById('sndBtn');
   tapBtn(sndBtn, ()=>{
-    sfxOn=!sfxOn;
-    /* 【走统一入口】以前直接写 VOL.master，会把设置里的音量倍率抹掉 ——
-       玩家把音量拉到 30%，点一下 HUD 静音再取消，音量就回到 100%。 */
-    if(typeof masterVolApply==='function') masterVolApply();
-    else if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
-    const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
-    if(sndBtn.firstChild) sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
+    toggleSound();
     if(sfxOn){ try{ sfxUI(); }catch(e){} }
   });
 
@@ -1433,7 +1611,10 @@ function buildGunsmith(){
   let h='<div class="box" style="max-width:640px">';
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
     +'<h1 style="margin:0">🔧 '+T('改枪台')+'</h1>'
-    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div>'
+    +'<button class="backBtn" data-back="gunsmith">← '+T('返回')+'</button>'
+    +'</div></div>';
 
   if(!list.length){
     h+='<div class="d" style="text-align:center;padding:20px">'+T('你还没有任何武器，先去商店买一把')+'</div>';
@@ -1570,7 +1751,10 @@ function buildShop(){
   let h='<div class="box" style="max-width:600px">';
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
     +'<h1 style="margin:0">🛒 商店</h1>'
-    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div>'
+    +'<button class="backBtn" data-back="shop">← '+T('返回')+'</button>'
+    +'</div></div>';
   /* 分类标签 */
   h+='<div class="tabs">';
   for(const c of SHOP_CATS){
@@ -1880,7 +2064,7 @@ function buildStashNew(){
 
   /* ---------- 左侧：返回 + 标题 + 装备槽 ---------- */
   h+='<div class="stkleft">';
-  h+='<button class="stkback" id="stkBack">←</button>';
+  h+='<button class="stkback" id="stkBack" data-back="stash">←</button>';
   h+='<div class="stktitle">仓库</div>';
 
   /* 装备槽区：每个槽一行，图标 + 槽名 + 当前装备 */
@@ -2313,7 +2497,7 @@ function buildBagNew(){
 
   /* ---------- 左侧：返回 + 标题 + 装备槽（只读） ---------- */
   h+='<div class="stkleft">';
-  h+='<button class="stkback" id="bagBack">←</button>';
+  h+='<button class="stkback" id="bagBack" data-back="bag">←</button>';
   h+='<div class="stktitle">背包</div>';
 
   h+='<div class="stkslots">';

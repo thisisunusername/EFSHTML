@@ -1,11 +1,15 @@
 /* ============================================================
    t_settings.js —— 设置面板
 
-   包含四块：
-     1) 外观：主题（暗夜 / Material 浅色）
-     2) 主题色：512 色网格
-     3) 声音：全局音量滑块 + 总开关
-     4) 调试：调试日志开关 / 查看 / 复制 / 清空
+   包含六个页签：
+     1) 外观：主题（暗夜 / Material You）
+     2) 字体：9 个字体族 + 标题/正文/按钮三档字号（照搬 2D 版）
+     3) 主题色：512 色网格（选种子色）
+     4) 声音：全局音量滑块 + 总开关
+     5) 语言：中文 / English —— 原来挂在主菜单末尾，
+        但那个 .row 是 #saveRow（display:none），按钮被藏没了，
+        所以玩家说「语言设置不见了」。现在收进设置里，永远找得到。
+     6) 调试：调试日志开关 / 查看 / 复制 / 清空
 
    结构上和 shop/stash/gunsmith 同构（一个 #settings 全屏浮层），
    但内容全部在这里生成，不往 f_ui.js 里搎。
@@ -17,6 +21,9 @@ let setTab = 'look';
 function closeSettings(){
   const s=document.getElementById('settings');
   if(s) s.style.display='none';
+  /* 【从暂停里进来的要还回去】玩家局内暂停 → 点「设置」→
+     改完点返回，应该回到暂停界面，而不是掉回一个看不出状态的对局画面。 */
+  try{ if(typeof pauseReturnFromPanel==='function') pauseReturnFromPanel(); }catch(e){}
 }
 
 function toggleSettings(){
@@ -31,22 +38,24 @@ function toggleSettings(){
     try{ if(typeof closeGunsmith==='function') closeGunsmith(); }catch(e){}
     try{ if(typeof closeBag==='function') closeBag(); }catch(e){}
     buildSettings();
-  } else s.style.display='none';
+  } else closeSettings();
 }
 
 function buildSettings(){
   const el=document.getElementById('settings');
   if(!el) return;
   let h='<div class="box" style="max-width:600px">';
-  /* 标题行 */
+  /* 标题行：返回放在最左，符合「左上角返回」的通用习惯 */
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px">'
     +'<h1 style="margin:0">⚙️ '+T('设置')+'</h1>'
-    +'<button class="btn ghost small" id="setClose">'+T('关闭')+'</button></div>';
+    +'<button class="backBtn" id="setClose">← '+T('返回')+'</button></div>';
   /* 页签 */
   const TABS=[
     {id:'look',  get n(){ return T('外观'); }},
+    {id:'font',  get n(){ return T('字体'); }},
     {id:'color', get n(){ return T('主题色'); }},
     {id:'sound', get n(){ return T('声音'); }},
+    {id:'lang',  get n(){ return T('语言'); }},
     {id:'debug', get n(){ return T('调试'); }}
   ];
   h+='<div class="tabs">';
@@ -67,6 +76,41 @@ function buildSettings(){
         +'<div class="setmark">'+(on?'✓':'')+'</div>'
         +'</div>';
     }
+  }
+
+  /* ---------- 字体（对齐 2D 版）----------
+     2D 版是在「自定义主题」里选字体族 + 三档字号，这里照抄同一套清单。 */
+  if(setTab==='font'){
+    h+='<div class="d" style="margin:10px 0 6px">'
+      +T('字体族与字号均与 2D 版一致。含站酷、马善政楷、龙藏等字体，设备未安装时自动回退到系统字体。')
+      +'</div>';
+    /* 字体族：两列小格子，比下拉框在手机上更好按 */
+    h+='<div class="setrow" style="flex-direction:column;align-items:stretch">'
+      +'<div class="setinfo"><div class="setn">'+T('字体族')+'</div>'
+      +'<div class="setd">'+T('当前：{0}', (FONT_FAMILY[fontSel.family]||FONT_FAMILY.system).name)+'</div></div>'
+      +'</div>';
+    h+='<div class="fontgrid">';
+    for(const fk of FONT_ORDER){
+      const f=FONT_FAMILY[fk];
+      const on=(fontSel.family===fk);
+      h+='<button class="fontcell'+(on?' on':'')+'" data-font-fam="'+fk+'" '
+        +'style="font-family:'+f.css+'">'+f.name+'</button>';
+    }
+    h+='</div>';
+    /* 三档字号 */
+    for(const sk of ['title','body','btn']){
+      const lim=FONT_LIMITS[sk];
+      const v=fontSel[sk];
+      h+='<div class="setrow" style="flex-direction:column;align-items:stretch">'
+        +'<div class="setinfo" style="display:flex;justify-content:space-between;align-items:center">'
+        +'<div><div class="setn">'+T(lim.n)+'</div>'
+        +'<div class="setd">'+T('范围 {0}–{1}px', lim.min, lim.max)+'</div></div>'
+        +'<div class="setval">'+v+'</div></div>'
+        +'<input class="volrange" id="fs_'+sk+'" type="range" min="'+lim.min+'" max="'+lim.max+'" step="'+lim.step+'" value="'+v+'">'
+        +'</div>';
+    }
+    h+='<div class="row" style="margin-top:10px">'
+      +'<button class="btn ghost small" id="fontReset">'+T('恢复默认字体')+'</button></div>';
   }
 
   /* ---------- 512 色 ---------- */
@@ -111,6 +155,22 @@ function buildSettings(){
       +'<div class="setinfo"><div class="setn">'+T('音效开关')+'</div>'
       +'<div class="setd">'+T('完全静音，倍率保留')+'</div></div>'
       +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+  }
+
+  /* ---------- 语言 ---------- */
+  if(setTab==='lang'){
+    h+='<div class="d" style="margin:10px 0 6px">'
+      +T('界面语言。切换后所有界面立即重绘，不需要重开游戏。')
+      +'</div>';
+    const langs=[['zh','中文'],['en','English']];
+    const cur=(typeof I18N_LANG!=='undefined')?I18N_LANG:'zh';
+    for(const [code,name] of langs){
+      const on=(cur===code);
+      h+='<div class="setrow'+(on?' on':'')+'" data-lang-pick="'+code+'">'
+        +'<div class="setinfo"><div class="setn">'+name+'</div>'
+        +'<div class="setd">'+(code==='zh'?T('简体中文界面'):T('英文界面'))+'</div></div>'
+        +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+    }
   }
 
   /* ---------- 调试 ---------- */
@@ -165,6 +225,48 @@ function bindSettings(){
       accentSet(parseInt(b.getAttribute('data-accent'),10));
       try{ sfxUI(); }catch(e){}
       buildSettings();
+    };
+  });
+  /* 字体族 —— 九宫格，点一格立即换字并重建面板以刷新选中态 */
+  el.querySelectorAll('[data-font-fam]').forEach(b=>{
+    b.onclick=()=>{
+      fontSetFamily(b.getAttribute('data-font-fam'));
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  });
+  /* 三档字号 —— 和音量滑块同一个道理：拖动过程中只改数值与预览，
+     不能 rebuild，否则滑块一拖就断。松手（change）才重建。 */
+  for(const sk of ['title','body','btn']){
+    const r=document.getElementById('fs_'+sk);
+    if(!r) continue;
+    const fresh=()=>{
+      const v=parseInt(r.value,10);
+      if(isNaN(v)) return;
+      fontSetSize(sk, v);
+      /* 滑块上方那个 .setval 数字跟着走 */
+      const rowv=r.parentElement && r.parentElement.querySelector('.setval');
+      if(rowv) rowv.textContent=v;
+    };
+    r.oninput=fresh;
+    r.onchange=()=>{ fresh(); buildSettings(); };
+  }
+  /* 恢复默认字体 */
+  const fr=document.getElementById('fontReset');
+  if(fr) fr.onclick=()=>{
+    fontReset();
+    try{ sfxUI(); }catch(e){}
+    buildSettings();
+  };
+  /* 语言 —— 切完要把整个界面重绘一遍，所以先关面板再重开，
+     否则设置面板里残留的还是旧语言的文案。 */
+  el.querySelectorAll('[data-lang-pick]').forEach(b=>{
+    b.onclick=()=>{
+      const code=b.getAttribute('data-lang-pick');
+      try{ sfxUI(); }catch(e){}
+      try{ i18nSetLang(code, i18nRebuildAll); }catch(e){}
+      /* 设置面板自身也要跟着换语言：直接重建一次即可 */
+      try{ buildSettings(); }catch(e){}
     };
   });
   /* 音量滑块 */

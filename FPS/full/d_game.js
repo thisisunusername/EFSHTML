@@ -401,9 +401,127 @@ function updLoot(dt){
    这个核心决策完全不存在。现在 8 分钟一到强制结束，东西全丢。 */
 const RAID_LIMIT = 480;   // 单局时长（秒）8 分钟
 
-/* 每帧推进计时。返回剩余秒数（用于 HUD 显示）。 */
+/* ============================================================
+   【局内暂停系统】
+   设计要点（这几条决定了它能不能「正常运转」）：
+
+   1) 暂停不是「停掉渲染循环」，而是「跳过所有需要推进的子步骤」。
+      为什么不能直接 cancelAnimationFrame：渲染循环一旦停，
+      暂停菜单自己的按钮动画、HUD 刷新全没了，而且恢复时
+      clock.getDelta() 会攒出一个巨大的 dt（等于暂停多久就走多少帧），
+      人物会瞬移、倒计时会一下掉一大截。所以必须让循环继续跑，
+      只是把 dt 当作 0 处理。
+
+   2) clock.getDelta() 每帧都必须消费掉，绝不能「暂停时不取」。
+      three 的 Clock 是「距上次取值」的差值，攒着不取就会越攒越大。
+      所以 animate() 里先无条件取 dt，再交给 here 决定用不用。
+
+   3) 倒计时（P.raidT）只在未暂停时累加 —— 这是玩家最在意的点：
+      暂停期间时间必须真的停住，不能偷偷流失。
+
+   4) 暂停时把按键状态清空：否则暂停前按着 W 的手一松开，
+      暂停中收不到 keyup，恢复后人物会一直往前走。
+   ============================================================ */
+let paused = false;
+
+function pauseIsActive(){ return !!paused; }
+
+function pauseGame(reason){
+  if(paused) return false;
+  /* 已经死了 / 已撤离 / 结算中：没有可暂停的局面 */
+  if(!window.__inGame) return false;
+  if(typeof exfiled!=='undefined' && exfiled) return false;
+  if(window.__raidOver) return false;
+
+  paused = true;
+  window.__paused = true;
+  window.__pauseReason = reason || 'manual';
+
+  /* 【清空输入】见上面第 4 条。不清的话恢复后人物会自己走。 */
+  try{ P.keys={}; }catch(e){}
+  try{ P.sprinting=false; }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ if(typeof P.joyX==='number'){ P.joyX=0; P.joyY=0; } }catch(e){}
+  /* 开镜状态保留，但把「按住式」的射击/移动作废 */
+  try{ if(typeof window.__joyTouch==='object' && window.__joyTouch) window.__joyTouch.active=false; }catch(e){}
+
+  /* 【暂停时不吸收鼠标/触摸】pointer lock 在菜单里会抢走点击，
+     必须退出，否则暂停菜单的按钮点不动。 */
+  try{
+    if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+  }catch(e){}
+
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  try{ if(typeof showPauseOverlay==='function') showPauseOverlay(); }catch(e){ console.error('pause overlay', e); }
+  try{ if(typeof dlog==='function') dlog('paused', window.__pauseReason); }catch(e){}
+  return true;
+}
+
+function resumeGame(){
+  if(!paused) return false;
+  paused = false;
+  window.__paused = false;
+  window.__pauseReason = '';
+  /* 清空输入，避免暂停面板上的点击残留成「还在按着」 */
+  try{ P.keys={}; }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ P.sprinting=false; }catch(e){}
+  try{ if(typeof hidePauseOverlay==='function') hidePauseOverlay(); }catch(e){}
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  try{ if(typeof dlog==='function') dlog('resumed'); }catch(e){}
+  return true;
+}
+
+function pauseToggle(){
+  if(paused) return resumeGame();
+  return pauseGame('manual');
+}
+
+/* 【暂停中退出撤离】＝放弃本局：身上/背包/胸挂的物资全部丢失，
+   和阵亡完全一致。这是玩家明确要的「暂停可以退出（丢失所有）」。 */
+function pauseQuitRaid(){
+  if(!window.__inGame) return false;
+  window.__inGame = false;
+  paused = false;
+  window.__paused = false;
+  try{ if(typeof hidePauseOverlay==='function') hidePauseOverlay(); }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ P.keys={}; }catch(e){}
+  /* 与超时/阵亡同一套结算函数，保证规则一致 */
+  try{ if(typeof settleDeath==='function') settleDeath(); }catch(e){ console.error('settleDeath failed', e); }
+  try{ if(typeof saveTick==='function') saveTick(); }catch(e){}
+  /* 回主菜单而不 reload：reload 会重跑整个 three 场景，手机上很慢，
+     而且玩家刚被扣了东西，再等十秒才看到菜单体验很差。
+     这里直接把界面切回主菜单，场景留在后台不渲染。 */
+  try{ showMainMenuAfterRaid(); }catch(e){ console.error('back to menu failed', e); }
+  return true;
+}
+
+/* 退出后把界面恢复成主菜单形态（不重载页面） */
+function showMainMenuAfterRaid(){
+  try{ if(typeof hideTouchUI==='function') hideTouchUI(); }catch(e){}
+  try{
+    const hud=$('hud'); if(hud) hud.style.display='none';
+    const wp=$('wpnBar'); if(wp) wp.style.display='none';
+    const lb=$('lootBox'); if(lb) lb.style.display='none';
+  }catch(e){}
+  try{
+    const d=$('death'); if(d) d.style.display='none';
+  }catch(e){}
+  try{
+    const m=$('menu'); if(m) m.style.display='flex';
+  }catch(e){}
+  /* 主菜单的几个统计要刷新（钱少了、槽位空了要立刻看到） */
+  try{ if(typeof refreshHUD==='function') refreshHUD(); }catch(e){}
+  try{ if(typeof buildWpnBar==='function') buildWpnBar(); }catch(e){}
+  try{ if(typeof i18nRebuildAll==='function') i18nRebuildAll(); }catch(e){}
+}
+
+/* 每帧推进计时。返回剩余秒数（用于 HUD 显示）。
+   【暂停时直接返回当前剩余值，不推进 P.raidT】 */
 function updRaidTimer(dt){
   if(!window.__inGame) return RAID_LIMIT;
+  if(paused) return Math.max(0, RAID_LIMIT - (P.raidT||0));
   if(typeof P.raidT!=='number') P.raidT=0;
   P.raidT += dt;
   const left = RAID_LIMIT - P.raidT;

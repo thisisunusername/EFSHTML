@@ -288,7 +288,121 @@ function accentSet(idx){
 }
 
 /* ============================================================
-   3) 调试日志
+   3) 字体（照搬 2D 版 full/f_theme.js 的 FONT_FAMILY / FONT_LIMITS）
+   2D 版把字体选择做在「自定义主题」里，共 9 个字体族 + 3 个字号。
+   这里保持完全一致的清单与取值范围，只把存储 key 换成 3D 版自己的，
+   免得和 2D 的 localStorage 互相覆盖。
+   ============================================================ */
+const FONT_KEY = 'efs_font_v1';
+
+const FONT_FAMILY = {
+  system: { name:'系统默认', css:'-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif' },
+  mono:   { name:'等宽',     css:'"JetBrains Mono","Cascadia Mono",Consolas,"Noto Sans Mono",monospace' },
+  serif:  { name:'衬线',     css:'Georgia,"Songti SC","SimSun","Noto Serif SC",serif' },
+  round:  { name:'圆体',     css:'"Yuanti SC","Hiragino Sans GB","Microsoft YaHei",sans-serif' },
+  hand:   { name:'手写',     css:'"Kaiti SC","STKaiti",KaiTi,"Noto Serif SC",cursive' },
+  zw:     { name:'站酷小薇', css:'"ZCOOLXiaoWei","PingFang SC",sans-serif' },
+  ms:     { name:'马善政楷', css:'"MaShanZheng","PingFang SC",cursive' },
+  zk:     { name:'站酷快乐', css:'"ZCOOLKuaiLe","PingFang SC",sans-serif' },
+  lc:     { name:'龙藏体',   css:'"LongCang","PingFang SC",cursive' }
+};
+/* 字号：和 2D 版完全相同的上下限与默认值 */
+const FONT_LIMITS = {
+  title: { min:14, max:48, step:1, def:28, n:'标题字号' },
+  body:  { min:9,  max:24, step:1, def:13, n:'正文字号' },
+  btn:   { min:10, max:26, step:1, def:14, n:'按钮字号' }
+};
+/* 3D 版的字体缩放基准：
+   上面这三档是照着 2D 版的绝对像素设计的（2D 的标题 28px、正文 13px）。
+   3D 版原有字号并不一样（h1 更大、正文更小），如果直接把 28px 套上去，
+   界面会整体走形。所以这里做「相对倍率」换算：
+     倍率 = 选中的字号 / 该档默认字号
+   再乘到 3D 版自己的基准像素上，观感一致又不会破坏布局。 */
+const FONT_BASE_3D = { title:30, body:13, btn:14 };
+
+let fontSel = { family:'system', title:28, body:13, btn:14 };
+
+function fontClampSize(k, v){
+  const lim = FONT_LIMITS[k];
+  if(!lim) return null;
+  let n = parseInt(v, 10);
+  if(!isFinite(n)) return lim.def;
+  if(n < lim.min) n = lim.min;
+  if(n > lim.max) n = lim.max;
+  return n;
+}
+function fontNormFamily(v){
+  const s = String(v||'').toLowerCase();
+  return FONT_FAMILY[s] ? s : 'system';
+}
+function fontLoad(){
+  try{
+    const raw = localStorage.getItem(FONT_KEY);
+    if(raw){
+      const o = JSON.parse(raw);
+      if(o && typeof o === 'object'){
+        fontSel.family = fontNormFamily(o.family);
+        fontSel.title = fontClampSize('title', o.title);
+        fontSel.body  = fontClampSize('body',  o.body);
+        fontSel.btn   = fontClampSize('btn',   o.btn);
+      }
+    }
+  }catch(e){}
+  return fontSel;
+}
+function fontSave(){
+  try{ localStorage.setItem(FONT_KEY, JSON.stringify(fontSel)); }catch(e){}
+}
+/* 把字体作用到页面：
+   --font-ui  —— 所有界面的字体族
+   --fs-title / --fs-body / --fs-btn —— 换算后的实际像素 */
+function fontApply(){
+  try{
+    const el = document.documentElement;
+    if(!el || !el.style) return fontSel;
+    const fam = FONT_FAMILY[fontSel.family] || FONT_FAMILY.system;
+    el.style.setProperty('--font-ui', fam.css);
+    el.style.setProperty('--fs-title', Math.round(FONT_BASE_3D.title * (fontSel.title / FONT_LIMITS.title.def)) + 'px');
+    el.style.setProperty('--fs-body',  Math.round(FONT_BASE_3D.body  * (fontSel.body  / FONT_LIMITS.body.def))  + 'px');
+    el.style.setProperty('--fs-btn',   Math.round(FONT_BASE_3D.btn   * (fontSel.btn   / FONT_LIMITS.btn.def))   + 'px');
+    /* 打标记方便 CSS 里用 html[data-font] 做特例 */
+    el.setAttribute('data-font', fontSel.family);
+  }catch(e){}
+  return fontSel;
+}
+function fontSetFamily(v){
+  fontSel.family = fontNormFamily(v);
+  fontSave(); fontApply();
+  return fontSel.family;
+}
+function fontSetSize(k, v){
+  const n = fontClampSize(k, v);
+  if(n===null) return fontSel;
+  fontSel[k] = n;
+  fontSave(); fontApply();
+  return fontSel;
+}
+function fontSet(newSel){
+  if(newSel && typeof newSel === 'object'){
+    if('family' in newSel) fontSel.family = fontNormFamily(newSel.family);
+    for(const k of ['title','body','btn']){
+      if(k in newSel){ const n = fontClampSize(k, newSel[k]); if(n!==null) fontSel[k]=n; }
+    }
+  }
+  fontSave(); fontApply();
+  return fontSel;
+}
+function fontReset(){
+  fontSel = { family:'system', title:FONT_LIMITS.title.def,
+              body:FONT_LIMITS.body.def, btn:FONT_LIMITS.btn.def };
+  fontSave(); fontApply();
+  return fontSel;
+}
+/* 字体族列表（给设置面板渲染用，保持顺序稳定） */
+const FONT_ORDER = ['system','mono','serif','round','hand','zw','ms','zk','lc'];
+
+/* ============================================================
+   4) 调试日志
    ============================================================ */
 const LOG_MAX = 300;
 let logOn = false;
@@ -380,6 +494,7 @@ function updateLogBadge(){
 function themeInit(){
   themeLoad();
   accentLoad();
+  fontLoad();
   logLoad();
   logHookConsole();
   /* 【顺序不能反】
@@ -387,5 +502,9 @@ function themeInit(){
      accentApply 再按当前主题写一次 —— 反过来玩家选的颜色会被盖掉。 */
   themeApply();
   accentApply();
+  /* 字体放在主题之后：fontApply 只写 --font-ui / --fs-*，不碰颜色，
+     所以顺序其实无所谓，但排在后面读起来更合逻辑。 */
+  fontApply();
   dlog('theme init', curTheme, 'accent', accentIdx, 'seed', accentSeed(accentIdx));
+  dlog('font init', fontSel.family, fontSel.title, fontSel.body, fontSel.btn);
 }

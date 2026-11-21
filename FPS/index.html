@@ -5,9 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Escape Form School</title>
 <style>
-  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92); }
+  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
+    /* 【字体变量兜底】s_theme.js 的 fontApply() 会在 <html> 的 inline style
+       上覆盖这三个；这里给的默认值必须和 FONT_BASE_3D 完全一致
+       （title 30 / body 13 / btn 14），否则脚本没跑起来时字号会先闪一下。 */
+    --font-ui: system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    --fs-title: 30px;
+    --fs-body: 13px;
+    --fs-btn: 14px;
+  }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
-  html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#e8e8f0; touch-action:none; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:var(--font-ui); font-size:var(--fs-body); color:#e8e8f0; touch-action:none; }
   #c{ position:fixed; inset:0; width:100%; height:100%; display:block;
       /* saltline 观感：提对比 + 压高光 + 微降饱和 + 轻微色偏。
          CSS filter 走 GPU 合成，几乎零开销，不需要 EffectComposer。 */
@@ -405,10 +413,10 @@ html[data-lang="en"] #bagBtn span{
   #gmKeyD:active{ transform:translateY(1px); background:rgba(124,92,255,.45); }
   .kk span{ color:#98a0b0; }
   .keysbox-note{ margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.09); font-size:11.5px; color:#8b93a6; line-height:1.6; }
-  h1{ font-size:22px; margin-bottom:4px; } h1 span{ color:var(--accent2); }
+  h1{ font-size:var(--fs-title); margin-bottom:4px; font-family:var(--font-ui); } h1 span{ color:var(--accent2); }
   .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
   .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
-  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:var(--fs-btn); font-weight:700; cursor:pointer; font-family:var(--font-ui); }
   .btn:active{ filter:brightness(1.2); }
   .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
   .btn.danger{ background:#c2382a; }
@@ -450,7 +458,7 @@ html[data-lang="en"] #bagBtn span{
     scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
   #gunsmith .box::-webkit-scrollbar{ width:8px; }
   #gunsmith .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
-  #gunsmith h1{ font-size:19px; margin-bottom:4px; }
+  #gunsmith h1{ font-size:calc(var(--fs-title) * .85); margin-bottom:4px; }
   /* 改枪台的关闭按钮在筛选栏里也要能点 */
   #gunsmith .tab, #gunsmith .btn{ pointer-events:auto; }
   #shop .box, #bag .box{ width:100%; max-width:560px; max-height:88vh;
@@ -489,7 +497,7 @@ html[data-lang="en"] #bagBtn span{
     -webkit-tap-highlight-color:transparent; }
   #shop .box::-webkit-scrollbar, #bag .box::-webkit-scrollbar{ width:8px; }
   #shop .box::-webkit-scrollbar-thumb, #bag .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
-  #shop h1, #bag h1{ font-size:19px; margin-bottom:4px; }
+  #shop h1, #bag h1{ font-size:calc(var(--fs-title) * .85); margin-bottom:4px; }
   /* 顶部货币条 */
   .shophead{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
   .shophead .cash{ font-weight:800; color:#ffd54a; font-size:15px; white-space:nowrap; }
@@ -559,6 +567,17 @@ html[data-lang="en"] #bagBtn span{
   .setd{ font-size:11px; opacity:.62; margin-top:2px; line-height:1.45; }
   .setmark{ width:22px; text-align:center; font-weight:800; color:var(--accent2); font-size:16px; }
   .setval{ font-size:13px; font-weight:800; color:var(--accent2); font-variant-numeric:tabular-nums; }
+  /* 【字体族九宫格】每个格子用它自己代表的字体渲染 —— 所见即所得，
+     不用试一遍才知道「站酷快乐」长什么样。 */
+  .fontgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin:8px 0 4px; }
+  .fontcell{ pointer-events:auto; background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.16); color:#e8e8f0; border-radius:10px;
+    padding:9px 6px; font-size:13px; text-align:center; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    -webkit-tap-highlight-color:transparent; transition:background .12s, border-color .12s; }
+  .fontcell:active{ background:rgba(255,255,255,.16); }
+  .fontcell.on{ border-color:var(--accent); background:rgba(124,92,255,.28);
+    box-shadow:0 0 0 1px var(--accent) inset; }
   /* 音量滑块：默认样式在手机上太细，加粗一点才好拖 */
   .volrange{ -webkit-appearance:none; appearance:none; width:100%; height:34px;
     background:transparent; margin:2px 0 12px; touch-action:manipulation; }
@@ -598,10 +617,35 @@ html[data-lang="en"] #bagBtn span{
   #logBadge{ display:none; padding:2px 7px; border-radius:6px;
     background:rgba(255,193,74,.9); color:#2a1a05;
     font-size:9.5px; font-weight:800; letter-spacing:.03em; }
+  /* ================= 局内暂停浮层 =================
+     结构：全屏遮罩 #pause > 卡片 .pzbox > 标题/说明/时间/按钮组/警告
+     z-index 取 60：必须盖住 HUD(10) 与各面板，但要低于
+       #__bootdiag(99999) 和 GM 面板，否则真出错时红框会被挡住。 */
+  #pause{ position:fixed; inset:0; z-index:60; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(4,6,11,.78); backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px); padding:16px; box-sizing:border-box; }
+  #pause .pzbox{ width:100%; max-width:360px; padding:22px 18px 18px;
+    border-radius:18px; background:rgba(18,23,34,.98);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 12px 40px rgba(0,0,0,.62);
+    text-align:center; box-sizing:border-box; }
+  #pause .pztitle{ margin:0 0 6px; font-size:20px; font-weight:800;
+    color:#eef2ff; letter-spacing:.5px; }
+  #pause .pzsub{ font-size:11.5px; color:#9aa6bd; line-height:1.5; }
+  #pause .pzmeta{ margin:10px 0 14px; font-size:12.5px; color:#b9c4da; }
+  #pause .pzmeta b{ color:var(--accent); font-size:15px; font-weight:800; }
+  #pause .pzbtns{ display:flex; flex-direction:column; gap:8px; }
+  #pause .pzbtns .btn{ width:100%; margin:0; padding:11px 12px; font-size:14px; }
+  #pause .pznote{ margin-top:12px; font-size:10.5px; line-height:1.55;
+    color:#8d99b0; }
+  /* 各面板统一「返回」按钮：固定尺寸，和面板标题行对齐 */
+  .backBtn{ padding:6px 14px; font-size:12.5px; font-weight:700;
+    border-radius:9px; cursor:pointer; font-family:inherit;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+    color:#dfe6f5; }
+  .backBtn:active{ background:rgba(255,255,255,.2); }
 
-/* ==================================================================
-/* ==================================================================
-/* ==================================================================
 /* ==================================================================
      Material You 主题（对齐 2D 版 full/f_theme.js + full/a_head.html）
 
@@ -758,6 +802,15 @@ html[data-lang="en"] #bagBtn span{
   }
   html[data-theme="material"] .volrange::-moz-range-thumb{
     background:var(--m3-primary); border-color:var(--m3-surface-2);
+  }
+  /* ---- 字体页签九宫格（M3 皮肤）---- */
+  html[data-theme="material"] .fontcell{
+    background:var(--m3-surface-3); border:1px solid var(--m3-outline-var);
+    color:var(--m3-on-surface); border-radius:var(--m3-r-s);
+  }
+  html[data-theme="material"] .fontcell.on{
+    background:var(--m3-primary-container); color:var(--m3-on-primary-container);
+    border-color:var(--m3-primary); box-shadow:none;
   }
   /* ---- 仓库内页（.stk 系列）----
      这一段原来一个都没覆盖，导致切到 Material 后仓库里还是暗夜硬编码色。
@@ -1064,6 +1117,9 @@ background:rgba(90,220,255,.03); cursor:default; }
     <!-- 调试日志徽标：只在设置里打开调试日志时出现，显示当前条数。
          点一下直接打开设置面板的「调试」页签，省得去菜单里翻。 -->
     <div class="pill" id="logBadge" style="cursor:pointer" title="调试日志">LOG 0</div>
+    <!-- 【暂停按钮】放在 topbar 最右：手机横屏时右手拇指够得到。
+         点一下冻结游戏时间与撤离倒计时，弹出暂停浮层。 -->
+    <div class="pill" id="pauseBtn" style="cursor:pointer" title="暂停">⏸ <span>暂停</span></div>
   </div>
   <!-- 小地图：左上角固定，显示校园平面 + 玩家朝向 + 撤离点 -->
   <div id="mmWrap">
@@ -1227,6 +1283,10 @@ background:rgba(90,220,255,.03); cursor:default; }
 <div id="settings" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- 【局内暂停浮层】容器是静态的，内容由 f_ui.js 的 renderPauseOverlay 重建。
+     放在 #bag 之后、#lootBox 之前：z-index 在 CSS 里单独给，
+     必须盖住 HUD 但低于系统级自检红框。 -->
+<div id="pause" style="display:none"></div>
 <!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
      里面是一堆可点的物品格，点一个拿一个，拿完自动关。 -->
 <div id="lootBox" style="display:none">
@@ -2125,6 +2185,47 @@ const I18N_EN = {
   '复制失败，请手动选择': 'Copy failed, please select manually',
   '复制失败': 'Copy failed',
   '调试日志已开启': 'Debug log enabled',
+  /* ---- 设置面板：字体页签（与 2D 版一致的九族三档）---- */
+  '字体': 'Font',
+  '字体族': 'Font family',
+  '字体族与字号均与 2D 版一致。含站酷、马善政楷、龙藏等字体，设备未安装时自动回退到系统字体。':
+    'Font families and sizes match the 2D build. Includes ZCOOL, Ma Shan Zheng, Long Cang and others; falls back to the system font when not installed.',
+  '当前：{0}': 'Current: {0}',
+  '标题字号': 'Title size',
+  '正文字号': 'Body size',
+  '按钮字号': 'Button size',
+  '范围 {0}–{1}px': 'Range {0}–{1}px',
+  '恢复默认字体': 'Reset font',
+  '系统默认': 'System default',
+  '等宽': 'Monospace',
+  '衬线': 'Serif',
+  '圆体': 'Rounded',
+  '手写': 'Handwriting',
+  '站酷小薇': 'ZCOOL XiaoWei',
+  '马善政楷': 'Ma Shan Zheng',
+  '站酷快乐': 'ZCOOL KuaiLe',
+  '龙藏体': 'Long Cang',
+  /* ---- 设置面板：语言页签 ----
+     这里原本挂在主菜单最后一个 .row 上，而那个 .row 就是导入导出行，
+     平时 display:none，所以按钮一直被藏着 —— 这就是「语言设置不见了」。 */
+  '界面语言。切换后所有界面立即重绘，不需要重开游戏。':
+    'Interface language. Every screen is repainted immediately, no restart needed.',
+  '简体中文界面': 'Simplified Chinese interface',
+  '英文界面': 'English interface',
+  '中文': 'Chinese',
+  /* ---- 局内暂停 ----
+     【语义要点】暂停时倒计时也一起冻结，不是「后台还在走」。
+     退出等于放弃本局，物资全丢，所以按钮文案必须写清楚后果。 */
+  '已暂停': 'Paused',
+  '继续游戏': 'Resume',
+  '声音：开': 'Sound: on',
+  '声音：关': 'Sound: off',
+  '退出（丢失所有）': 'Quit (lose everything)',
+  '暂停中 · 剩余 {0}': 'Paused · {0} left',
+  '游戏时间与撤离倒计时已冻结': 'Game time and extraction timer are frozen',
+  '剩余': 'Left',
+  '退出等于放弃本局：身上的装备、背包与胸挂里的物资全部丢失。':
+    'Quitting abandons this raid: gear, backpack and chest rig contents are all lost.',
   /* ---- 仓库格子空状态 ---- */
   '空（点击仓库物品放入）': 'Empty (tap a stash item to put it in)',
   '空（局内放入医疗/弹药）': 'Empty (put meds/ammo in during a raid)',
@@ -4018,9 +4119,127 @@ function updLoot(dt){
    这个核心决策完全不存在。现在 8 分钟一到强制结束，东西全丢。 */
 const RAID_LIMIT = 480;   // 单局时长（秒）8 分钟
 
-/* 每帧推进计时。返回剩余秒数（用于 HUD 显示）。 */
+/* ============================================================
+   【局内暂停系统】
+   设计要点（这几条决定了它能不能「正常运转」）：
+
+   1) 暂停不是「停掉渲染循环」，而是「跳过所有需要推进的子步骤」。
+      为什么不能直接 cancelAnimationFrame：渲染循环一旦停，
+      暂停菜单自己的按钮动画、HUD 刷新全没了，而且恢复时
+      clock.getDelta() 会攒出一个巨大的 dt（等于暂停多久就走多少帧），
+      人物会瞬移、倒计时会一下掉一大截。所以必须让循环继续跑，
+      只是把 dt 当作 0 处理。
+
+   2) clock.getDelta() 每帧都必须消费掉，绝不能「暂停时不取」。
+      three 的 Clock 是「距上次取值」的差值，攒着不取就会越攒越大。
+      所以 animate() 里先无条件取 dt，再交给 here 决定用不用。
+
+   3) 倒计时（P.raidT）只在未暂停时累加 —— 这是玩家最在意的点：
+      暂停期间时间必须真的停住，不能偷偷流失。
+
+   4) 暂停时把按键状态清空：否则暂停前按着 W 的手一松开，
+      暂停中收不到 keyup，恢复后人物会一直往前走。
+   ============================================================ */
+let paused = false;
+
+function pauseIsActive(){ return !!paused; }
+
+function pauseGame(reason){
+  if(paused) return false;
+  /* 已经死了 / 已撤离 / 结算中：没有可暂停的局面 */
+  if(!window.__inGame) return false;
+  if(typeof exfiled!=='undefined' && exfiled) return false;
+  if(window.__raidOver) return false;
+
+  paused = true;
+  window.__paused = true;
+  window.__pauseReason = reason || 'manual';
+
+  /* 【清空输入】见上面第 4 条。不清的话恢复后人物会自己走。 */
+  try{ P.keys={}; }catch(e){}
+  try{ P.sprinting=false; }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ if(typeof P.joyX==='number'){ P.joyX=0; P.joyY=0; } }catch(e){}
+  /* 开镜状态保留，但把「按住式」的射击/移动作废 */
+  try{ if(typeof window.__joyTouch==='object' && window.__joyTouch) window.__joyTouch.active=false; }catch(e){}
+
+  /* 【暂停时不吸收鼠标/触摸】pointer lock 在菜单里会抢走点击，
+     必须退出，否则暂停菜单的按钮点不动。 */
+  try{
+    if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+  }catch(e){}
+
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  try{ if(typeof showPauseOverlay==='function') showPauseOverlay(); }catch(e){ console.error('pause overlay', e); }
+  try{ if(typeof dlog==='function') dlog('paused', window.__pauseReason); }catch(e){}
+  return true;
+}
+
+function resumeGame(){
+  if(!paused) return false;
+  paused = false;
+  window.__paused = false;
+  window.__pauseReason = '';
+  /* 清空输入，避免暂停面板上的点击残留成「还在按着」 */
+  try{ P.keys={}; }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ P.sprinting=false; }catch(e){}
+  try{ if(typeof hidePauseOverlay==='function') hidePauseOverlay(); }catch(e){}
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  try{ if(typeof dlog==='function') dlog('resumed'); }catch(e){}
+  return true;
+}
+
+function pauseToggle(){
+  if(paused) return resumeGame();
+  return pauseGame('manual');
+}
+
+/* 【暂停中退出撤离】＝放弃本局：身上/背包/胸挂的物资全部丢失，
+   和阵亡完全一致。这是玩家明确要的「暂停可以退出（丢失所有）」。 */
+function pauseQuitRaid(){
+  if(!window.__inGame) return false;
+  window.__inGame = false;
+  paused = false;
+  window.__paused = false;
+  try{ if(typeof hidePauseOverlay==='function') hidePauseOverlay(); }catch(e){}
+  try{ P.firing=false; }catch(e){}
+  try{ P.keys={}; }catch(e){}
+  /* 与超时/阵亡同一套结算函数，保证规则一致 */
+  try{ if(typeof settleDeath==='function') settleDeath(); }catch(e){ console.error('settleDeath failed', e); }
+  try{ if(typeof saveTick==='function') saveTick(); }catch(e){}
+  /* 回主菜单而不 reload：reload 会重跑整个 three 场景，手机上很慢，
+     而且玩家刚被扣了东西，再等十秒才看到菜单体验很差。
+     这里直接把界面切回主菜单，场景留在后台不渲染。 */
+  try{ showMainMenuAfterRaid(); }catch(e){ console.error('back to menu failed', e); }
+  return true;
+}
+
+/* 退出后把界面恢复成主菜单形态（不重载页面） */
+function showMainMenuAfterRaid(){
+  try{ if(typeof hideTouchUI==='function') hideTouchUI(); }catch(e){}
+  try{
+    const hud=$('hud'); if(hud) hud.style.display='none';
+    const wp=$('wpnBar'); if(wp) wp.style.display='none';
+    const lb=$('lootBox'); if(lb) lb.style.display='none';
+  }catch(e){}
+  try{
+    const d=$('death'); if(d) d.style.display='none';
+  }catch(e){}
+  try{
+    const m=$('menu'); if(m) m.style.display='flex';
+  }catch(e){}
+  /* 主菜单的几个统计要刷新（钱少了、槽位空了要立刻看到） */
+  try{ if(typeof refreshHUD==='function') refreshHUD(); }catch(e){}
+  try{ if(typeof buildWpnBar==='function') buildWpnBar(); }catch(e){}
+  try{ if(typeof i18nRebuildAll==='function') i18nRebuildAll(); }catch(e){}
+}
+
+/* 每帧推进计时。返回剩余秒数（用于 HUD 显示）。
+   【暂停时直接返回当前剩余值，不推进 P.raidT】 */
 function updRaidTimer(dt){
   if(!window.__inGame) return RAID_LIMIT;
+  if(paused) return Math.max(0, RAID_LIMIT - (P.raidT||0));
   if(typeof P.raidT!=='number') P.raidT=0;
   P.raidT += dt;
   const left = RAID_LIMIT - P.raidT;
@@ -4723,6 +4942,45 @@ function refreshHUD(){
     mb.classList.toggle('none', n<=0 || P.hp>=100);
   }
 }
+/* ================= 全局声音开关（HUD / 暂停面板 / 设置面板共用）=================
+   【为什么抽成函数】原来这 7 行逻辑只写在 HUD 的 sndBtn 里，
+   暂停面板和设置面板要各写一份，三处的判定迟早会走样。
+   现在统一入口，谁都能调，状态永远一致。 */
+function toggleSound(){
+  const on = !(typeof sfxOn==='boolean' ? sfxOn : true);
+  try{
+    /* sfxOn 是 y_audio.js 里用 let 声明的模块级变量，
+       这里直接赋值即可（同一个 module 作用域）。 */
+    sfxOn = on;
+  }catch(e){}
+  /* 【走统一入口】不能直接写 VOL.master，否则会把设置里的音量倍率抹掉 ——
+     玩家把音量拉到 30%，点一下静音再取消，音量就回到 100%。 */
+  try{
+    if(typeof masterVolApply==='function') masterVolApply();
+    else if(typeof masterGain!=='undefined' && masterGain) masterGain.gain.value = on ? VOL.master : 0;
+  }catch(e){}
+  syncSoundUI();
+  return on;
+}
+/* 把当前声音状态同步到所有显示「开/关」的地方 */
+function syncSoundUI(){
+  const on = !!(typeof sfxOn!=='undefined' && sfxOn);
+  const txt = on ? T('开') : T('关');
+  const t=document.getElementById('sndTxt');
+  if(t) t.textContent = txt;
+  const sb=document.getElementById('sndBtn');
+  if(sb && sb.firstChild && sb.firstChild.nodeType===3) sb.firstChild.textContent = on ? '🔊 ' : '🔇 ';
+  /* 设置面板里的音效开关行：只有它正开着时才存在 */
+  try{
+    const row=document.querySelector('#settings [data-sfx-toggle]');
+    if(row){
+      row.classList.toggle('on', on);
+      const mk=row.querySelector('.setmark');
+      if(mk) mk.textContent = on ? '✓' : '';
+    }
+  }catch(e){}
+}
+
 /* 统计身上（胸挂 + 背包）所有治疗品的总数 */
 function medTotalCount(){
   let n=0;
@@ -4773,6 +5031,74 @@ function toast(t){
   const el=$('toast'); if(!el) return;
   el.textContent=t; el.style.opacity='1';
   clearTimeout(el._t); el._t=setTimeout(()=>el.style.opacity='0',1500);
+}
+
+/* ================= 局内暂停浮层 =================
+   #pause 是静态容器（a_head.html 里就有），内容每次显示时重建。
+   为什么重建而不是一次性写好：按钮上的文字要跟语言和声音状态同步，
+   暂停界面里的「声音：开/关」必须实时反映当前状态。
+   注意：这里绝不重新绑定事件 —— 事件委托挂在 #pause 上（bindUI 里）。 */
+function showPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el) return;
+  renderPauseOverlay();
+  el.style.display='flex';
+  /* 暂停时把 HUD 的指针事件让出来，避免点到后面的摇杆/开火区 */
+  try{ window.__joyEnabled=false; }catch(e){}
+  try{ if(typeof endJoyNow==='function') endJoyNow(); }catch(e){}
+}
+/* keepForReturn=true 表示「暂时藏起来但要能回来」（比如去开设置） */
+function hidePauseOverlay(keepForReturn){
+  const el=document.getElementById('pause');
+  if(el) el.style.display='none';
+  if(keepForReturn){
+    window.__pauseHiddenForPanel=true;
+  }else{
+    window.__pauseHiddenForPanel=false;
+    try{ window.__joyEnabled = !!window.__inGame; }catch(e){}
+  }
+}
+/* 从设置面板返回：如果刚才是因为暂停才进去的，把暂停浮层还回去 */
+function pauseReturnFromPanel(){
+  if(!window.__pauseHiddenForPanel) return false;
+  window.__pauseHiddenForPanel=false;
+  if(!(typeof paused!=='undefined' && paused)) return false;
+  const el=document.getElementById('pause');
+  if(el){ renderPauseOverlay(); el.style.display='flex'; }
+  return true;
+}
+function refreshPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el || el.style.display==='none') return;
+  renderPauseOverlay();
+}
+function renderPauseOverlay(){
+  const el=document.getElementById('pause');
+  if(!el) return;
+  const on = !!(typeof sfxOn!=='undefined' && sfxOn);
+  /* 剩余时间：暂停时读的是冻结值 */
+  let leftTxt='--:--';
+  try{
+    const left=Math.max(0, (typeof RAID_LIMIT==='number'?RAID_LIMIT:480) - (P.raidT||0));
+    const l=Math.ceil(left);
+    leftTxt=Math.floor(l/60)+':'+((l%60)<10?'0':'')+(l%60);
+  }catch(e){}
+
+  let h='<div class="pzbox">';
+  h+='<h2 class="pztitle">⏸ '+T('已暂停')+'</h2>';
+  h+='<div class="pzsub">'+T('游戏时间与撤离倒计时已冻结')+'</div>';
+  h+='<div class="pzmeta">⏱ '+T('剩余')+' <b>'+leftTxt+'</b></div>';
+
+  h+='<div class="pzbtns">';
+  h+='<button class="btn" data-pause-act="resume">▶ '+T('继续游戏')+'</button>';
+  h+='<button class="btn ghost" data-pause-act="sound">'+(on?'🔊 '+T('声音：开'):'🔇 '+T('声音：关'))+'</button>';
+  h+='<button class="btn ghost" data-pause-act="settings">⚙️ '+T('设置')+'</button>';
+  h+='<button class="btn danger" data-pause-act="quit">🚪 '+T('退出（丢失所有）')+'</button>';
+  h+='</div>';
+
+  h+='<div class="pznote">'+T('退出等于放弃本局：身上的装备、背包与胸挂里的物资全部丢失。')+'</div>';
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 /* ---- 主菜单 / 开始 / 结束按钮 ---- */
@@ -5025,6 +5351,83 @@ function bindUI(){
     el.addEventListener('click', run);
   };
 
+  /* ---- 局内暂停按钮 + 暂停浮层 ----
+     【为什么必须放在这里】tapBtn 是 const 箭头函数，没有变量提升。
+     上面那版把它用在 tapBtn 定义之前，会直接抛
+     "Cannot access 'tapBtn' before initialization" ——
+     而 bindUI 一旦在这里中断，后面所有按键/摇杆/开火绑定全部失效，
+     正好复刻「主界面按钮全点不动」那种灾难。所以顺序不能动。 */
+  const pauseBtn=document.getElementById('pauseBtn');
+  tapBtn(pauseBtn, ()=>{ try{ pauseToggle(); }catch(e){ console.error('pause', e); } });
+
+  /* 暂停浮层：内容由 showPauseOverlay 每次重建，
+     所以按钮不能逐个绑死 —— 用委托挂在静态容器 #pause 上。 */
+  const pauseRoot=document.getElementById('pause');
+  if(pauseRoot && !pauseRoot.__pauseBound){
+    pauseRoot.__pauseBound=true;
+    const onPauseAction=(ev)=>{
+      const t=ev.target;
+      if(!t || !t.closest) return;
+      const b=t.closest('[data-pause-act]');
+      if(!b) return;
+      if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+      if(ev.stopPropagation) ev.stopPropagation();
+      const act=b.getAttribute('data-pause-act');
+      try{
+        if(act==='resume'){ resumeGame(); }
+        else if(act==='quit'){ pauseQuitRaid(); }
+        else if(act==='sound'){ toggleSound(); refreshPauseOverlay(); }
+        else if(act==='settings'){
+          /* 暂停中也能进设置改字体/音量/语言。
+             先把暂停浮层藏起来，免得两层全屏浮层叠在一起点不动。 */
+          try{ setTab='look'; }catch(e){}
+          try{ hidePauseOverlay(true); if(typeof toggleSettings==='function') toggleSettings(); }
+          catch(e){ console.error('pause settings', e); }
+        }
+      }catch(e){ console.error('pause action '+act, e); }
+    };
+    pauseRoot.addEventListener('touchstart', onPauseAction, {passive:false});
+    pauseRoot.addEventListener('click', onPauseAction);
+  }
+
+  /* ---- 全局「← 返回」委托 ----
+     【为什么用 document 级委托而不是逐个绑定】商店/仓库/改枪台/背包/
+     设置这些面板的内容都是每次打开时 innerHTML 重建的，
+     如果在这里拿按钮元素绑 onclick，下次重建就全部失效。
+     委托挂在 document 上则永远有效。
+     data-back 的值决定回到哪里：
+       shop / gunsmith / stash / bag → 关掉自己（回上一层，通常是主菜单或对局）
+       settings → closeSettings（内含「从暂停进来的要回暂停界面」的逻辑）
+     【注意】settings 面板自己没用 data-back，它用 id=setClose，
+     但仍然兼容处理一下，避免以后有人手滑加上。 */
+  if(!window.__backBound){
+    window.__backBound = true;
+    const onBack=(ev)=>{
+      const t=ev.target;
+      if(!t || !t.closest) return;
+      const b=t.closest('[data-back]');
+      if(!b) return;
+      if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+      if(ev.stopPropagation) ev.stopPropagation();
+      const what=b.getAttribute('data-back');
+      try{ sfxUI(); }catch(e){}
+      try{
+        if(what==='shop') closeShop();
+        else if(what==='gunsmith') closeGunsmith();
+        else if(what==='stash') closeStash();
+        else if(what==='bag') closeBag();
+        else if(what==='settings'){
+          /* 不走 closeSettings 的暂停回填逻辑也没问题，它自己会处理 */
+          if(typeof closeSettings==='function') closeSettings();
+        }
+        /* 返回之后 HUD 上的金币/负重可能变了，刷一次 */
+        try{ refreshHUD(); }catch(e){}
+      }catch(e){ console.error('back '+what, e); }
+    };
+    document.addEventListener('touchstart', onBack, {passive:false});
+    document.addEventListener('click', onBack);
+  }
+
   const bagBtn=document.getElementById('bagBtn');
   tapBtn(bagBtn, ()=>{ try{ sfxUI(); }catch(e){} toggleBag(); });
   /* 【HUD 治疗按钮】一键吃药，不用开背包。
@@ -5049,13 +5452,7 @@ function bindUI(){
   // 音效开关
   const sndBtn=document.getElementById('sndBtn');
   tapBtn(sndBtn, ()=>{
-    sfxOn=!sfxOn;
-    /* 【走统一入口】以前直接写 VOL.master，会把设置里的音量倍率抹掉 ——
-       玩家把音量拉到 30%，点一下 HUD 静音再取消，音量就回到 100%。 */
-    if(typeof masterVolApply==='function') masterVolApply();
-    else if(masterGain) masterGain.gain.value=sfxOn?VOL.master:0;
-    const t=document.getElementById('sndTxt'); if(t) t.textContent=sfxOn?'开':'关';
-    if(sndBtn.firstChild) sndBtn.firstChild.textContent=sfxOn?'🔊 ':'🔇 ';
+    toggleSound();
     if(sfxOn){ try{ sfxUI(); }catch(e){} }
   });
 
@@ -6026,7 +6423,10 @@ function buildGunsmith(){
   let h='<div class="box" style="max-width:640px">';
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
     +'<h1 style="margin:0">🔧 '+T('改枪台')+'</h1>'
-    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div>'
+    +'<button class="backBtn" data-back="gunsmith">← '+T('返回')+'</button>'
+    +'</div></div>';
 
   if(!list.length){
     h+='<div class="d" style="text-align:center;padding:20px">'+T('你还没有任何武器，先去商店买一把')+'</div>';
@@ -6163,7 +6563,10 @@ function buildShop(){
   let h='<div class="box" style="max-width:600px">';
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
     +'<h1 style="margin:0">🛒 商店</h1>'
-    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div>'
+    +'<button class="backBtn" data-back="shop">← '+T('返回')+'</button>'
+    +'</div></div>';
   /* 分类标签 */
   h+='<div class="tabs">';
   for(const c of SHOP_CATS){
@@ -6473,7 +6876,7 @@ function buildStashNew(){
 
   /* ---------- 左侧：返回 + 标题 + 装备槽 ---------- */
   h+='<div class="stkleft">';
-  h+='<button class="stkback" id="stkBack">←</button>';
+  h+='<button class="stkback" id="stkBack" data-back="stash">←</button>';
   h+='<div class="stktitle">仓库</div>';
 
   /* 装备槽区：每个槽一行，图标 + 槽名 + 当前装备 */
@@ -6906,7 +7309,7 @@ function buildBagNew(){
 
   /* ---------- 左侧：返回 + 标题 + 装备槽（只读） ---------- */
   h+='<div class="stkleft">';
-  h+='<button class="stkback" id="bagBack">←</button>';
+  h+='<button class="stkback" id="bagBack" data-back="bag">←</button>';
   h+='<div class="stktitle">背包</div>';
 
   h+='<div class="stkslots">';
@@ -10351,7 +10754,121 @@ function accentSet(idx){
 }
 
 /* ============================================================
-   3) 调试日志
+   3) 字体（照搬 2D 版 full/f_theme.js 的 FONT_FAMILY / FONT_LIMITS）
+   2D 版把字体选择做在「自定义主题」里，共 9 个字体族 + 3 个字号。
+   这里保持完全一致的清单与取值范围，只把存储 key 换成 3D 版自己的，
+   免得和 2D 的 localStorage 互相覆盖。
+   ============================================================ */
+const FONT_KEY = 'efs_font_v1';
+
+const FONT_FAMILY = {
+  system: { name:'系统默认', css:'-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif' },
+  mono:   { name:'等宽',     css:'"JetBrains Mono","Cascadia Mono",Consolas,"Noto Sans Mono",monospace' },
+  serif:  { name:'衬线',     css:'Georgia,"Songti SC","SimSun","Noto Serif SC",serif' },
+  round:  { name:'圆体',     css:'"Yuanti SC","Hiragino Sans GB","Microsoft YaHei",sans-serif' },
+  hand:   { name:'手写',     css:'"Kaiti SC","STKaiti",KaiTi,"Noto Serif SC",cursive' },
+  zw:     { name:'站酷小薇', css:'"ZCOOLXiaoWei","PingFang SC",sans-serif' },
+  ms:     { name:'马善政楷', css:'"MaShanZheng","PingFang SC",cursive' },
+  zk:     { name:'站酷快乐', css:'"ZCOOLKuaiLe","PingFang SC",sans-serif' },
+  lc:     { name:'龙藏体',   css:'"LongCang","PingFang SC",cursive' }
+};
+/* 字号：和 2D 版完全相同的上下限与默认值 */
+const FONT_LIMITS = {
+  title: { min:14, max:48, step:1, def:28, n:'标题字号' },
+  body:  { min:9,  max:24, step:1, def:13, n:'正文字号' },
+  btn:   { min:10, max:26, step:1, def:14, n:'按钮字号' }
+};
+/* 3D 版的字体缩放基准：
+   上面这三档是照着 2D 版的绝对像素设计的（2D 的标题 28px、正文 13px）。
+   3D 版原有字号并不一样（h1 更大、正文更小），如果直接把 28px 套上去，
+   界面会整体走形。所以这里做「相对倍率」换算：
+     倍率 = 选中的字号 / 该档默认字号
+   再乘到 3D 版自己的基准像素上，观感一致又不会破坏布局。 */
+const FONT_BASE_3D = { title:30, body:13, btn:14 };
+
+let fontSel = { family:'system', title:28, body:13, btn:14 };
+
+function fontClampSize(k, v){
+  const lim = FONT_LIMITS[k];
+  if(!lim) return null;
+  let n = parseInt(v, 10);
+  if(!isFinite(n)) return lim.def;
+  if(n < lim.min) n = lim.min;
+  if(n > lim.max) n = lim.max;
+  return n;
+}
+function fontNormFamily(v){
+  const s = String(v||'').toLowerCase();
+  return FONT_FAMILY[s] ? s : 'system';
+}
+function fontLoad(){
+  try{
+    const raw = localStorage.getItem(FONT_KEY);
+    if(raw){
+      const o = JSON.parse(raw);
+      if(o && typeof o === 'object'){
+        fontSel.family = fontNormFamily(o.family);
+        fontSel.title = fontClampSize('title', o.title);
+        fontSel.body  = fontClampSize('body',  o.body);
+        fontSel.btn   = fontClampSize('btn',   o.btn);
+      }
+    }
+  }catch(e){}
+  return fontSel;
+}
+function fontSave(){
+  try{ localStorage.setItem(FONT_KEY, JSON.stringify(fontSel)); }catch(e){}
+}
+/* 把字体作用到页面：
+   --font-ui  —— 所有界面的字体族
+   --fs-title / --fs-body / --fs-btn —— 换算后的实际像素 */
+function fontApply(){
+  try{
+    const el = document.documentElement;
+    if(!el || !el.style) return fontSel;
+    const fam = FONT_FAMILY[fontSel.family] || FONT_FAMILY.system;
+    el.style.setProperty('--font-ui', fam.css);
+    el.style.setProperty('--fs-title', Math.round(FONT_BASE_3D.title * (fontSel.title / FONT_LIMITS.title.def)) + 'px');
+    el.style.setProperty('--fs-body',  Math.round(FONT_BASE_3D.body  * (fontSel.body  / FONT_LIMITS.body.def))  + 'px');
+    el.style.setProperty('--fs-btn',   Math.round(FONT_BASE_3D.btn   * (fontSel.btn   / FONT_LIMITS.btn.def))   + 'px');
+    /* 打标记方便 CSS 里用 html[data-font] 做特例 */
+    el.setAttribute('data-font', fontSel.family);
+  }catch(e){}
+  return fontSel;
+}
+function fontSetFamily(v){
+  fontSel.family = fontNormFamily(v);
+  fontSave(); fontApply();
+  return fontSel.family;
+}
+function fontSetSize(k, v){
+  const n = fontClampSize(k, v);
+  if(n===null) return fontSel;
+  fontSel[k] = n;
+  fontSave(); fontApply();
+  return fontSel;
+}
+function fontSet(newSel){
+  if(newSel && typeof newSel === 'object'){
+    if('family' in newSel) fontSel.family = fontNormFamily(newSel.family);
+    for(const k of ['title','body','btn']){
+      if(k in newSel){ const n = fontClampSize(k, newSel[k]); if(n!==null) fontSel[k]=n; }
+    }
+  }
+  fontSave(); fontApply();
+  return fontSel;
+}
+function fontReset(){
+  fontSel = { family:'system', title:FONT_LIMITS.title.def,
+              body:FONT_LIMITS.body.def, btn:FONT_LIMITS.btn.def };
+  fontSave(); fontApply();
+  return fontSel;
+}
+/* 字体族列表（给设置面板渲染用，保持顺序稳定） */
+const FONT_ORDER = ['system','mono','serif','round','hand','zw','ms','zk','lc'];
+
+/* ============================================================
+   4) 调试日志
    ============================================================ */
 const LOG_MAX = 300;
 let logOn = false;
@@ -10443,6 +10960,7 @@ function updateLogBadge(){
 function themeInit(){
   themeLoad();
   accentLoad();
+  fontLoad();
   logLoad();
   logHookConsole();
   /* 【顺序不能反】
@@ -10450,16 +10968,24 @@ function themeInit(){
      accentApply 再按当前主题写一次 —— 反过来玩家选的颜色会被盖掉。 */
   themeApply();
   accentApply();
+  /* 字体放在主题之后：fontApply 只写 --font-ui / --fs-*，不碰颜色，
+     所以顺序其实无所谓，但排在后面读起来更合逻辑。 */
+  fontApply();
   dlog('theme init', curTheme, 'accent', accentIdx, 'seed', accentSeed(accentIdx));
+  dlog('font init', fontSel.family, fontSel.title, fontSel.body, fontSel.btn);
 }
 /* ============================================================
    t_settings.js —— 设置面板
 
-   包含四块：
-     1) 外观：主题（暗夜 / Material 浅色）
-     2) 主题色：512 色网格
-     3) 声音：全局音量滑块 + 总开关
-     4) 调试：调试日志开关 / 查看 / 复制 / 清空
+   包含六个页签：
+     1) 外观：主题（暗夜 / Material You）
+     2) 字体：9 个字体族 + 标题/正文/按钮三档字号（照搬 2D 版）
+     3) 主题色：512 色网格（选种子色）
+     4) 声音：全局音量滑块 + 总开关
+     5) 语言：中文 / English —— 原来挂在主菜单末尾，
+        但那个 .row 是 #saveRow（display:none），按钮被藏没了，
+        所以玩家说「语言设置不见了」。现在收进设置里，永远找得到。
+     6) 调试：调试日志开关 / 查看 / 复制 / 清空
 
    结构上和 shop/stash/gunsmith 同构（一个 #settings 全屏浮层），
    但内容全部在这里生成，不往 f_ui.js 里搎。
@@ -10471,6 +10997,9 @@ let setTab = 'look';
 function closeSettings(){
   const s=document.getElementById('settings');
   if(s) s.style.display='none';
+  /* 【从暂停里进来的要还回去】玩家局内暂停 → 点「设置」→
+     改完点返回，应该回到暂停界面，而不是掉回一个看不出状态的对局画面。 */
+  try{ if(typeof pauseReturnFromPanel==='function') pauseReturnFromPanel(); }catch(e){}
 }
 
 function toggleSettings(){
@@ -10485,22 +11014,24 @@ function toggleSettings(){
     try{ if(typeof closeGunsmith==='function') closeGunsmith(); }catch(e){}
     try{ if(typeof closeBag==='function') closeBag(); }catch(e){}
     buildSettings();
-  } else s.style.display='none';
+  } else closeSettings();
 }
 
 function buildSettings(){
   const el=document.getElementById('settings');
   if(!el) return;
   let h='<div class="box" style="max-width:600px">';
-  /* 标题行 */
+  /* 标题行：返回放在最左，符合「左上角返回」的通用习惯 */
   h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px">'
     +'<h1 style="margin:0">⚙️ '+T('设置')+'</h1>'
-    +'<button class="btn ghost small" id="setClose">'+T('关闭')+'</button></div>';
+    +'<button class="backBtn" id="setClose">← '+T('返回')+'</button></div>';
   /* 页签 */
   const TABS=[
     {id:'look',  get n(){ return T('外观'); }},
+    {id:'font',  get n(){ return T('字体'); }},
     {id:'color', get n(){ return T('主题色'); }},
     {id:'sound', get n(){ return T('声音'); }},
+    {id:'lang',  get n(){ return T('语言'); }},
     {id:'debug', get n(){ return T('调试'); }}
   ];
   h+='<div class="tabs">';
@@ -10521,6 +11052,41 @@ function buildSettings(){
         +'<div class="setmark">'+(on?'✓':'')+'</div>'
         +'</div>';
     }
+  }
+
+  /* ---------- 字体（对齐 2D 版）----------
+     2D 版是在「自定义主题」里选字体族 + 三档字号，这里照抄同一套清单。 */
+  if(setTab==='font'){
+    h+='<div class="d" style="margin:10px 0 6px">'
+      +T('字体族与字号均与 2D 版一致。含站酷、马善政楷、龙藏等字体，设备未安装时自动回退到系统字体。')
+      +'</div>';
+    /* 字体族：两列小格子，比下拉框在手机上更好按 */
+    h+='<div class="setrow" style="flex-direction:column;align-items:stretch">'
+      +'<div class="setinfo"><div class="setn">'+T('字体族')+'</div>'
+      +'<div class="setd">'+T('当前：{0}', (FONT_FAMILY[fontSel.family]||FONT_FAMILY.system).name)+'</div></div>'
+      +'</div>';
+    h+='<div class="fontgrid">';
+    for(const fk of FONT_ORDER){
+      const f=FONT_FAMILY[fk];
+      const on=(fontSel.family===fk);
+      h+='<button class="fontcell'+(on?' on':'')+'" data-font-fam="'+fk+'" '
+        +'style="font-family:'+f.css+'">'+f.name+'</button>';
+    }
+    h+='</div>';
+    /* 三档字号 */
+    for(const sk of ['title','body','btn']){
+      const lim=FONT_LIMITS[sk];
+      const v=fontSel[sk];
+      h+='<div class="setrow" style="flex-direction:column;align-items:stretch">'
+        +'<div class="setinfo" style="display:flex;justify-content:space-between;align-items:center">'
+        +'<div><div class="setn">'+T(lim.n)+'</div>'
+        +'<div class="setd">'+T('范围 {0}–{1}px', lim.min, lim.max)+'</div></div>'
+        +'<div class="setval">'+v+'</div></div>'
+        +'<input class="volrange" id="fs_'+sk+'" type="range" min="'+lim.min+'" max="'+lim.max+'" step="'+lim.step+'" value="'+v+'">'
+        +'</div>';
+    }
+    h+='<div class="row" style="margin-top:10px">'
+      +'<button class="btn ghost small" id="fontReset">'+T('恢复默认字体')+'</button></div>';
   }
 
   /* ---------- 512 色 ---------- */
@@ -10565,6 +11131,22 @@ function buildSettings(){
       +'<div class="setinfo"><div class="setn">'+T('音效开关')+'</div>'
       +'<div class="setd">'+T('完全静音，倍率保留')+'</div></div>'
       +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+  }
+
+  /* ---------- 语言 ---------- */
+  if(setTab==='lang'){
+    h+='<div class="d" style="margin:10px 0 6px">'
+      +T('界面语言。切换后所有界面立即重绘，不需要重开游戏。')
+      +'</div>';
+    const langs=[['zh','中文'],['en','English']];
+    const cur=(typeof I18N_LANG!=='undefined')?I18N_LANG:'zh';
+    for(const [code,name] of langs){
+      const on=(cur===code);
+      h+='<div class="setrow'+(on?' on':'')+'" data-lang-pick="'+code+'">'
+        +'<div class="setinfo"><div class="setn">'+name+'</div>'
+        +'<div class="setd">'+(code==='zh'?T('简体中文界面'):T('英文界面'))+'</div></div>'
+        +'<div class="setmark">'+(on?'✓':'')+'</div></div>';
+    }
   }
 
   /* ---------- 调试 ---------- */
@@ -10619,6 +11201,48 @@ function bindSettings(){
       accentSet(parseInt(b.getAttribute('data-accent'),10));
       try{ sfxUI(); }catch(e){}
       buildSettings();
+    };
+  });
+  /* 字体族 —— 九宫格，点一格立即换字并重建面板以刷新选中态 */
+  el.querySelectorAll('[data-font-fam]').forEach(b=>{
+    b.onclick=()=>{
+      fontSetFamily(b.getAttribute('data-font-fam'));
+      try{ sfxUI(); }catch(e){}
+      buildSettings();
+    };
+  });
+  /* 三档字号 —— 和音量滑块同一个道理：拖动过程中只改数值与预览，
+     不能 rebuild，否则滑块一拖就断。松手（change）才重建。 */
+  for(const sk of ['title','body','btn']){
+    const r=document.getElementById('fs_'+sk);
+    if(!r) continue;
+    const fresh=()=>{
+      const v=parseInt(r.value,10);
+      if(isNaN(v)) return;
+      fontSetSize(sk, v);
+      /* 滑块上方那个 .setval 数字跟着走 */
+      const rowv=r.parentElement && r.parentElement.querySelector('.setval');
+      if(rowv) rowv.textContent=v;
+    };
+    r.oninput=fresh;
+    r.onchange=()=>{ fresh(); buildSettings(); };
+  }
+  /* 恢复默认字体 */
+  const fr=document.getElementById('fontReset');
+  if(fr) fr.onclick=()=>{
+    fontReset();
+    try{ sfxUI(); }catch(e){}
+    buildSettings();
+  };
+  /* 语言 —— 切完要把整个界面重绘一遍，所以先关面板再重开，
+     否则设置面板里残留的还是旧语言的文案。 */
+  el.querySelectorAll('[data-lang-pick]').forEach(b=>{
+    b.onclick=()=>{
+      const code=b.getAttribute('data-lang-pick');
+      try{ sfxUI(); }catch(e){}
+      try{ i18nSetLang(code, i18nRebuildAll); }catch(e){}
+      /* 设置面板自身也要跟着换语言：直接重建一次即可 */
+      try{ buildSettings(); }catch(e){}
     };
   });
   /* 音量滑块 */
@@ -10767,30 +11391,46 @@ function safeShake(dt){
 function animate(){
   requestAnimationFrame(animate);
   if(!ready) return;
-  const dt=Math.min(clock.getDelta(),0.05);
+  /* 【必须先无条件消费 dt】three 的 Clock 记录「距上次 getDelta 的时间差」。
+     暂停时如果跳过这一行，差值会一直累积，恢复瞬间会拿到一个巨大 dt：
+     人物瞬移、倒计时一下掉一大截。所以先取出来，再决定用不用。 */
+  const rawDt=Math.min(clock.getDelta(),0.05);
+  /* 暂停：所有需要推进的子步骤一律用 dt=0（等于冻结），
+     但 renderer.render 照常执行 —— 暂停菜单要能看见，
+     而且恢复时画面不会黑一帧。 */
+  const dt = paused ? 0 : rawDt;
   /* 心跳统计：如果 frames 不涨，说明 animate 根本没在跑
      （WebView 后台、异常中断、或 ready 一直为 false），
      这是「怎么拖都不动」的另一种可能原因，直接显示出来好判断。 */
   window.__frames=(window.__frames||0)+1;
-  window.__lastDt=dt;
-  window.__fps=Math.round(1/Math.max(dt,0.001));
+  window.__lastDt=rawDt;
+  window.__fps=Math.round(1/Math.max(rawDt,0.001));
 
-  /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
-     否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
-  safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
-  safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
-  safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
-  /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
-     这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
-  safeCall(updRaidTimer,dt);
-  /* 小地图：内部自限 10fps，每帧调用无害。 */
-  safeCall(drawMiniMap, performance.now());
+  if(!paused){
+    /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
+       否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
+    safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
+    safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
+    safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
+    /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
+       这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
+    safeCall(updRaidTimer,dt);
+    /* 小地图：内部自限 10fps，每帧调用无害。暂停时也冻结，省得地图上
+       的敌人点位在暂停面板下面偷偷动。 */
+    safeCall(drawMiniMap, performance.now());
+  } else {
+    /* 暂停期间仍要刷新倒计时读数（它不推进，但显示要保持正确），
+       以及 HUD 里那些不依赖时间的部分。 */
+    safeCall(updRaidTimer,0);
+  }
 
-  // 相机抖动叠加（基准位置由 updP 写入）
-  const sh=safeShake(dt);
-  if(sh!==0){
-    camera.position.x+=(Math.random()-0.5)*sh;
-    camera.position.y+=(Math.random()-0.5)*sh;
+  // 相机抖动叠加（基准位置由 updP 写入）；暂停时不抖
+  if(!paused){
+    const sh=safeShake(dt);
+    if(sh!==0){
+      camera.position.x+=(Math.random()-0.5)*sh;
+      camera.position.y+=(Math.random()-0.5)*sh;
+    }
   }
 
   refreshHUD();

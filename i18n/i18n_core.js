@@ -656,6 +656,47 @@ const I18N_EN = {
   '复制失败，请手动选择': 'Copy failed, please select manually',
   '复制失败': 'Copy failed',
   '调试日志已开启': 'Debug log enabled',
+  /* ---- 设置面板：字体页签（与 2D 版一致的九族三档）---- */
+  '字体': 'Font',
+  '字体族': 'Font family',
+  '字体族与字号均与 2D 版一致。含站酷、马善政楷、龙藏等字体，设备未安装时自动回退到系统字体。':
+    'Font families and sizes match the 2D build. Includes ZCOOL, Ma Shan Zheng, Long Cang and others; falls back to the system font when not installed.',
+  '当前：{0}': 'Current: {0}',
+  '标题字号': 'Title size',
+  '正文字号': 'Body size',
+  '按钮字号': 'Button size',
+  '范围 {0}–{1}px': 'Range {0}–{1}px',
+  '恢复默认字体': 'Reset font',
+  '系统默认': 'System default',
+  '等宽': 'Monospace',
+  '衬线': 'Serif',
+  '圆体': 'Rounded',
+  '手写': 'Handwriting',
+  '站酷小薇': 'ZCOOL XiaoWei',
+  '马善政楷': 'Ma Shan Zheng',
+  '站酷快乐': 'ZCOOL KuaiLe',
+  '龙藏体': 'Long Cang',
+  /* ---- 设置面板：语言页签 ----
+     这里原本挂在主菜单最后一个 .row 上，而那个 .row 就是导入导出行，
+     平时 display:none，所以按钮一直被藏着 —— 这就是「语言设置不见了」。 */
+  '界面语言。切换后所有界面立即重绘，不需要重开游戏。':
+    'Interface language. Every screen is repainted immediately, no restart needed.',
+  '简体中文界面': 'Simplified Chinese interface',
+  '英文界面': 'English interface',
+  '中文': 'Chinese',
+  /* ---- 局内暂停 ----
+     【语义要点】暂停时倒计时也一起冻结，不是「后台还在走」。
+     退出等于放弃本局，物资全丢，所以按钮文案必须写清楚后果。 */
+  '已暂停': 'Paused',
+  '继续游戏': 'Resume',
+  '声音：开': 'Sound: on',
+  '声音：关': 'Sound: off',
+  '退出（丢失所有）': 'Quit (lose everything)',
+  '暂停中 · 剩余 {0}': 'Paused · {0} left',
+  '游戏时间与撤离倒计时已冻结': 'Game time and extraction timer are frozen',
+  '剩余': 'Left',
+  '退出等于放弃本局：身上的装备、背包与胸挂里的物资全部丢失。':
+    'Quitting abandons this raid: gear, backpack and chest rig contents are all lost.',
   /* ---- 仓库格子空状态 ---- */
   '空（点击仓库物品放入）': 'Empty (tap a stash item to put it in)',
   '空（局内放入医疗/弹药）': 'Empty (put meds/ammo in during a raid)',

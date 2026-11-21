@@ -5,9 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Escape Form School</title>
 <style>
-  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92); }
+  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92);
+    /* 【字体变量兜底】s_theme.js 的 fontApply() 会在 <html> 的 inline style
+       上覆盖这三个；这里给的默认值必须和 FONT_BASE_3D 完全一致
+       （title 30 / body 13 / btn 14），否则脚本没跑起来时字号会先闪一下。 */
+    --font-ui: system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    --fs-title: 30px;
+    --fs-body: 13px;
+    --fs-btn: 14px;
+  }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
-  html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#e8e8f0; touch-action:none; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:var(--font-ui); font-size:var(--fs-body); color:#e8e8f0; touch-action:none; }
   #c{ position:fixed; inset:0; width:100%; height:100%; display:block;
       /* saltline 观感：提对比 + 压高光 + 微降饱和 + 轻微色偏。
          CSS filter 走 GPU 合成，几乎零开销，不需要 EffectComposer。 */
@@ -405,10 +413,10 @@ html[data-lang="en"] #bagBtn span{
   #gmKeyD:active{ transform:translateY(1px); background:rgba(124,92,255,.45); }
   .kk span{ color:#98a0b0; }
   .keysbox-note{ margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.09); font-size:11.5px; color:#8b93a6; line-height:1.6; }
-  h1{ font-size:22px; margin-bottom:4px; } h1 span{ color:var(--accent2); }
+  h1{ font-size:var(--fs-title); margin-bottom:4px; font-family:var(--font-ui); } h1 span{ color:var(--accent2); }
   .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
   .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
-  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:var(--fs-btn); font-weight:700; cursor:pointer; font-family:var(--font-ui); }
   .btn:active{ filter:brightness(1.2); }
   .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
   .btn.danger{ background:#c2382a; }
@@ -450,7 +458,7 @@ html[data-lang="en"] #bagBtn span{
     scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); }
   #gunsmith .box::-webkit-scrollbar{ width:8px; }
   #gunsmith .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
-  #gunsmith h1{ font-size:19px; margin-bottom:4px; }
+  #gunsmith h1{ font-size:calc(var(--fs-title) * .85); margin-bottom:4px; }
   /* 改枪台的关闭按钮在筛选栏里也要能点 */
   #gunsmith .tab, #gunsmith .btn{ pointer-events:auto; }
   #shop .box, #bag .box{ width:100%; max-width:560px; max-height:88vh;
@@ -489,7 +497,7 @@ html[data-lang="en"] #bagBtn span{
     -webkit-tap-highlight-color:transparent; }
   #shop .box::-webkit-scrollbar, #bag .box::-webkit-scrollbar{ width:8px; }
   #shop .box::-webkit-scrollbar-thumb, #bag .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
-  #shop h1, #bag h1{ font-size:19px; margin-bottom:4px; }
+  #shop h1, #bag h1{ font-size:calc(var(--fs-title) * .85); margin-bottom:4px; }
   /* 顶部货币条 */
   .shophead{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
   .shophead .cash{ font-weight:800; color:#ffd54a; font-size:15px; white-space:nowrap; }
@@ -559,6 +567,17 @@ html[data-lang="en"] #bagBtn span{
   .setd{ font-size:11px; opacity:.62; margin-top:2px; line-height:1.45; }
   .setmark{ width:22px; text-align:center; font-weight:800; color:var(--accent2); font-size:16px; }
   .setval{ font-size:13px; font-weight:800; color:var(--accent2); font-variant-numeric:tabular-nums; }
+  /* 【字体族九宫格】每个格子用它自己代表的字体渲染 —— 所见即所得，
+     不用试一遍才知道「站酷快乐」长什么样。 */
+  .fontgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin:8px 0 4px; }
+  .fontcell{ pointer-events:auto; background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.16); color:#e8e8f0; border-radius:10px;
+    padding:9px 6px; font-size:13px; text-align:center; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    -webkit-tap-highlight-color:transparent; transition:background .12s, border-color .12s; }
+  .fontcell:active{ background:rgba(255,255,255,.16); }
+  .fontcell.on{ border-color:var(--accent); background:rgba(124,92,255,.28);
+    box-shadow:0 0 0 1px var(--accent) inset; }
   /* 音量滑块：默认样式在手机上太细，加粗一点才好拖 */
   .volrange{ -webkit-appearance:none; appearance:none; width:100%; height:34px;
     background:transparent; margin:2px 0 12px; touch-action:manipulation; }
@@ -598,10 +617,35 @@ html[data-lang="en"] #bagBtn span{
   #logBadge{ display:none; padding:2px 7px; border-radius:6px;
     background:rgba(255,193,74,.9); color:#2a1a05;
     font-size:9.5px; font-weight:800; letter-spacing:.03em; }
+  /* ================= 局内暂停浮层 =================
+     结构：全屏遮罩 #pause > 卡片 .pzbox > 标题/说明/时间/按钮组/警告
+     z-index 取 60：必须盖住 HUD(10) 与各面板，但要低于
+       #__bootdiag(99999) 和 GM 面板，否则真出错时红框会被挡住。 */
+  #pause{ position:fixed; inset:0; z-index:60; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(4,6,11,.78); backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px); padding:16px; box-sizing:border-box; }
+  #pause .pzbox{ width:100%; max-width:360px; padding:22px 18px 18px;
+    border-radius:18px; background:rgba(18,23,34,.98);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 12px 40px rgba(0,0,0,.62);
+    text-align:center; box-sizing:border-box; }
+  #pause .pztitle{ margin:0 0 6px; font-size:20px; font-weight:800;
+    color:#eef2ff; letter-spacing:.5px; }
+  #pause .pzsub{ font-size:11.5px; color:#9aa6bd; line-height:1.5; }
+  #pause .pzmeta{ margin:10px 0 14px; font-size:12.5px; color:#b9c4da; }
+  #pause .pzmeta b{ color:var(--accent); font-size:15px; font-weight:800; }
+  #pause .pzbtns{ display:flex; flex-direction:column; gap:8px; }
+  #pause .pzbtns .btn{ width:100%; margin:0; padding:11px 12px; font-size:14px; }
+  #pause .pznote{ margin-top:12px; font-size:10.5px; line-height:1.55;
+    color:#8d99b0; }
+  /* 各面板统一「返回」按钮：固定尺寸，和面板标题行对齐 */
+  .backBtn{ padding:6px 14px; font-size:12.5px; font-weight:700;
+    border-radius:9px; cursor:pointer; font-family:inherit;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+    color:#dfe6f5; }
+  .backBtn:active{ background:rgba(255,255,255,.2); }
 
-/* ==================================================================
-/* ==================================================================
-/* ==================================================================
 /* ==================================================================
      Material You 主题（对齐 2D 版 full/f_theme.js + full/a_head.html）
 
@@ -758,6 +802,15 @@ html[data-lang="en"] #bagBtn span{
   }
   html[data-theme="material"] .volrange::-moz-range-thumb{
     background:var(--m3-primary); border-color:var(--m3-surface-2);
+  }
+  /* ---- 字体页签九宫格（M3 皮肤）---- */
+  html[data-theme="material"] .fontcell{
+    background:var(--m3-surface-3); border:1px solid var(--m3-outline-var);
+    color:var(--m3-on-surface); border-radius:var(--m3-r-s);
+  }
+  html[data-theme="material"] .fontcell.on{
+    background:var(--m3-primary-container); color:var(--m3-on-primary-container);
+    border-color:var(--m3-primary); box-shadow:none;
   }
   /* ---- 仓库内页（.stk 系列）----
      这一段原来一个都没覆盖，导致切到 Material 后仓库里还是暗夜硬编码色。
@@ -1064,6 +1117,9 @@ background:rgba(90,220,255,.03); cursor:default; }
     <!-- 调试日志徽标：只在设置里打开调试日志时出现，显示当前条数。
          点一下直接打开设置面板的「调试」页签，省得去菜单里翻。 -->
     <div class="pill" id="logBadge" style="cursor:pointer" title="调试日志">LOG 0</div>
+    <!-- 【暂停按钮】放在 topbar 最右：手机横屏时右手拇指够得到。
+         点一下冻结游戏时间与撤离倒计时，弹出暂停浮层。 -->
+    <div class="pill" id="pauseBtn" style="cursor:pointer" title="暂停">⏸ <span>暂停</span></div>
   </div>
   <!-- 小地图：左上角固定，显示校园平面 + 玩家朝向 + 撤离点 -->
   <div id="mmWrap">
@@ -1227,6 +1283,10 @@ background:rgba(90,220,255,.03); cursor:default; }
 <div id="settings" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
+<!-- 【局内暂停浮层】容器是静态的，内容由 f_ui.js 的 renderPauseOverlay 重建。
+     放在 #bag 之后、#lootBox 之前：z-index 在 CSS 里单独给，
+     必须盖住 HUD 但低于系统级自检红框。 -->
+<div id="pause" style="display:none"></div>
 <!-- 【局内容器搜索面板】靠近箱子/柜子按交互键打开，
      里面是一堆可点的物品格，点一个拿一个，拿完自动关。 -->
 <div id="lootBox" style="display:none">

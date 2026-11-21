@@ -65,30 +65,46 @@ function safeShake(dt){
 function animate(){
   requestAnimationFrame(animate);
   if(!ready) return;
-  const dt=Math.min(clock.getDelta(),0.05);
+  /* 【必须先无条件消费 dt】three 的 Clock 记录「距上次 getDelta 的时间差」。
+     暂停时如果跳过这一行，差值会一直累积，恢复瞬间会拿到一个巨大 dt：
+     人物瞬移、倒计时一下掉一大截。所以先取出来，再决定用不用。 */
+  const rawDt=Math.min(clock.getDelta(),0.05);
+  /* 暂停：所有需要推进的子步骤一律用 dt=0（等于冻结），
+     但 renderer.render 照常执行 —— 暂停菜单要能看见，
+     而且恢复时画面不会黑一帧。 */
+  const dt = paused ? 0 : rawDt;
   /* 心跳统计：如果 frames 不涨，说明 animate 根本没在跑
      （WebView 后台、异常中断、或 ready 一直为 false），
      这是「怎么拖都不动」的另一种可能原因，直接显示出来好判断。 */
   window.__frames=(window.__frames||0)+1;
-  window.__lastDt=dt;
-  window.__fps=Math.round(1/Math.max(dt,0.001));
+  window.__lastDt=rawDt;
+  window.__fps=Math.round(1/Math.max(rawDt,0.001));
 
-  /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
-     否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
-  safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
-  safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
-  safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
-  /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
-     这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
-  safeCall(updRaidTimer,dt);
-  /* 小地图：内部自限 10fps，每帧调用无害。 */
-  safeCall(drawMiniMap, performance.now());
+  if(!paused){
+    /* 每个子系统单独兜底：任何一个抛错都不能拖垮渲染循环，
+       否则会出现「场景/枪/人物全黑」这种整屏停摆。 */
+    safeCall(updP,dt); safeCall(updFireHold,dt); safeCall(updE,dt); safeCall(updLoot,dt);
+    safeCall(updDoors,dt);   // 门：高亮提示 + 开关动画
+    safeCall(checkExfil); safeCall(updAudio,dt); safeCall(updWeapon,dt);
+    /* 撤离倒计时：必须在每帧推进，且排在 checkExfil 之后 ——
+       这样「刚好在最后一秒跑进撤离点」算成功撤离，而不是被超时抢先判定。 */
+    safeCall(updRaidTimer,dt);
+    /* 小地图：内部自限 10fps，每帧调用无害。暂停时也冻结，省得地图上
+       的敌人点位在暂停面板下面偷偷动。 */
+    safeCall(drawMiniMap, performance.now());
+  } else {
+    /* 暂停期间仍要刷新倒计时读数（它不推进，但显示要保持正确），
+       以及 HUD 里那些不依赖时间的部分。 */
+    safeCall(updRaidTimer,0);
+  }
 
-  // 相机抖动叠加（基准位置由 updP 写入）
-  const sh=safeShake(dt);
-  if(sh!==0){
-    camera.position.x+=(Math.random()-0.5)*sh;
-    camera.position.y+=(Math.random()-0.5)*sh;
+  // 相机抖动叠加（基准位置由 updP 写入）；暂停时不抖
+  if(!paused){
+    const sh=safeShake(dt);
+    if(sh!==0){
+      camera.position.x+=(Math.random()-0.5)*sh;
+      camera.position.y+=(Math.random()-0.5)*sh;
+    }
   }
 
   refreshHUD();

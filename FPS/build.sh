@@ -38,13 +38,30 @@ if command -v node >/dev/null 2>&1; then
   L1=$(grep -n '^<script type="module">$' "$OUT" | head -1 | cut -d: -f1)
   L2=$(grep -n '^</script>$' "$OUT" | head -1 | cut -d: -f1)
   if [ -n "$L1" ] && [ -n "$L2" ]; then
-    sed -n "$((L1+1)),$((L2-1))p" "$OUT" > /tmp/efs_fps_check.js
-    # 剥离顶层 import 行（ESM 专属），剩余代码作为普通脚本做语法检查
-    grep -v '^import ' /tmp/efs_fps_check.js > /tmp/efs_fps_check_plain.js
-    if node --check /tmp/efs_fps_check_plain.js; then
-      echo "OK: $OUT ($(wc -c < "$OUT") bytes) 语法通过"
+    sed -n "$((L1+1)),$((L2-1))p" "$OUT" > /tmp/efs_fps_check.mjs
+    # ============================================================
+    # 【必须用 .mjs 做真正的 module 检查】
+    # 旧版这里是：grep -v '^import ' 之后按「普通脚本」检查。
+    # 那是个致命的盲区 —— 普通脚本模式下，重复声明同名函数是合法的
+    # （后一个直接覆盖前一个，连警告都没有）；而在 ES module 里
+    # （严格模式），重复声明是 SyntaxError：
+    #   Identifier 'xxx' has already been declared
+    # 一旦出现，整个 module 无法编译，所有 JS 一行都不执行 ——
+    # 页面看起来完全正常（HTML/CSS 都在），但所有按钮都没反应。
+    # 这就是「主界面按钮点不动、但按下有蓝圈」的真正原因：
+    # bagUsed 在 f_ui.js 里被声明了两次，build.sh 却报告「语法通过」。
+    # 现在直接把拼接结果写成 .mjs，让 node 按 module 语义解析，
+    # 重复声明、顶层 await 位置错误等问题都能被抓出来。
+    # ============================================================
+    if node --input-type=module --check < /tmp/efs_fps_check.mjs 2>/tmp/efs_fps_err.txt; then
+      echo "OK: $OUT ($(wc -c < "$OUT") bytes) 语法通过（module 模式）"
     else
-      echo "语法错误！请检查 full/ 里的分块"
+      echo "════════ 语法错误（module 模式）════════"
+      cat /tmp/efs_fps_err.txt
+      echo "───────────────────────────────────────"
+      echo "最常见原因：同一个分块或跨分块重复声明了同名函数/常量。"
+      echo "查一下报错里的标识符，在 full/*.js 里 grep 它的声明次数。"
+      echo "注意：这类错误会让整个页面 JS 全部不执行（按钮点不动、有蓝圈）。"
       exit 1
     fi
   else

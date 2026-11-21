@@ -4920,9 +4920,14 @@ function chestAccept(id){
   if(it.cat==='mod') return true;                  // 配件（小件）
   return false;                                    // 枪/背包/胸挂/护甲 都不收
 }
-/* 兼容旧名字 */
-function bagUsed(){ return pouchUsed(); }
-
+/* 【注意】这里原先还有一句 `function bagUsed(){ return pouchUsed(); }`
+   注释写着「兼容旧名字」。但 bagUsed 在文件上方（pouchUsed 旁边）
+   已经定义过一次了 —— 同一个作用域里重复声明同名函数，
+   在 ES module（严格模式）下是 SyntaxError：
+     Identifier 'bagUsed' has already been declared
+   而**语法错误会让整个 module 无法编译**，于是所有 JS 一行都不执行，
+   表现就是「主界面所有按钮点不动、但按下有蓝圈」（蓝圈是 CSS :active，
+   不需要 JS）。这个重复声明已经删除，旧名字仍由上方那处定义提供。 */
 /* 往局内背包塞东西（局内拾取用），容量不足返回 false */
 function bagAdd(id, cnt){
   if(!cnt) cnt=1;

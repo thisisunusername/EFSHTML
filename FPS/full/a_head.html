@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>FPS 搜打撤 · 学校逃离 3D</title>
+<style>
+  :root{ --accent:#7c5cff; --accent2:#a88cff; --bg:#0b0e14; --panel:rgba(14,18,28,.92); }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#0b0e14; font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#e8e8f0; touch-action:none; }
+  #c{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  /* HUD */
+  #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #topbar{ position:absolute; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:10px; }
+  .pill{ background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; backdrop-filter:blur(6px); }
+  .pill b{ color:var(--accent2); }
+  #hpwrap{ flex:1; min-width:80px; }
+  #hpbar{ height:8px; background:rgba(255,255,255,.12); border-radius:6px; overflow:hidden; margin-top:5px; }
+  #hpfill{ height:100%; width:100%; background:linear-gradient(90deg,#48c774,#8ce6a0); border-radius:6px; transition:width .2s; }
+  #hpfill.low{ background:linear-gradient(90deg,#e6533c,#ff8a70); }
+  #crosshair{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:22px; height:22px; }
+  #crosshair::before,#crosshair::after{ content:""; position:absolute; background:rgba(255,255,255,.85); }
+  #crosshair::before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
+  #crosshair::after{ top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
+  #hitmark{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:32px; height:32px; opacity:0; transition:opacity .1s; }
+  #hitmark span{ position:absolute; width:12px; height:3px; background:#fff; border-radius:2px; }
+  #hitmark .h1{ top:-1px; left:-1px; transform:rotate(45deg); } #hitmark .h2{ top:-1px; right:-1px; transform:rotate(-45deg); }
+  #hitmark .h3{ bottom:-1px; left:-1px; transform:rotate(-45deg); } #hitmark .h4{ bottom:-1px; right:-1px; transform:rotate(45deg); }
+  /* 消息 / 拾取提示 */
+  #msg{ position:absolute; top:70px; left:50%; transform:translateX(-50%); text-align:center; font-size:15px; font-weight:600; text-shadow:0 1px 4px #000; pointer-events:none; opacity:0; transition:opacity .2s; }
+  #prompt{ position:absolute; bottom:130px; left:50%; transform:translateX(-50%); background:var(--panel); padding:8px 16px; border-radius:10px; font-size:14px; border:1px solid var(--accent); opacity:0; transition:opacity .15s; }
+  #toast{ position:absolute; bottom:140px; left:50%; transform:translateX(-50%); color:#7ee8a0; font-size:14px; font-weight:600; opacity:0; text-shadow:0 1px 3px #000; white-space:nowrap; }
+  /* 加载/错误提示 */
+  #loaderr{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#ff7a6a; font-size:15px; font-weight:700; text-align:center; z-index:200; background:rgba(20,8,8,.92); padding:16px 22px; border-radius:12px; border:1px solid #c2382a; display:none; max-width:80%; line-height:1.6; }
+  /* 摇杆（移动端） */
+  #joyZone{ position:absolute; bottom:0; left:0; width:50%; height:55%; display:none; pointer-events:auto; }
+  #joyBase{ position:absolute; left:24px; bottom:24px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.18); }
+  #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
+  /* 右侧操作区（移动端） */
+  #actZone{ position:absolute; bottom:0; right:0; width:50%; height:55%; display:none; pointer-events:auto; }
+  .actbtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:2px solid rgba(255,255,255,.2); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  .actbtn:active{ background:var(--accent); }
+  #btnFire{ right:30px; bottom:28px; width:88px; height:88px; border-color:#ff5a4d; background:rgba(255,90,77,.18); font-size:15px; }
+  #btnJump{ right:130px; bottom:28px; }
+  #btnReload{ right:130px; bottom:116px; }
+  #btnInteract{ right:30px; bottom:130px; border-color:var(--accent2); }
+  #btnSprint{ right:130px; bottom:204px; }
+
+  /* 菜单 */
+  #menu{ position:fixed; inset:0; z-index:100; background:rgba(5,7,12,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
+  #menu .box{ width:100%; max-width:520px; max-height:92vh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:rgba(124,92,255,.7) rgba(255,255,255,.06); background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:24px; }
+  #menu .box::-webkit-scrollbar{ width:8px; }
+  #menu .box::-webkit-scrollbar-track{ background:rgba(255,255,255,.06); border-radius:4px; }
+  #menu .box::-webkit-scrollbar-thumb{ background:rgba(124,92,255,.75); border-radius:4px; }
+  .keysbox{ margin-top:18px; padding:14px; border-radius:12px; background:rgba(124,92,255,.09); border:1px solid rgba(124,92,255,.28); }
+  .keysbox-t{ font-size:12px; letter-spacing:.08em; color:var(--accent2); margin-bottom:10px; font-weight:700; }
+  .keysgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+  .kk{ display:flex; align-items:center; gap:5px; font-size:12px; color:#c8d0e0; }
+  .kk kbd{ display:inline-block; min-width:20px; padding:2px 6px; font:600 11px/1.4 ui-monospace,monospace; text-align:center; color:#e8ecf5; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22); border-bottom-width:2px; border-radius:5px; }
+  .kk span{ color:#98a0b0; }
+  .keysbox-note{ margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.09); font-size:11.5px; color:#8b93a6; line-height:1.6; }
+  h1{ font-size:22px; margin-bottom:4px; } h1 span{ color:var(--accent2); }
+  .sub{ color:#98a0b0; font-size:13px; margin-bottom:18px; }
+  .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .btn{ pointer-events:auto; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn:active{ filter:brightness(1.2); }
+  .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.2); }
+  .btn.danger{ background:#c2382a; }
+  .btn.small{ padding:8px 12px; font-size:13px; }
+  .stat{ background:rgba(255,255,255,.05); border-radius:10px; padding:10px 14px; flex:1; min-width:120px; }
+  .stat .k{ font-size:11px; color:#98a0b0; } .stat .v{ font-size:18px; font-weight:800; color:var(--accent2); }
+  .shoprow{ display:flex; align-items:center; gap:10px; padding:10px; border:1px solid rgba(255,255,255,.1); border-radius:10px; margin-top:8px; background:rgba(255,255,255,.03); }
+  .shoprow .info{ flex:1; } .shoprow .n{ font-weight:700; font-size:14px; } .shoprow .d{ font-size:12px; color:#98a0b0; }
+  .shoprow .price{ font-weight:800; color:#ffd54a; white-space:nowrap; }
+  #death{ position:fixed; inset:0; z-index:90; background:rgba(120,10,10,.6); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  #death h2{ font-size:32px; text-shadow:0 2px 8px #000; }
+  #fpscount{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:11px; color:#778; }
+  @media (max-width:768px){ .actbtn,.joyZone,.actZone{ } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="topbar">
+    <div class="pill">🪙 <b id="money">0</b></div>
+    <div class="pill" id="weaponPill">🔫 <span id="wpnName">手枪</span></div>
+    <div class="pill" id="ammoPill"><span id="ammo">12</span> / <span id="ammoReserve">36</span></div>
+    <div class="pill" id="hpwrap">❤️ <span id="hpNum">100</span><div id="hpbar"><div id="hpfill"></div></div></div>
+    <div class="pill">⏱ <span id="timer">00:00</span></div>
+    <div class="pill" id="sndBtn" style="cursor:pointer">🔊 <span id="sndTxt">开</span></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="hitmark"><span class="h1"></span><span class="h2"></span><span class="h3"></span><span class="h4"></span></div>
+  <div id="msg"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+
+  <div id="joyZone"><div id="joyBase"><div id="joyStick"></div></div></div>
+  <div id="actZone">
+    <div class="actbtn" id="btnFire">开火</div>
+    <div class="actbtn" id="btnJump">跳</div>
+    <div class="actbtn" id="btnReload">换弹</div>
+    <div class="actbtn" id="btnInteract">拾取</div>
+    <div class="actbtn" id="btnSprint">奔跑</div>
+  </div>
+</div>
+
+<div id="loaderr"></div>
+<div id="fpscount"></div>
+<!-- 主菜单 -->
+<div id="menu">
+  <div class="box">
+    <h1>🔫 FPS <span>搜打撤</span> · 学校 3D</h1>
+    <p class="sub">搜刮物资 → 击杀敌人 → 撤离点撤离。货币可在商店购买装备。数据加密导出，防篡改。</p>
+    <div class="row">
+      <div class="stat"><div class="k">当前货币</div><div class="v" id="mMoney">0</div></div>
+      <div class="stat"><div class="k">撤离次数</div><div class="v" id="mExfil">0</div></div>
+      <div class="stat"><div class="k">击杀数</div><div class="v" id="mKills">0</div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
+      <button class="btn ghost" id="btnShop">🛒 商店</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
+      <button class="btn ghost small" id="btnImport">⬆️ 加密导入</button>
+      <button class="btn danger small" id="btnReset">♻️ 重置数据</button>
+      <button class="btn ghost small" id="btnBack">← 返回原版</button>
+    </div>
+    <div class="keysbox">
+      <div class="keysbox-t">⌨️ 操作说明</div>
+      <div class="keysgrid">
+        <div class="kk"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移动</span></div>
+        <div class="kk"><kbd>鼠标</kbd><span>转视角</span></div>
+        <div class="kk"><kbd>左键</kbd><span>射击</span></div>
+        <div class="kk"><kbd>R</kbd><span>换弹</span></div>
+        <div class="kk"><kbd>Shift</kbd><span>奔跑</span></div>
+        <div class="kk"><kbd>空格</kbd><span>跳跃</span></div>
+        <div class="kk"><kbd>E</kbd><span>拾取/互动</span></div>
+        <div class="kk"><kbd>Q</kbd><span>商店</span></div>
+        <div class="kk"><kbd>Esc</kbd><span>菜单</span></div>
+      </div>
+      <div class="keysbox-note">📱 手机：左半屏拖动移动 · 右半屏拖动转视角 · 右下按钮射击</div>
+    </div>
+  </div>
+</div>
+<!-- 商店 -->
+<div id="shop" style="display:none"></div>
+<!-- 死亡界面 -->
+<div id="death">
+<h2>💀 你阵亡了</h2>
+  <p id="deathInfo"></p>
+  <button class="btn" id="btnRespawn">重新部署</button>
+  <button class="btn ghost" id="btnDeathMenu">回主菜单</button>
+</div>
+<script type="importmap">
+{ "imports": { "three": "./three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';

@@ -446,6 +446,15 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
    - P.bag / P.equip 描述「玩家实际拥有什么」
    - BAG_CAP 描述「能带多少」（背包决定容量） */
 
+/* 装备槽定义：顺序就是左侧从上到下的顺序 */
+const SLOTS=[
+  { key:'primary',  label:'主武器',  fb:'🔫', accept:['gun'] },
+  { key:'secondary',label:'手枪',    fb:'🔫', accept:['pistol'] },
+  { key:'melee',    label:'副武器',  fb:'🔪', accept:['melee'] },
+  { key:'chest',    label:'胸挂',    fb:'🦺', accept:['chest'] },
+  { key:'backpack', label:'背包',    fb:'🎒', accept:['bag'] },
+];
+
 const SHOP_ITEMS={
   /* ---- 医疗：局内回血，按回复量分档 ---- */
   med:      {cat:'med', name:'医疗包',   icon:'🩹', price:300,  desc:'恢复 40 生命', heal:40},
@@ -480,10 +489,31 @@ const SHOP_ITEMS={
   vest_light:{cat:'armor', name:'轻型护甲', icon:'🦺', price:1200, desc:'减伤 15% · 耐久 80',  reduce:.15, dur:80},
   vest_med:  {cat:'armor', name:'标准护甲', icon:'🦺', price:3000, desc:'减伤 25% · 耐久 150', reduce:.25, dur:150},
   vest_heavy:{cat:'armor', name:'重型护甲', icon:'🛡️', price:6500, desc:'减伤 40% · 耐久 260', reduce:.40, dur:260},
+  /* ---- 武器槽（对应左侧装备栏） ----
+     主武器决定你拿的是步枪还是冲锋枪；手枪是副武器，主武器没子弹时切换用；
+     小刀是最后的近战手段，不耗子弹。
+     这三个 cat 分别对应 SLOTS 里的 primary / secondary / melee。 */
+  gun_rifle:  {cat:'gun',    name:'突击步枪', icon:'🔫', price:4500, desc:'全自动 · 高伤害', ammoType:'rifle',  dmg:26},
+  gun_smg:    {cat:'gun',    name:'冲锋枪',   icon:'🔫', price:2800, desc:'射速快 · 后坐力小', ammoType:'pistol', dmg:18},
+  gun_sniper: {cat:'gun',    name:'狙击步枪', icon:'🎯', price:8000, desc:'单发 · 极高伤害', ammoType:'sniper', dmg:60},
+  pis_default:{cat:'pistol', name:'制式手枪', icon:'🔫', price:600,  desc:'应急副武器', ammoType:'pistol', dmg:14},
+  pis_heavy:  {cat:'pistol', name:'大口径手枪', icon:'🔫', price:1800, desc:'高伤副武器', ammoType:'pistol', dmg:24},
+  melee_knife:{cat:'melee',  name:'战术小刀', icon:'🔪', price:200,  desc:'近战 · 永不耗弹', dmg:35},
+  melee_baton:{cat:'melee',  name:'防暴棍',   icon:'🏏', price:500,  desc:'近战 · 攻击范围大', dmg:28},
+  /* ---- 胸挂（对应左侧装备栏，提供额外弹药携带） ---- */
+  chest_small:{cat:'chest',  name:'简易胸挂', icon:'🦺', price:800,  desc:'额外 2 个弹匣位', mags:2},
+  chest_med:  {cat:'chest',  name:'战术胸挂', icon:'🦺', price:2000, desc:'额外 4 个弹匣位', mags:4},
+  chest_large:{cat:'chest',  name:'重型胸挂', icon:'🦺', price:4500, desc:'额外 6 个弹匣位', mags:6},
 };
 
 /* 分类标签（顺序即显示顺序） */
 const SHOP_CATS=[
+  /* 武器分类要放在最前面：这是玩家在仓库里最先要填的三个槽
+     （主武器/手枪/副武器），商店里买不到就永远空着。 */
+  {id:'gun',    name:'主武器'},
+  {id:'pistol', name:'手枪'},
+  {id:'melee',  name:'副武器'},
+  {id:'chest',  name:'胸挂'},
   {id:'med',    name:'医药'},
   {id:'tool',   name:'道具'},
   {id:'ammo',   name:'子弹'},
@@ -491,8 +521,7 @@ const SHOP_CATS=[
   {id:'helmet', name:'头盔'},
   {id:'armor',  name:'护甲'},
 ];
-
-let shopTab='med';   // 当前商店标签页
+let shopTab='gun';   // 当前商店标签页（默认停在主武器，对应仓库第一件事）
 let bagTab='all';    // 当前背包筛选
 
 /* 背包占用格数：数量 1 个占 1 格，子弹按堆叠算 1 格 */
@@ -619,6 +648,20 @@ function buyItem(id){
     P.equip.backpack=id; P.bagCap=it.cap;
     sfxBuy(); toast('背包装备成功，出击背包 '+it.cap+' 格'); refreshHUD(); buildShop(); return;
   }
+  /* 【新加的四个装备槽】
+     主武器/手枪/副武器/胸挂都直接穿上，因为它们只有在装备槽里才有意义。
+     但「主武器」比较特殊：玩家可能想先买一把备着，所以我们只在
+     对应槽位空着的时候自动装备，否则丢进仓库。 */
+  if(cat==='gun'||cat==='pistol'||cat==='melee'||cat==='chest'){
+    P.ammo.cash-=it.price;
+    const slot=stashSlotOf(id);
+    if(slot && !P.equip[slot]){
+      P.equip[slot]=id;
+      sfxBuy(); toast('已装备 '+it.name); refreshHUD(); buildShop(); return;
+    }
+    stashAdd(id,1);
+    sfxBuy(); toast('买下 '+it.name+' → 仓库'); refreshHUD(); buildShop(); return;
+  }
 
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;
@@ -650,7 +693,7 @@ function buyItem(id){
 function toggleStash(){
   const el=$('stash'); if(!el) return;
   const opening = el.style.display!=='flex';
-  if(opening){ buildStash(); el.style.display='flex'; }
+  if(opening){ buildStashNew(); el.style.display='flex'; }
   else el.style.display='none';
 }
 function closeStash(){ const el=$('stash'); if(el) el.style.display='none'; }
@@ -677,64 +720,181 @@ function stashPut(id, n){
   sfxPickup(); return true;
 }
 
-function buildStash(){
-  const el=$('stash'); if(!el) return;
-  let h='<div class="box" style="max-width:660px">';
-  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
-    +'<h1 style="margin:0">🏠 仓库</h1>'
-    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+/* ============ 局外仓库（按设计图重做） ============ */
+/* 布局参考塔科夫/暗区突围：
+     左侧竖排 —— 返回键、大标题「仓库」、装备槽
+                  主武器 / 手枪 / 副武器(小刀) / 胸挂 / 背包
+     右侧     —— 顶部现金，下面是仓库格子
 
-  /* 装备栏：出击时真正带进局的三件 */
-  h+='<div class="tabs"><span class="tab on" style="cursor:default">出击装备</span></div>';
-  h+='<div class="grid">';
-  h+=cellOf(P.equip.helmet,'头盔','🪖');
-  h+=cellOf(P.equip.armorVest,'护甲','🦺');
-  h+=cellOf(P.equip.backpack,'背包','🎒');
+   和老实现的区别：
+     老的是「左仓库右出击背包」两列平铺，本质还是一维列表。
+     现在是真正的「装备槽 + 仓库格子」分离，装备槽管你身上穿什么，
+     仓库管你囤了什么，出击背包在装备槽里点「背包」进去装。 */
+
+
+/* 当前选中的物品（点一下格子选中，再点装备槽放入） */
+let selStash=null;
+
+function stashSlotOf(id){
+  const it=SHOP_ITEMS[id]; if(!it) return null;
+  for(const s of SLOTS){ if(s.accept.includes(it.cat)) return s.key; }
+  return null;
+}
+
+function buildStashNew(){
+  const el=$('stash'); if(!el) return;
+  let h='<div class="stk">';
+
+  /* ---------- 左侧：返回 + 标题 + 装备槽 ---------- */
+  h+='<div class="stkleft">';
+  h+='<button class="stkback" id="stkBack">←</button>';
+  h+='<div class="stktitle">仓库</div>';
+
+  /* 装备槽区：每个槽一行，图标 + 槽名 + 当前装备 */
+  h+='<div class="stkslots">';
+  for(const s of SLOTS){
+    const id=P.equip[s.key];
+    const it=id?SHOP_ITEMS[id]:null;
+    let fill=it?(it.icon):('  ');
+    let cls='stkslot'+(it?' on':'');
+    let name=it?it.name:s.label;
+    /* 背包槽显示容量 */
+    let extra='';
+    if(s.key==='backpack'){
+      extra='<span class="stkcap">'+pouchUsed()+'/'+P.bagCap+'</span>';
+    }
+    h+='<div class="'+cls+'" data-slot="'+s.key+'">'
+      +'<span class="stksi">'+(it?it.icon:s.fb)+'</span>'
+      +'<span class="stksn">'+name+'</span>'
+      +extra
+      +'</div>';
+  }
   h+='</div>';
 
-  /* 两栏：仓库 ↔ 出击背包 */
-  h+='<div class="stashrow" style="margin-top:10px">';
-
-  /* 左：仓库 */
-  h+='<div class="stashcol"><div class="tabs"><span class="tab on" style="cursor:default">📦 仓库</span></div><div class="grid">';
-  let n=0;
-  for(const id in P.stash){
-    if(!(P.stash[id]>0)) continue;
-    const it=SHOP_ITEMS[id]; if(!it) continue;
-    n++;
-    h+='<div class="cell" data-out="'+id+'"><div class="ci">'+it.icon+'</div>'
-      +'<div class="cn">'+it.name+'</div><div class="cq">×'+P.stash[id]+'</div></div>';
-  }
-  if(!n) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:10px">仓库是空的</div>';
-  h+='</div></div>';
-
-  /* 右：出击背包 */
-  h+='<div class="stashcol"><div class="tabs"><span class="tab on" style="cursor:default">🎒 出击背包 '+pouchUsed()+'/'+P.bagCap+'</span></div><div class="grid">';
-  let m=0;
+  /* 出击背包格子（在左侧下方，点背包槽展开） */
+  h+='<div class="stkpouch" id="stkPouchBox" style="display:none">';
+  h+='<div class="stkph">🎒 出击背包 <span class="stkcap">'+pouchUsed()+'/'+P.bagCap+'</span></div>';
+  h+='<div class="stkpgrid">';
+  let np=0;
   for(const id in P.pouch){
     if(!(P.pouch[id]>0)) continue;
     const it=SHOP_ITEMS[id]; if(!it) continue;
-    m++;
-    h+='<div class="cell" data-in="'+id+'"><div class="ci">'+it.icon+'</div>'
-      +'<div class="cn">'+it.name+'</div><div class="cq">×'+P.pouch[id]+'</div></div>';
+    np++;
+    h+='<div class="stkpi" data-pouch="'+id+'" title="'+it.name+'">'+it.icon+'<b>'+P.pouch[id]+'</b></div>';
   }
-  if(!m) h+='<div class="d" style="grid-column:1/-1;text-align:center;padding:10px">点左边的物品装进来</div>';
+  if(!np) h+='<div class="stkempty2">空（点击仓库物品放入）</div>';
   h+='</div></div>';
 
+  h+='</div>';   /* 左栏结束 */
+
+  /* ---------- 右侧：现金 + 仓库格子 ---------- */
+  h+='<div class="stkright">';
+  h+='<div class="stkcash">💵 <b>'+P.ammo.cash+'</b> 元</div>';
+
+  /* 仓库格子：把数量展开成一格一格的小方块。
+     塔科夫那种 2×3 大物品我们先不做（手机屏幕太小），
+     这里每件物品占一个方块，数量用角标表示。 */
+  h+='<div class="stkgrid" id="stkGrid">';
+  /* 先铺满底格，形成「一堆格子」的观感 */
+  const cellTotal=96;      // 8 列 × 12 行
+  let used=0;
+  const owned=[];
+  for(const id in P.stash){
+    if(!(P.stash[id]>0)) continue;
+    if(!SHOP_ITEMS[id]) continue;
+    owned.push(id);
+  }
+  /* 已占用格数 = sum(ceil(数量)) 简单按种类算一格，数量累加到角标 */
+  used=owned.length;
+
+  /* 渲染有物品的格子 */
+  for(const id of owned){
+    const it=SHOP_ITEMS[id];
+    const sel=(selStash===id)?' sel':'';
+    h+='<div class="stkg'+sel+'" data-item="'+id+'">'
+      +'<span class="stkgi">'+it.icon+'</span>'
+      +'<b class="stkgq">'+P.stash[id]+'</b>'
+      +'</div>';
+  }
+  /* 补空格子，凑成整齐的一片 */
+  for(let i=owned.length;i<cellTotal;i++){
+    h+='<div class="stkg"></div>';
+  }
   h+='</div>';
-  h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
-    +'<div class="d">点仓库物品 → 装进背包 · 点背包物品 → 放回仓库</div>'
-    +'<button class="btn ghost" id="closeStash">关闭</button></div>';
-  h+='</div>';
+
+  h+='</div>';   /* 右栏结束 */
+
+  h+='</div>';   /* 容器结束 */
   el.innerHTML=h;
 
-  el.querySelectorAll('[data-out]').forEach(c=>{
-    c.onclick=()=>{ if(stashTake(c.getAttribute('data-out'))) buildStash(); };
+  /* ---- 绑定事件 ---- */
+  const bk=$('stkBack');
+  if(bk) bk.onclick=()=>{ selStash=null; toggleStash(); };
+
+  /* 点装备槽：如果是背包就展开出击背包，否则卸下 */
+  el.querySelectorAll('[data-slot]').forEach(node=>{
+    node.onclick=()=>{
+      const k=node.dataset.slot;
+      if(k==='backpack'){
+        const box=$('stkPouchBox');
+        if(box){
+          const show=box.style.display==='none';
+          box.style.display=show?'':'none';
+        }
+        return;
+      }
+      /* 其它槽：点一下卸下到仓库 */
+      const cur=P.equip[k];
+      if(cur){
+        stashAdd(cur,1);
+        P.equip[k]=null;
+        if(k==='primary'||k==='secondary'||k==='melee') P.inv.gun=true;
+        toast('已卸下');
+        buildStashNew();
+      }
+    };
   });
-  el.querySelectorAll('[data-in]').forEach(c=>{
-    c.onclick=()=>{ if(stashPut(c.getAttribute('data-in'))) buildStash(); };
+
+  /* 点仓库格子：选中 / 放入装备槽 / 放进出击背包 */
+  el.querySelectorAll('[data-item]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.item;
+      const it=SHOP_ITEMS[id]; if(!it) return;
+
+      /* 装备类直接穿上（替换下来的回仓库） */
+      const slot=stashSlotOf(id);
+      if(slot){
+        const old=P.equip[slot];
+        if(old && old!==id) stashAdd(old,1);
+        P.equip[slot]=id;
+        P.stash[id]--;
+        if(P.stash[id]<=0) delete P.stash[id];
+        /* 背包要重算容量 */
+        if(slot==='backpack'){ P.bagCap=it.cap||24; }
+        toast('已装备 '+(it.name||''));
+        buildStashNew(); refreshHUD();
+        return;
+      }
+
+      /* 消耗品：放进出击背包 */
+      if(P.bagCap<=0){ toast('没有背包，装不了东西'); sfxDeny(); return; }
+      if(pouchUsed()>=P.bagCap){ toast('背包满了'); sfxDeny(); return; }
+      /* 容量：物品本身占 1 格，一次放 1 个 */
+      if(stashTake(id,1)){
+        bagAdd(id,1);
+        buildStashNew(); refreshHUD();
+      }
+    };
   });
-  const cs=$('closeStash'); if(cs) cs.onclick=()=>{ sfxUI(); closeStash(); };
+
+  /* 点出击背包里的物品：放回仓库 */
+  el.querySelectorAll('[data-pouch]').forEach(node=>{
+    node.onclick=()=>{
+      const id=node.dataset.pouch;
+      if(bagTake(id,1)) stashAdd(id,1);
+      buildStashNew(); refreshHUD();
+    };
+  });
 }
 
 /* ---- 局内背包 ---- */
@@ -835,7 +995,14 @@ function settleExfil(){
 function settleDeath(){
   const lost=Object.keys(P.pouch).length;
   P.pouch={};
-  P.equip={ helmet:null, armorVest:null, backpack:null };
+  /* 【阵亡清空全部九个槽位】
+     原来只写了 helmet/armorVest/backpack 三个，
+     后来加了 primary/secondary/melee/chest 四个武器槽却忘了同步，
+     结果主武器、手枪、小刀、胸挂在你死后会「跟着你进下一局」——
+     等于白捡，搜打撤的风险完全消失了。
+     这里改成整表重建，以后再加槽也不会漏。 */
+  P.equip={ helmet:null, armorVest:null, backpack:null,
+            primary:null, secondary:null, melee:null, chest:null };
   P.helmetDur=0; P.vestDur=0; P.bagCap=0;
   return lost;
 }

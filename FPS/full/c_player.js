@@ -15,10 +15,18 @@ const P={
      pouch —— 局内背包，装什么带什么，容量由背包装备决定，阵亡全丢
      原来的 P.bag 把两者混成一个，导致「蹲局里还能买到所有东西」，
      完全不像搜打撤。现在彻底拆开。 */
-  stash:{ med:2, ammo_pistol:2, bandage:3 },  // 局外仓库（新手初始物资）
+  stash:{ med:2, ammo_pistol:2, bandage:3, melee_knife:1, pis_default:1 },  // 局外仓库（新手初始物资）
   pouch:{},                // 局内背包 { itemId: 数量 }
   bagCap:24,               // 局内背包容量（由背包装备决定）
-  equip:{ helmet:null, armorVest:null, backpack:'bp_small' },  // 出击装备
+  /* 出击装备：六个槽位，对应仓库左侧的竖排装备栏
+       primary   主武器（步枪/冲锋枪/狙击）
+       secondary 手枪
+       melee     副武器（小刀/防暴棍，永不耗弹）
+       chest     胸挂（决定额外弹匣位）
+       backpack  背包（决定 bagCap）
+       helmet / armorVest 头盔护甲（减伤） */
+  equip:{ helmet:null, armorVest:null, backpack:'bp_small',
+          primary:null, secondary:'pis_default', melee:'melee_knife', chest:null },
   helmetDur:0, vestDur:0, // 护甲耐久（受伤时先扣）
   speed:6, sprint:10,
   onGround:true,

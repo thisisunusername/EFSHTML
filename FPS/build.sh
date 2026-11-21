@@ -97,3 +97,15 @@ if command -v node >/dev/null 2>&1 && [ -f scene_test.js ]; then
     exit 1
   fi
 fi
+
+# 仓库布局测试：验证「左装备槽 + 右格子」的数据流
+if command -v node >/dev/null 2>&1 && [ -f stash_test.js ]; then
+  ST=$(node stash_test.js 2>&1)
+  if echo "$ST" | grep -q 'STASH_OK'; then
+    echo "STASH_OK: 左侧五个装备槽 + 右侧格子区，装卸/换包/阵亡清空全部正确"
+  else
+    echo "$ST" | tail -20
+    echo "仓库测试失败"
+    exit 1
+  fi
+fi

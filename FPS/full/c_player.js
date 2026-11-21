@@ -129,29 +129,6 @@ function updP(dt){
   // 玩家朝向跟随视角
   camera.position.set(P.pos.x,P.pos.y,P.pos.z);
   lookAtYawPitch();
-
-  /* 调试：把摇杆活值和速度显示在 HUD 上，直接看数据而不是猜。
-     位置固定右下角，字体很小，不影响游戏。 */
-  if(!window.__dbgEl){
-    const d=document.createElement('div');
-    d.id='__dbg';
-    d.style.cssText='position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:99999;color:#00ff88;font:bold 12px monospace;background:rgba(0,0,0,.75);padding:5px 10px;border-radius:6px;pointer-events:none;line-height:1.45;white-space:pre;text-align:left';
-    document.body.appendChild(d);
-    window.__dbgEl=d;
-  }
-  if(window.__dbgEl){
-    const t=window.__joyTouch||{};
-    const j=window.__joyTouch||{};
-    const jd=(j.active&&j.sx!=null)?Math.round(Math.hypot(j.cx-j.sx,j.cy-j.sy)):0;
-    window.__dbgEl.textContent=
-      'EVT start='+(window.__evtStart||0)+' move='+(window.__evtMove||0)+'\n'+
-      'joy='+(P.joyX||0).toFixed(2)+','+(P.joyY||0).toFixed(2)+' d='+jd+'\n'+
-      'vel='+(P.vel.x||0).toFixed(2)+','+(P.vel.z||0).toFixed(2)+'\n'+
-      'pos='+P.pos.x.toFixed(2)+','+P.pos.y.toFixed(2)+','+P.pos.z.toFixed(2)+'\n'+
-      'FPS '+(window.__fps||0)+' dt='+(window.__lastDt||0).toFixed(3)+
-      ' frames='+(window.__frames||0)+'\n'+
-      'touch='+(t.active?'Y':'N')+' ERR:'+(window.__lastErr||'-');
-  }
 }
 
 /* 简单的地面碰撞：只检测与 colliders（BOX）的 XZ 平面重叠 */

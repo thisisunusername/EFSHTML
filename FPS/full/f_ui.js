@@ -54,7 +54,54 @@ function hideTouchUI(){
   if(window.__joyTouch) window.__joyTouch.active=false;
 }
 function bindUI(){
+  /* 【幂等保护】bindUI 里注册了大量 addEventListener，
+     一旦被执行两次，每个 handler 就挂了两份：
+     视角每帧的位移会被算两遍（灵敏度直接翻倍）、
+     摇杆的移动也会叠两次。
+     这正是「两个单独用没问题、一起用灵敏度爆炸」的放大器：
+     真实设备上 DOMContentLoaded 与直接调用、或某些 WebView 重复派发，
+     都可能触发二次执行。
+     用标志位保证只跑一次。 */
+  if(window.__uiBound) return;
+  window.__uiBound=true;
+
   hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
+
+  /* ===== 多指触控工具（bindUI 顶层，摇杆和视角层共用） =====
+     【多指 bug 的核心修复】
+     旧实现到处用 e.changedTouches[0] 取触点：
+     当「左手推摇杆 + 右手转视角」时，一次 touchmove 会同时派发到
+     #joyZone 和 #viewLayer 两个处理函数，而 changedTouches 里
+     装的往往是**另一根手指**。结果：
+       - 摇杆把手腕的横移当成推杆 → 方向乱跳
+       - 视角把摇杆的位移当成转角 → 一点就飞（灵敏度「爆炸」）
+     表现就是「单独用没问题，两个一起用灵敏度超级高」。
+     所以必须做 identifier 配对：谁认领了哪根手指，就只认那一根。 */
+
+  /* 在 TouchList 里按 identifier 找触点 */
+  const findTouch=(e,tid)=>{
+    if(!e||tid===null||tid===undefined) return null;
+    const lists=[e.changedTouches, e.touches];
+    for(const list of lists){
+      if(!list) continue;
+      for(let i=0;i<list.length;i++){
+        if(list[i] && list[i].identifier===tid) return list[i];
+      }
+    }
+    return null;
+  };
+  /* 某个 identifier 是否在这次变更里被抬起 */
+  const hasTouch=(list,tid)=>{
+    if(!list||tid===null||tid===undefined) return false;
+    for(let i=0;i<list.length;i++){
+      if(list[i] && list[i].identifier===tid) return true;
+    }
+    return false;
+  };
+  /* 摇杆当前锁定的触点 identifier（null = 没有手指在推摇杆） */
+  let joyTid=null;
+
+
   /* 【横屏支持】屏幕旋转时立即重算：
        1) 画布尺寸与像素预算（applyPixelBudget 里同时修正相机 aspect）
        2) 摇杆区域占比（横屏时左侧给摇杆 42%，其余归视角拖拽）
@@ -144,10 +191,9 @@ function bindUI(){
      结果两套事件都「启动了」，但没有任何一套真正更新 P.joyX，
      表现就是摇杆能显示、能跟随手指，玩家却一动不动。
      这里只保留 touch 事件，逻辑单一，不再有配对问题。 */
-  const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
+const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   if(joyZone&&joyBase&&joyStick){
     let activeId=null, sx=0, sy=0;
-
     /* 【真凶就在这里】原来 startJoy 每次都无条件执行 sx=cx;sy=cy;
        浏览器只要多发一次 touchstart（手指轻微抖动、WebView 重新派发、
        或者 #joyZone 被反复 touchstart），起点就被刷新成「当前点」，
@@ -174,6 +220,8 @@ function bindUI(){
     };
 
     const moveJoy=(cx,cy)=>{
+      /* 【死区与缩放】max 是摇杆最大位移，输出经 max 归一化到 -1~1。
+         这里保持原逻辑，只补注释。 */
       window.__evtMove=(window.__evtMove||0)+1;
       window.__lastMove=[cx|0,cy|0];
       let dx=cx-sx, dy=cy-sy;
@@ -188,7 +236,7 @@ function bindUI(){
     };
 
     const endJoy=()=>{
-      activeId=null; P.joyX=0; P.joyY=0;
+      activeId=null; joyTid=null; P.joyX=0; P.joyY=0;
       if(window.__joyTouch) window.__joyTouch.active=false;
       joyStick.style.transform='translate(-50%,-50%)';
       /* 松开后回到常驻位置（左下角），而不是隐藏——
@@ -197,17 +245,29 @@ function bindUI(){
       joyBase.style.top='calc(100% - 110px)';
     };
 
+    /* 【多指触控的核心修复】
+       旧代码一律取 e.changedTouches[0]：
+       手指 A 推摇杆、手指 B 转视角时，两个处理函数都会各自收到
+       「本次变更的触点数组」，而 [0] 拿到的常常是**另一根手指**。
+       于是摇杆把手腕的横移当成了「推杆」，视角也拿摇杆的位移当转角，
+       两边互相污染 —— 表现就是「单独用没事，一起用灵敏度爆炸」。
+
+       现在改成：摇杆和视角各自**锁定一个 touch identifier**，
+       move/end 时用 identifiers 或 changedTouches 精确找出「自己那根手指」，
+       属于别人的触点一律忽略。 */
     joyZone.addEventListener('touchstart',e=>{
-      /* 已经在拖时不再重置起点（见上面 startJoy 的说明） */
-      const t=e.changedTouches[0]; if(!t) return;
-      startJoy(t.clientX,t.clientY);
+      for(const t of e.changedTouches){
+        if(joyTid!==null) break;             // 已经认领了一根，其余忽略
+        joyTid=t.identifier;
+        startJoy(t.clientX,t.clientY);
+      }
       const tip=$('htip');
       if(tip){ tip.classList.remove('hide'); tip.textContent='🎮 摇杆已激活 · 拖动移动'; }
       e.preventDefault();
     }, {passive:false});
     joyZone.addEventListener('touchmove',e=>{
-      if(activeId===null) return;
-      const t=e.changedTouches[0]; if(!t) return;
+      if(joyTid===null) return;
+      const t=findTouch(e,joyTid); if(!t) return;
       moveJoy(t.clientX,t.clientY);
       e.preventDefault();
     }, {passive:false});
@@ -229,8 +289,17 @@ function bindUI(){
         endJoy();
       }, 250);
     };
-    joyZone.addEventListener('touchend',e=>{ softEnd(); },{passive:true});
-    joyZone.addEventListener('touchcancel',e=>{ endJoy(); },{passive:true});
+    joyZone.addEventListener('touchend',e=>{
+      /* 只有「摇杆那根手指」抬起才结束，别的指头抬起不影响 */
+      if(joyTid===null) return;
+      if(!hasTouch(e.changedTouches,joyTid)) return;
+      softEnd();
+    },{passive:true});
+    joyZone.addEventListener('touchcancel',e=>{
+      if(joyTid===null) return;
+      if(!hasTouch(e.changedTouches,joyTid)) return;
+      endJoy();
+    },{passive:true});
     /* 【全局兜底】有些 WebView 里 #joyZone 的 touch 事件会被
        其它覆盖层吃掉（canvas、#grade、#grain、甚至系统手势区）。
        这里在 document 上再挂一份：只要触点落在左半屏、
@@ -240,20 +309,30 @@ function bindUI(){
        原来固定是 50%，横屏后左半屏很宽，手指稍微往中间推就落到视角层，
        会变成「推着推着视角自己转起来」。 */
     document.addEventListener('touchstart',e=>{
-      if(activeId!==null) return;
+      if(joyTid!==null) return;
       if(!window.__joyEnabled) return;    // 还没进游戏（菜单界面）不接管
-      const t=e.changedTouches[0]; if(!t) return;
-      if(t.clientX > window.innerWidth*(window.__joyZoneRatio||0.42)) return;
-      startJoy(t.clientX,t.clientY);
+      for(const t of e.changedTouches){
+        if(joyTid!==null) break;
+        if(t.clientX > window.innerWidth*(window.__joyZoneRatio||0.42)) continue;
+        joyTid=t.identifier;
+        startJoy(t.clientX,t.clientY);
+        break;
+      }
     }, {passive:true});
     document.addEventListener('touchmove',e=>{
-      if(activeId===null) return;
-      const t=e.changedTouches[0]; if(!t) return;
+      if(joyTid===null) return;
+      const t=findTouch(e,joyTid); if(!t) return;
       moveJoy(t.clientX,t.clientY);
     }, {passive:true});
     document.addEventListener('touchend',e=>{
-      if(activeId===null) return;
+      if(joyTid===null) return;
+      if(!hasTouch(e.changedTouches,joyTid)) return;
       softEnd();
+    }, {passive:true});
+    document.addEventListener('touchcancel',e=>{
+      if(joyTid===null) return;
+      if(!hasTouch(e.changedTouches,joyTid)) return;
+      endJoy();
     }, {passive:true});
 
     /* 桌面调试用：鼠标拖左半屏也能触发摇杆，方便在电脑上验证移动逻辑 */
@@ -314,11 +393,14 @@ function bindUI(){
        以前按 identifier 严格配对，WebView 里 identifier 偶尔会对不上，
        表现就是视角偶尔卡住。现在改成记录一个独立标记，
        touchend 时检查是不是自己那根手指（位置配对容错更大）。 */
-    let vx=0, vy=0, vOn=false;
+    let vx=0, vy=0, vOn=false, viewTid=null;
     viewLayer.addEventListener('touchstart',e=>{
-      if(vOn) return;
-      const t=e.changedTouches[0]; if(!t) return;
-      vOn=true; vx=t.clientX; vy=t.clientY;
+      if(viewTid!==null) return;
+      for(const t of e.changedTouches){
+        if(viewTid!==null) break;
+        viewTid=t.identifier;
+        vOn=true; vx=t.clientX; vy=t.clientY;
+      }
     }, {passive:true});
     /* 【视角灵敏度】单位是「弧度/像素」。
        历史上调过两次：
@@ -330,15 +412,29 @@ function bindUI(){
    const TOUCH_SENS=0.0016;
    const MOUSE_SENS=0.0016;
    viewLayer.addEventListener('touchmove',e=>{
-      if(!vOn) return;
-      const t=e.changedTouches[0]; if(!t) return;
+      if(!vOn || viewTid===null) return;
+      /* 【关键】必须先用 findTouch 找到「视角自己那根手指」再决定要不要动。
+         不能反过来写成 `if(!t) return` 之前就更新起点——
+         否则摇杆手指的 touchmove 也会派发到这里，
+         虽然被当成「别人的手指」跳过，却会把 vx/vy 覆写成摇杆的位置，
+         导致之后右手怎么划都算不出位移（视角卡死）。
+         同理，也绝不能用 changedTouches[0] 兜底。 */
+      const t=findTouch(e,viewTid); if(!t) return;
       P.yaw-=(t.clientX-vx)*TOUCH_SENS;
       P.pitch-=(t.clientY-vy)*TOUCH_SENS;
       const lim=1.45; if(P.pitch>lim)P.pitch=lim; if(P.pitch<-lim)P.pitch=-lim;
       vx=t.clientX; vy=t.clientY;
     }, {passive:true});
-    viewLayer.addEventListener('touchend',()=>{ vOn=false; }, {passive:true});
-    viewLayer.addEventListener('touchcancel',()=>{ vOn=false; }, {passive:true});
+    viewLayer.addEventListener('touchend',e=>{
+      if(viewTid===null) return;
+      if(!hasTouch(e.changedTouches,viewTid)) return;   // 抬起的不是视角手指
+      vOn=false; viewTid=null;
+    }, {passive:true});
+    viewLayer.addEventListener('touchcancel',e=>{
+      if(viewTid===null) return;
+      if(!hasTouch(e.changedTouches,viewTid)) return;
+      vOn=false; viewTid=null;
+    }, {passive:true});
   }
 }
 

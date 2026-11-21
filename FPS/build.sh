@@ -71,3 +71,14 @@ if command -v node >/dev/null 2>&1 && [ -f shop_test.js ]; then
   fi
   echo "SHOP_BAG_OK: 商店/背包/护甲全部通过"
 fi
+
+# 多指触控测试：验证「左手推摇杆 + 右手转视角」按 identifier 严格隔离
+if command -v node >/dev/null 2>&1 && [ -f touch_test.js ]; then
+  TT=$(node touch_test.js 2>&1)
+  if echo "$TT" | grep -q '❌'; then
+    echo "多指触控测试失败："
+    echo "$TT" | grep '❌'
+    exit 1
+  fi
+  echo "MULTITOUCH_OK: 摇杆与视角按 identifier 严格隔离，互不污染"
+fi

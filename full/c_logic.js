@@ -63,18 +63,18 @@ var S = {
 /* ================= 成就（只存在内存里，重启/重开就没了） ================= */
 /* tier: gold 金 / red 红 / blue 蓝 */
 var ACH = {
-  clear_any:  {name:'逃出去了',        desc:'任意难度通关一次',              tier:'blue'},
-  clear_hard: {name:'硬骨头',          desc:'在困难难度通关',                tier:'gold'},
-  clear_hell: {name:'地狱归来',        desc:'在地狱难度通关',                tier:'red'},
-  car_any:    {name:'砸车的人',        desc:'砸烂校长的车',                  tier:'gold'},
-  car_hell:   {name:'地狱砸车',        desc:'在地狱难度砸烂校长的车',        tier:'red'},
-  no_alert:   {name:'隐身人',          desc:'一次都没有被发现就通关',        tier:'gold'},
-  swift:      {name:'闪电逃学',        desc:'3 分钟内通关',                  tier:'blue'},
-  knife_win:  {name:'以小博大',        desc:'用小刀解决过一个敌人后通关',    tier:'gold'},
-  survivor:   {name:'命大',            desc:'被抓住一次之后仍然通关',        tier:'blue'},
-  cctv_off:   {name:'保安之友',        desc:'关掉全楼监控并通关',            tier:'blue'},
-  all_gates:  {name:'开锁匠',          desc:'通关时同时拿到了工作牌和黑钥匙',tier:'gold'},
-  phone_end:  {name:'打通了原作者的专线', desc:'用 7777777 在地下室拨通那通神秘电话（地狱限定）', tier:'rainbow'}
+  clear_any:  {name:T('逃出去了'),        desc:T('任意难度通关一次'),              tier:'blue'},
+  clear_hard: {name:T('硬骨头'),          desc:T('在困难难度通关'),                tier:'gold'},
+  clear_hell: {name:T('地狱归来'),        desc:T('在地狱难度通关'),                tier:'red'},
+  car_any:    {name:T('砸车的人'),        desc:T('砸烂校长的车'),                  tier:'gold'},
+  car_hell:   {name:T('地狱砸车'),        desc:T('在地狱难度砸烂校长的车'),        tier:'red'},
+  no_alert:   {name:T('隐身人'),          desc:T('一次都没有被发现就通关'),        tier:'gold'},
+  swift:      {name:T('闪电逃学'),        desc:T('3 分钟内通关'),                  tier:'blue'},
+  knife_win:  {name:T('以小博大'),        desc:T('用小刀解决过一个敌人后通关'),    tier:'gold'},
+  survivor:   {name:T('命大'),            desc:T('被抓住一次之后仍然通关'),        tier:'blue'},
+  cctv_off:   {name:T('保安之友'),        desc:T('关掉全楼监控并通关'),            tier:'blue'},
+  all_gates:  {name:T('开锁匠'),          desc:T('通关时同时拿到了工作牌和黑钥匙'),tier:'gold'},
+  phone_end:  {name:T('打通了原作者的专线'), desc:T('用 7777777 在地下室拨通那通神秘电话（地狱限定）'), tier:'rainbow'}
 };
 var ACH_ORDER = ['clear_any','clear_hard','clear_hell','car_any','car_hell',
                  'no_alert','swift','knife_win','survivor','cctv_off','all_gates','phone_end'];
@@ -87,10 +87,10 @@ function achColor(tier){
   return '#94a3b8';
 }
 function achTierName(tier){
-  if(tier==='gold') return '金';
-  if(tier==='red') return '红';
-  if(tier==='blue') return '蓝';
-  if(tier==='rainbow') return '炫彩';
+  if(tier==='gold') return T('金');
+  if(tier==='red') return T('红');
+  if(tier==='blue') return T('蓝');
+  if(tier==='rainbow') return T('炫彩');
   return '—';
 }
 /* 成就在本地持久保存：localStorage + cookie 双写，刷新/重开都还在 */
@@ -283,9 +283,9 @@ function openAchPage(){
       '<div class="achDot" style="background:'+(has?col:UC.dotOff)+
         ';box-shadow:'+(has?('0 0 10px '+col):'none')+'"></div>'+
       '<div class="achTxt">'+
-        '<b style="color:'+(has?col:UC.dim)+'">'+(has?a.name:'？？？')+'</b>'+timesTag+'<br>'+
-        '<span class="achDesc">'+(has?a.desc:'尚未解锁')+
-          (HELL_BANNED_ACH[id]?' <span style="color:'+UC.warn+'">（地狱不给）</span>':'')+
+        '<b style="color:'+(has?col:UC.dim)+'">'+(has?a.name:T('？？？'))+'</b>'+timesTag+'<br>'+
+        '<span class="achDesc">'+(has?a.desc:T('尚未解锁'))+
+          (HELL_BANNED_ACH[id]?' <span style="color:'+UC.warn+'">'+T('（地狱不给）')+'</span>':'')+
         '</span>'+
       '</div>'+
       '<div class="achTag" style="color:'+(has?col:UC.faint)+'">'+
@@ -294,9 +294,9 @@ function openAchPage(){
   }
   html+='</div>';
   html+='<div style="margin-top:8px;font-size:11px;color:'+UC.sub+';line-height:1.7">'+
-    '已解锁 <b style="color:'+UC.title+'">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
-    '　累计达成 <b style="color:'+UC.gold+'">'+achTotalTimes()+'</b> 次'+
-    '　<span style="color:'+UC.warn+'">（用 GM 的那一局不给成就）</span></div>';
+    T('已解锁')+' <b style="color:'+UC.title+'">'+achTotalUnlocked()+'</b> / '+ACH_ORDER.length+
+    ' '+T('累计达成')+' <b style="color:'+UC.gold+'">'+achTotalTimes()+'</b> '+T('次')+
+    ' <span style="color:'+UC.warn+'">'+T('（用 GM 的那一局不给成就）')+'</span></div>';
   showPanel('🏆 成就', html);
 }
 /* 结局六解锁标记：通关任意一次后被解锁，写在 cookie 里永久有效 */
@@ -354,6 +354,11 @@ var input = {up:false,down:false,left:false,right:false};
 function toast(txt){
   var el=document.getElementById('toast');
   if(!el) return;
+  /* 【为什么要在这里翻译】2D 里所有提示（拿到道具、被抓、开门失败……）
+     都走 toast()，原来直接把中文塞进 textContent，切英文后全是中文。
+     在出口统一翻一次，比去改 400 多个调用点安全得多。
+     T() 找不到译文时原样返回中文，不会变成 undefined。 */
+  if(typeof T === 'function') txt = T(txt);
   el.textContent=txt;
   el.classList.add('show');
   S.msgT=1.9;
@@ -368,7 +373,7 @@ function updateHUD(){
   var lc=document.getElementById('lifeChip');
   if(lc) lc.style.color = (S.lives<=1)? '#ff8095':'';
   var mc=document.getElementById('modeChip');
-  if(mc) mc.textContent = (S.mode2==='classic') ? '经典' : '回合';
+  if(mc) mc.textContent = (S.mode2==='classic') ? (typeof T==='function'?T('经典'):'经典') : (typeof T==='function'?T('回合'):'回合');
   renderAchChip();
 
   var swN=0; for(var k in S.sw) if(S.sw[k]) swN++;

@@ -1,6 +1,10 @@
 /* ================= 商店 / 制作 / 门 ================= */
 function hidePanel(){ document.getElementById('panel').classList.add('hidden'); }
 function showPanel(title, bodyHtml){
+  /* 【为什么要在这翻译】面板标题（成就 / 排行榜 / 小卖部 / 制作台）
+     原来直接写中文，切英文后标题不变。只有 5 个调用点，
+     在这里统一翻一次最安全。T() 缺译文时原样返回中文。 */
+  if(typeof T === 'function') title = T(title);
   document.getElementById('panelTitle').textContent=title;
   document.getElementById('panelBody').innerHTML=bodyHtml;
   document.getElementById('panel').classList.remove('hidden');
@@ -8,11 +12,11 @@ function showPanel(title, bodyHtml){
 
 function openShop(){
   var items=[
-    {id:'stealth',   desc:'打一针：监控看不见你，被发现所需的 3 秒延长到 5 秒'},
-    {id:'yellowkey', desc:'能打开一层的侧门（结局三）'},
-    {id:'cola',      desc:'喝下去：移动速度提升 45%'},
-    {id:'knife',     desc:'可以雕刻，也能按 E 捅人（25% 概率解决一名敌人）'},
-    {id:'torch',     desc:'手电筒：在任意地下室点亮（三层/四层/地下室），整局只能用一次'}
+    {id:'stealth',   desc:T('打一针：监控看不见你，被发现所需的 3 秒延长到 5 秒')},
+    {id:'yellowkey', desc:T('能打开一层的侧门（结局三）')},
+    {id:'cola',      desc:T('喝下去：移动速度提升 45%')},
+    {id:'knife',     desc:T('可以雕刻，也能按 E 捅人（25% 概率解决一名敌人）')},
+    {id:'torch',     desc:T('手电筒：在任意地下室点亮（三层/四层/地下室），整局只能用一次')}
   ];
   /* 地狱难度没有手电筒 */
   if(DIFF[S.diff] && DIFF[S.diff].instant){
@@ -22,9 +26,9 @@ function openShop(){
   if(S.shopPick){
     var it0=null;
     for(var q=0;q<items.length;q++) if(items[q].id===S.shopPick) it0=items[q];
-    html='<div class="pitem"><div>✅ <b>本局已经选过了</b><br>'+
-      '<span style="font-size:10.5px;color:#8ea6c2">你选的是 '+(it0?ITEM[it0.id].name:'道具')+
-      '。每局只能从小卖部带走一样东西。</span></div></div>';
+    html='<div class="pitem"><div>✅ <b>'+T('本局已经选过了')+'</b><br>'+
+      '<span style="font-size:10.5px;color:#8ea6c2">'+T('你选的是')+' '+(it0?ITEM[it0.id].name:T('道具'))+
+      '。'+T('每局只能从小卖部带走一样东西。')+'</span></div></div>';
     showPanel('小卖部 · 每局只能选一个', html);
     return;
   }
@@ -34,9 +38,9 @@ function openShop(){
     var owned = !!S.inv[it.id];
     html += '<div class="pitem"><div>'+
       ITEM[it.id].icon+' <b>'+ITEM[it.id].name+'</b><br>'+
-      '<span style="font-size:10.5px;color:#8ea6c2">'+it.desc+'</span></div>'+
+      '<span style="font-size:10.5px;color:#8ea6c2">'+T(it.desc)+'</span></div>'+
       '<button data-buy="'+it.id+'" '+(owned||!can?'':'')+'>'+
-      (owned?'已拥有':'免 费')+'</button></div>';
+      (owned?T('已拥有'):T('免 费'))+'</button></div>';
   }
   showPanel('小卖部 · 全部免费，但每局只能选一个', html);
   var bs=document.querySelectorAll('#panelBody button');

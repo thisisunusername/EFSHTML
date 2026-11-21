@@ -1,13 +1,20 @@
 /* ============================================================
-   s_theme.js —— Material 主题 · 512 色板 · 设置项存储 · 调试日志
+   s_theme.js —— Material You 主题 · 512 色板 · 调试日志
 
-   为什么单独一个文件：这些东西全局被引用（CSS 变量、面板渲染、
-   音效、日志），如果塞进 f_ui.js 会和 UI 逻辑缠在一起。
-   放在 u_i18n.js 之后加载，因为设置面板要调 T()。
+   【这次重写的缘由】
+   上一版的 Material 是「亮白底 + 写死几个变量」，和 2D 版完全不像。
+   2D 版（full/f_theme.js）的做法才是真正的 Material Design 3：
+     · 主菜单用 M3 深色表面（--m3-surface 系列），不是白底
+     · 所有颜色都由「一个种子色」派生（themeBuildTokens）
+     · 大圆角 28px + 极轻阴影 + Filled/Tonal Button
+   这里把 2D 那套色调函数原样搬过来，保证两版观感一致。
+   3D 版既有 CSS 用的是 --bg / --panel / --accent / --accent2，
+   所以注入 M3 变量的同时，把这一层也映射过去，
+   这样既有 20 处 var(--accent) 不用改一行。
 
    三个子系统：
-     1) 主题：默认盐线暗调 / Material You 亮调两套 CSS 变量
-     2) 512 色：指主色（accent）可调，512 = 8 组 × 64 色
+     1) 主题：暗夜（原版盐线）/ Material You
+     2) 512 色：选一个种子色，整套 M3 配色跟着派生
      3) 调试日志：环缓冲记录，设置面板里可查看/导出
    ============================================================ */
 
@@ -17,54 +24,173 @@ const ACCENT_KEY     = 'efs_accent_v1';
 const DEBUGLOG_KEY   = 'efs_debuglog_v1';   /* 是否开启调试日志 */
 
 /* ============================================================
+   色调引擎（移植自 2D 版 full/f_theme.js，算法保持一致）
+   ============================================================ */
+function themeHexToRgb(hex){
+  var s=String(hex).replace('#','');
+  if(s.length===3) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+  return [parseInt(s.substr(0,2),16), parseInt(s.substr(2,2),16), parseInt(s.substr(4,2),16)];
+}
+function themeRgbToHex(r,g,b){
+  function h(v){ v=Math.max(0,Math.min(255,Math.round(v))); return (v<16?'0':'')+v.toString(16); }
+  return '#'+h(r)+h(g)+h(b);
+}
+/* 从种子色求色相（HSL 空间足够近似 M3 的 HCT 色相） */
+function themeHue(hex){
+  var c=themeHexToRgb(hex);
+  var r=c[0]/255, g=c[1]/255, b=c[2]/255;
+  var mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  if(d===0) return 0;
+  var h;
+  if(mx===r) h=((g-b)/d)%6;
+  else if(mx===g) h=(b-r)/d+2;
+  else h=(r-g)/d+4;
+  h*=60;
+  if(h<0) h+=360;
+  return h;
+}
+function themeSat(hex){
+  var c=themeHexToRgb(hex);
+  var r=c[0]/255, g=c[1]/255, b=c[2]/255;
+  var mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+  var l=(mx+mn)/2;
+  if(mx===mn) return 0;
+  return (mx-mn)/(1-Math.abs(2*l-1));
+}
+/* HSL → HEX */
+function themeHsl(h,s,l){
+  h=((h%360)+360)%360; s=Math.max(0,Math.min(1,s)); l=Math.max(0,Math.min(1,l));
+  var c=(1-Math.abs(2*l-1))*s;
+  var x=c*(1-Math.abs((h/60)%2-1));
+  var m=l-c/2;
+  var r,g,b;
+  if(h<60){ r=c; g=x; b=0; }
+  else if(h<120){ r=x; g=c; b=0; }
+  else if(h<180){ r=0; g=c; b=x; }
+  else if(h<240){ r=0; g=x; b=c; }
+  else if(h<300){ r=x; g=0; b=c; }
+  else { r=c; g=0; b=x; }
+  return themeRgbToHex((r+m)*255,(g+m)*255,(b+m)*255);
+}
+/* 色调值 tone(0..100) → 颜色。chromaScale 控制偏离灰色的程度。
+   tone 低端收得比线性更快，接近 M3 实际观感。 */
+function themeTone(hue, sat, tone, chromaScale){
+  var s = sat * (chromaScale==null?1:chromaScale);
+  if(s < 0.06) s = 0.06;
+  var l = tone/100;
+  if(l < 0.5) l = l*0.86;
+  return themeHsl(hue, s, l);
+}
+
+/* 生成整套 M3 颜色变量（与 2D 版逐项一致） */
+function themeBuildTokens(hex){
+  var h = themeHue(hex);
+  var s = themeSat(hex);
+  var neutralSat = Math.min(s, 0.16);      /* 表面色用极低饱和的同色相 */
+  var t = {};
+  t['--m3-primary']             = themeTone(h, s, 80, 1);
+  t['--m3-on-primary']          = themeTone(h, s, 20, 1.2);
+  t['--m3-primary-container']   = themeTone(h, s, 30, 1);
+  t['--m3-on-primary-container']= themeTone(h, s, 90, 0.7);
+  t['--m3-secondary']           = themeTone(h, s*0.55, 80, 1);
+  t['--m3-on-secondary']        = themeTone(h, s*0.55, 20, 1);
+  t['--m3-tertiary']            = themeTone(h+60, s*0.8, 80, 1);
+  t['--m3-surface']             = themeTone(h, neutralSat, 6, 1);
+  t['--m3-surface-1']           = themeTone(h, neutralSat, 10, 1);
+  t['--m3-surface-2']           = themeTone(h, neutralSat, 14, 1);
+  t['--m3-surface-3']           = themeTone(h, neutralSat, 18, 1);
+  t['--m3-on-surface']          = themeTone(h, neutralSat, 92, 0.5);
+  t['--m3-on-surface-var']      = themeTone(h, neutralSat, 70, 0.5);
+  t['--m3-outline']             = themeTone(h, neutralSat, 45, 0.8);
+  t['--m3-outline-var']         = themeTone(h, neutralSat, 28, 0.8);
+  t['--m3-error']               = '#f2b8b5';
+  t['--m3-on-error']            = '#601410';
+  t['--m3-error-container']     = '#8c1d18';
+  t['--m3-success']             = themeTone(h+120, 0.45, 78, 1);
+  t['--m3-seed']                = hex;
+  return t;
+}
+/* 圆角常量与 2D 版一致 */
+const M3_RADII = {
+  '--m3-r-xl':'28px', '--m3-r-l':'20px', '--m3-r-m':'16px',
+  '--m3-r-s':'12px',  '--m3-r-xs':'8px'
+};
+
+/* ============================================================
    1) 主题
-   两套主题只靠 <html data-theme="..."> 切换，变量名一致，
-   这样所有既有 CSS 不需要改一行 —— 它们早就在用 var(--accent) 了。
    ============================================================ */
 const THEMES = {
-  dark: { id:'dark',  get name(){ return T('暗夜（原版）'); },  desc:'Saltline 暗色 · 对比强' },
-  material: { id:'material', get name(){ return T('Material 浅色'); }, desc:'Material You 亮调 · 白天友好' }
+  dark: {
+    id:'dark',
+    get name(){ return T('暗夜（原版）'); },
+    get desc(){ return T('盐线暗调 · 对比强'); }
+  },
+  material: {
+    id:'material',
+    get name(){ return T('Material You'); },
+    get desc(){ return T('深色表面 · 大圆角 · 由种子色派生整套配色'); }
+  }
 };
 let curTheme = 'dark';
 
-/* Material 主题的变量表。
-   只改颜色，不改尺寸 —— 否则布局会跟着变，风险太大。 */
-const MATERIAL_VARS = {
-  '--bg'      : '#f4f2f7',
-  '--panel'   : 'rgba(255,255,255,.92)',
-  '--accent'  : '#6750a4',
-  '--accent2' : '#8b6fd1',
-  '--fg'      : '#1d1b20',
-  '--fg-dim'  : '#5f5b66'
+/* 暗夜主题的原始值（切回时恢复） */
+const DARK_VARS = {
+  '--bg'     : '#0b0e14',
+  '--panel'  : 'rgba(14,18,28,.92)',
+  '--fg'     : '#e8e8f0',
+  '--fg-dim' : '#b9c4da'
 };
-
-function themeLoad(){
+/* 切回暗夜时要把注入过的 M3 变量清干净。
+   不清也不影响画面（CSS 都写在 [data-theme="material"] 下面），
+   但 inline style 会一直挂着 20 多个死变量，后面排查样式容易误判。 */
+function m3Clear(el){
   try{
-    const v = localStorage.getItem(THEME_KEY);
-    if(v && THEMES[v]) curTheme = v;
-    else if(v==='material') curTheme='material';
+    const tok = themeBuildTokens('#808080');
+    for(const k in tok) el.style.removeProperty(k);
+    for(const k in M3_RADII) el.style.removeProperty(k);
   }catch(e){}
-  return curTheme;
 }
+
+/* Material 主题作用到 DOM：
+   注入 M3 变量 + 把 3D 既有变量映射过去 + 打 data-theme 标记 */
 function themeApply(){
   try{
     const el = document.documentElement;
     if(!el) return curTheme;
     el.setAttribute('data-theme', curTheme);
     if(curTheme==='material'){
-      for(const k in MATERIAL_VARS) el.style.setProperty(k, MATERIAL_VARS[k]);
-      /* 浅色主题下正文颜色变深，否则白底白字看不见 */
-      el.style.setProperty('color-scheme','light');
+      const tok = themeBuildTokens(accentSeed(accentIdx));
+      for(const k in tok) el.style.setProperty(k, tok[k]);
+      for(const k in M3_RADII) el.style.setProperty(k, M3_RADII[k]);
+      /* 【把 M3 变量映射到 3D 既有变量】
+         3D 版的 CSS 早就在用 var(--accent) / var(--bg) / var(--panel)，
+         这里不改一行 CSS，靠映射让它自动跟着 M3 走。 */
+      el.style.setProperty('--accent',  tok['--m3-primary']);
+      el.style.setProperty('--accent2', tok['--m3-tertiary']);
+      el.style.setProperty('--bg',      tok['--m3-surface']);
+      el.style.setProperty('--panel',   tok['--m3-surface-2']);
+      el.style.setProperty('--fg',      tok['--m3-on-surface']);
+      el.style.setProperty('--fg-dim',  tok['--m3-on-surface-var']);
+      el.style.setProperty('color-scheme','dark');
     }else{
-      for(const k in MATERIAL_VARS) el.style.removeProperty(k);
+      m3Clear(el);
+      for(const k in DARK_VARS) el.style.setProperty(k, DARK_VARS[k]);
       el.style.removeProperty('color-scheme');
+      try{ accentApply(); }catch(e){}
     }
-    /* 3D 场景背景也跟着走：浅色主题下暗背景很刺眼 */
+    /* 3D 场景背景：Material 下不用纯黑，留一点种子色倾向 */
     try{
       if(typeof scene!=='undefined' && scene && scene.background && scene.background.isColor){
-        scene.background.set(curTheme==='material' ? 0xcfd8e3 : 0x0b0e14);
+        scene.background.set(curTheme==='material' ? 0x11151c : 0x0b0e14);
       }
     }catch(e){}
+  }catch(e){}
+  return curTheme;
+}
+function themeLoad(){
+  try{
+    const v = localStorage.getItem(THEME_KEY);
+    if(v && THEMES[v]) curTheme = v;
   }catch(e){}
   return curTheme;
 }
@@ -73,64 +199,57 @@ function themeSet(id){
   curTheme = id;
   try{ localStorage.setItem(THEME_KEY, id); }catch(e){}
   themeApply();
-  /* 【必须补一次 accentApply】
-     themeApply 在切回 dark 时会 removeProperty 清掉 MATERIAL_VARS，
-     而 --accent 就在那张表里 —— 于是玩家自定义的主色被一起剥掉，
-     界面变回默认紫。这里把玩家选的颜色写回去。
-     顺序和 themeInit 一致：先主题、后 accent。 */
+  /* 主题会整体覆盖 --accent，切完必须让 accent 再写一次 */
   try{ if(typeof accentApply==='function') accentApply(); }catch(e){}
   return curTheme;
 }
 
 /* ============================================================
    2) 512 色板
-   「512 color」理解为主色可选范围：8 个色相家族 × 64 个明度/饱和度档位。
-   为什么不直接用 HSL 滑条：玩家在手机上拉滑条很难拉准，
-   而且没参照物。这里直接给一个 8×64 的网格，点哪算哪，
-   还能一眼看完所有可选颜色。
+   选的是「种子色」，整套 M3 配色由它派生。
+   512 格 = 8 色系 × 64 档（8 饱和 × 8 明度）。
+   同一色系内一行扫过去就是一条明暗渐变，手机上最好挑。
    ============================================================ */
 const ACCENT_FAMILIES = [
-  { id:'purple', get name(){ return T('紫'); } },
-  { id:'blue',   get name(){ return T('蓝'); } },
-  { id:'cyan',   get name(){ return T('青'); } },
-  { id:'green',  get name(){ return T('绿'); } },
-  { id:'amber',  get name(){ return T('琥珀'); } },
-  { id:'orange', get name(){ return T('橙'); } },
-  { id:'red',    get name(){ return T('红'); } },
-  { id:'pink',   get name(){ return T('粉'); } }
+  { id:'red',    get name(){ return T('红'); },   hue0:0   },
+  { id:'orange', get name(){ return T('橙'); },   hue0:30  },
+  { id:'amber',  get name(){ return T('琥珀'); }, hue0:45  },
+  { id:'green',  get name(){ return T('绿'); },   hue0:130 },
+  { id:'cyan',   get name(){ return T('青'); },   hue0:185 },
+  { id:'blue',   get name(){ return T('蓝'); },   hue0:215 },
+  { id:'purple', get name(){ return T('紫'); },   hue0:265 },
+  { id:'pink',   get name(){ return T('粉'); },   hue0:325 }
 ];
-/* 每个家族的基准色相 */
-const ACCENT_HUE = {
-  purple:265, blue:215, cyan:188, green:142,
-  amber:45,  orange:22, red:358, pink:330
-};
-/* 64 档 = 8 饱和度 × 8 明度，形成深浅梯度 */
-const ACCENT_SATS = [0.28,0.40,0.52,0.64,0.76,0.88,0.96,1.00];
-const ACCENT_LIGS = [0.86,0.76,0.68,0.60,0.52,0.44,0.36,0.28];
+const ACCENT_SATS = [0.26,0.36,0.46,0.56,0.68,0.80,0.90,1.00];
+const ACCENT_LIGS = [0.72,0.64,0.58,0.52,0.46,0.40,0.34,0.28];
 const ACCENT_STEPS = 64;   /* 8*8 */
 let accentIdx = 0;         /* 0..511 */
 
-/* 下标 -> {h,s,l} */
+/* 下标 → {h,s,l} */
 function accentOf(idx){
   idx = ((idx|0) % 512 + 512) % 512;
   const fam = Math.floor(idx / ACCENT_STEPS);
   const sub = idx % ACCENT_STEPS;
-  const si = sub % 8;
-  const li = Math.floor(sub / 8) % 8;
-  const fid = ACCENT_FAMILIES[fam] ? ACCENT_FAMILIES[fam].id : 'purple';
+  const li = sub % 8;                 /* 明度：一行内由亮到暗 */
+  const si = Math.floor(sub / 8) % 8; /* 饱和度：一行比一行更艳 */
+  const F = ACCENT_FAMILIES[fam] || ACCENT_FAMILIES[6];
   return {
-    hue: ACCENT_HUE[fid] || 265,
-    s: ACCENT_SATS[si],
-    l: ACCENT_LIGS[li],
-    fam: fid
+    hue: F.hue0,
+    s:   ACCENT_SATS[si],
+    l:   ACCENT_LIGS[li],
+    fam: F.id
   };
+}
+/* 种子色（HEX）—— M3 色调引擎要 hex，不是 hsl() */
+function accentSeed(idx){
+  const a = accentOf(idx);
+  return themeHsl(a.hue, a.s, a.l);
 }
 function accentCss(idx){
   const a = accentOf(idx);
   return 'hsl('+a.hue+','+Math.round(a.s*100)+'%,'+Math.round(a.l*100)+'%)';
 }
 function accentCss2(idx){
-  /* 辅助色：同色相，抬高 8% 亮度 */
   const a = accentOf(idx);
   const l2 = Math.min(0.92, a.l+0.10);
   return 'hsl('+a.hue+','+Math.round(a.s*100)+'%,'+Math.round(l2*100)+'%)';
@@ -146,8 +265,18 @@ function accentApply(){
   try{
     const el = document.documentElement;
     if(!el) return accentIdx;
-    el.style.setProperty('--accent', accentCss(accentIdx));
-    el.style.setProperty('--accent2', accentCss2(accentIdx));
+    if(curTheme==='material'){
+      /* Material 下整套配色由种子色派生，直接重建 tokens */
+      const tok = themeBuildTokens(accentSeed(accentIdx));
+      for(const k in tok) el.style.setProperty(k, tok[k]);
+      el.style.setProperty('--accent',  tok['--m3-primary']);
+      el.style.setProperty('--accent2', tok['--m3-tertiary']);
+      el.style.setProperty('--bg',      tok['--m3-surface']);
+      el.style.setProperty('--panel',   tok['--m3-surface-2']);
+    }else{
+      el.style.setProperty('--accent',  accentCss(accentIdx));
+      el.style.setProperty('--accent2', accentCss2(accentIdx));
+    }
   }catch(e){}
   return accentIdx;
 }
@@ -160,10 +289,6 @@ function accentSet(idx){
 
 /* ============================================================
    3) 调试日志
-   两件事：
-     · 一个环缓冲（最近 300 条），不依赖控制台 —— 手机上没控制台
-     · 一个开关，关掉时不记录，避免影响帧率
-   console.error / console.warn 也会被抄一份进来。
    ============================================================ */
 const LOG_MAX = 300;
 let logOn = false;
@@ -206,7 +331,6 @@ function logHookConsole(){
     console.warn = function(){ try{ if(logOn) logPush('warn', arguments); }catch(e){} return ow.apply(console, arguments); };
     console.error= function(){ try{ if(logOn) logPush('error', arguments); }catch(e){} return oe.apply(console, arguments); };
   }catch(e){}
-  /* 未捕获异常也进日志 */
   try{
     window.addEventListener('error', function(e){
       try{
@@ -228,7 +352,7 @@ function logSet(on){
   logOn = !!on;
   try{ localStorage.setItem(DEBUGLOG_KEY, logOn?'1':'0'); }catch(e){}
   updateLogBadge();
-  if(logOn) logPush('info', ['调试日志已开启']);
+  if(logOn) logPush('info', [T('调试日志已开启')]);
   return logOn;
 }
 function logClear(){ logBuf=[]; updateLogBadge(); return 0; }
@@ -240,7 +364,6 @@ function logText(){
   }
   return out.join('\n');
 }
-/* 把开关状态同步到 HUD 那个小徽标（有就更新，没有就跳过） */
 function updateLogBadge(){
   try{
     const b=document.getElementById('logBadge');
@@ -259,10 +382,10 @@ function themeInit(){
   accentLoad();
   logLoad();
   logHookConsole();
-  /* 【两层都要上】
-     themeApply 会清掉 MATERIAL_VARS，accentApply 会盖 --accent。
-     顺序不能反：先主题（可能清 accent），再 accent（写回玩家选的颜色）。 */
+  /* 【顺序不能反】
+     themeApply 在 material 下会用种子色重建整套 tokens，
+     accentApply 再按当前主题写一次 —— 反过来玩家选的颜色会被盖掉。 */
   themeApply();
   accentApply();
-  dlog('theme init', curTheme, 'accent', accentIdx);
+  dlog('theme init', curTheme, 'accent', accentIdx, 'seed', accentSeed(accentIdx));
 }

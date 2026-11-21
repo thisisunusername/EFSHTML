@@ -57,7 +57,7 @@ function buildSettings(){
 
   /* ---------- 外观 ---------- */
   if(setTab==='look'){
-    h+='<div class="d" style="margin:10px 0 6px">'+T('选择界面主题。浅色主题适合白天，暗夜主题对比更强。')+'</div>';
+    h+='<div class="d" style="margin:10px 0 6px">'+T('选择界面主题。Material You 与 2D 版一致：深色表面、大圆角，配色由种子色派生。')+'</div>';
     for(const id in THEMES){
       const th=THEMES[id];
       const on = (typeof curTheme!=='undefined') && curTheme===id;

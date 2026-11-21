@@ -625,9 +625,12 @@ const I18N_EN = {
   '声音': 'Sound',
   '调试': 'Debug',
   '暗夜（原版）': 'Night (original)',
-  'Material 浅色': 'Material light',
-  '选择界面主题。浅色主题适合白天，暗夜主题对比更强。':
-    'Pick an interface theme. Light suits daytime; Night has stronger contrast.',
+  'Material You': 'Material You',
+  '盐线暗调 · 对比强': 'Saltline dark · strong contrast',
+  '深色表面 · 大圆角 · 由种子色派生整套配色':
+    'Dark surfaces · large radii · full palette derived from one seed color',
+  '选择界面主题。Material You 与 2D 版一致：深色表面、大圆角，配色由种子色派生。':
+    'Pick an interface theme. Material You matches the 2D build: dark surfaces, large radii, palette derived from a seed color.',
   '主色共 512 档：8 个色系 × 64 个深浅。点一格立即生效。':
     '512 accent shades: 8 families × 64 steps. Tap one to apply instantly.',
   '紫': 'Purple',

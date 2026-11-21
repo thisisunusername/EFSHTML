@@ -479,6 +479,54 @@ function setupWorld(){
     P.raidT=0;
     window.__raidOver=false;
   }catch(e){}
+  /* 【【每局重置玩家位置】】——「开局人还在天上」的真因
+     P 是模块级对象，声明在 c_player.js：
+       pos:new THREE.Vector3(0,1.6,5)
+     但 init() / setupWorld() 之前从来没有人把它重置回去。
+     init() 只把 camera 临时放在 (0,1.7,8)，
+     而 z_render 每帧都执行 camera.position.set(P.pos.x,P.pos.y,P.pos.z)，
+     于是下一帧相机就被拉回 P.pos 的真实值。
+     那么 P.pos 会变成什么？
+       · 上一局死在 3F/顶楼，P.pos.y 就是那个高度（y≈12~20）
+       · 上一局从楼上撞出去、或被射击击飞，也会拖着异常高度
+       · 刷新页面后 P 重新初始化，所以「第一局好、后面几局在天上」
+     这完全符合你描述的现象，而且也是前几轮修不好的原因：
+     前面改的都是「楼层显示」和「地板兜底」，没人动过出生点本身。
+     现在把它写死在每局起点，并把速度/落底标志一并清掉，
+     否则上一局残留的 vel.y（比如向下坠）会直接带进新一局。 */
+  try{
+    if(typeof P==='object' && P && P.pos && P.pos.set){
+      /* 出生点必须和 c_player.js 的 P.pos 初始值一致：
+         (0, 1.6, 5)，1.6 就是 P.eyeH（眼睛高度）。
+         操场意在 y=0，所以脚底 y=0、眼睛 y=1.6，人站在地面上。 */
+      P.pos.set(0, 1.6, 5);
+      P.eyeH = 1.6;
+      P.standH = 1.6;
+    }
+    if(P && P.vel){ P.vel.set(0,0,0); }
+    if(P){
+      P.onGround=false;
+      P.onLadder=false;
+      /* yaw/pitch 是 P 的平铺字段（不是 P.rot.yaw），
+         朝向楼门（-z 方向）才能一进局就看见楼。
+         出生点 (0,1.6,5) 而主楼在 z:-30..-14，面向 -z 就是正对楼门。 */
+      P.yaw = 0; P.pitch = 0;
+      if(typeof P.firing!=='undefined') P.firing = false;
+      /* P 没有 maxHp 字段，满血就是 100（与 P.hp 初始值一致） */
+      P.hp = 100;
+      P.eyeH = 1.6;
+    }
+  }catch(e){ console.error('spawn reset failed', e); }
+  /* 出生在楼外操场，层楼应全隐藏，
+     避免抬头看到悬空的 1F~B3 楼板家具。
+     注意：setFloorVisible() 是无参数的，它读全局 inBuilding、curFloor，
+     所以要先把这两个值摆对（楼外 + 任意层）再调用。
+     curFloor 保留 1（=1F）不动，因为进楼时 updFloors 会自己切到 1F；
+     把它写成 0 反而会让 floorGet() 拿到 1F 以外的楼层。 */
+  try{
+    if(typeof inBuilding!=='undefined') inBuilding = false;
+    if(typeof setFloorVisible==='function') setFloorVisible();
+  }catch(e){ console.error('floor visible reset failed', e); }
   /* 【局内容器】每次开局重新生成一遍，战利品随机 */
   if(typeof buildContainers==='function') buildContainers();
   /* 【多楼层：每局重置】难度可能被改过，黑钥匙刷新与否也按局算。 */

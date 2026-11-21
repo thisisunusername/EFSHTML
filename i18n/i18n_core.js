@@ -599,6 +599,26 @@ const I18N_EN = {
   '设定资金（当前 {0}）': 'Set balance (current {0})',
   '直接设定金额': 'Set exact amount',
   'GM 面板已解锁': 'GM panel unlocked',
+  /* ============================================================
+     3D 版：本轮新增（撤离倒计时 / 小地图 / 超时结算）
+     背景：这些 UI 是上一轮新加的，文案直接写死在代码里，
+     切到英文时依然显示中文。这里补齐。
+     ============================================================ */
+  /* ---- 撤离倒计时 ---- */
+  '撤离超时': 'Raid Timed Out',
+  '⏰ 撤离超时': '⏰ Raid Timed Out',
+  '你没在规定时间内到达撤离点 · 带进去的物资全部丢失':
+    'You did not reach the extraction point in time · everything you brought in is lost',
+  '⏰ 撤离超时 · 物资丢失': '⏰ Raid timed out · supplies lost',
+  /* ---- 小地图区域名 ---- */
+  '校园': 'Campus',
+  '主楼': 'Main Building',
+  '西楼': 'West Building',
+  '东楼': 'East Building',
+  '行政楼': 'Admin Building',
+  '校门口': 'School Gate',
+  '操场': 'Sports Field',
+  '北场地': 'North Field',
 };
 
 /* 把 {0} {1} 换掉。只在 T() 内部用。 */

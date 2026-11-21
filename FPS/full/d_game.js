@@ -424,9 +424,11 @@ function raidTimeout(){
   window.__inGame = false;
   const d=$('death');
   if(d){
-    const h2=d.querySelector('h2'); if(h2) h2.textContent='⏰ 撤离超时';
+    /* 【国际化】'T()' 在切语言时找不到译文就原样返回中文，
+       所以这里不需要判断语言。 */
+    const h2=d.querySelector('h2'); if(h2) h2.textContent=T('⏰ 撤离超时');
     const info=$('deathInfo');
-    if(info) info.textContent='你没在规定时间内到达撤离点 · 带进去的物资全部丢失';
+    if(info) info.textContent=T('你没在规定时间内到达撤离点 · 带进去的物资全部丢失');
     d.style.display='flex';
   }
   /* 【处理局内资产】超时 = 阵亡：背包、胸挂、身上装备全部丢失。
@@ -435,7 +437,7 @@ function raidTimeout(){
      超时的惩罚与阵亡完全一致 —— 搜打撤里「没撤走」就是死。 */
   try{ if(typeof settleDeath==='function') settleDeath(); }catch(e){ console.error('settleDeath failed', e); }
   try{ if(typeof saveTick==='function') saveTick(); }catch(e){}
-  try{ toast('⏰ 撤离超时 · 物资丢失'); }catch(e){}
+  try{ toast(T('⏰ 撤离超时 · 物资丢失')); }catch(e){}
 }
 
 /* ---- 撤离判定 ---- */

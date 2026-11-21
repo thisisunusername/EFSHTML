@@ -967,6 +967,8 @@ background:rgba(90,220,255,.03); cursor:default; }
         +'padding:10px 12px;border-radius:10px;border:1px solid #ff6a5a;white-space:pre-wrap;'
         +'max-height:60vh;overflow:auto;';
       d.textContent='⚠ 启动出错：\n'+msg;
+      /* 盖个全局钩子，方便调试时在控制台看到同一串 */
+      try{ window.__bootdiagText=msg; }catch(e){}
       (document.body||document.documentElement).appendChild(d);
     }catch(e){}
   }
@@ -999,30 +1001,84 @@ background:rgba(90,220,255,.03); cursor:default; }
     }
   }, 5000);
 
-  /* 4. 【按钮自检】模块跑完之后，逐个检查主菜单按钮有没有真的绑上 onclick。
-     这一条专治「代码没报错、但某些按钮点不动」：
-     如果某个按钮没有 handler（既没有 onclick 也没进事件委托），
-     就把它的 id 列出来 —— 一眼就知道是谁没绑上。
-     只在模块确实执行过（__moduleRan）时才检查，否则会误报。 */
+  /* 4. 【按钮试跑自检】
+     【为什么改掉旧版】旧版只看 el.onclick 有没有值，有两个致命盲区：
+       · 漏报：__bindMenuFallback 是捕获阶段事件委托，
+              不需要 onclick 就能工作。所以「onclick 空」不等于「坏了」。
+       · 误报：委托生效时 onclick 也可能是空的，旧版会把好按钮列进 miss。
+     新版改成「真的派发一次 click」，看面板有没有真的打开，
+     再把面板恢复原状（同步执行，画面不闪）。 */
+  var PANEL_OF = { btnShop:'shop', btnStash:'stash', btnGunsmith:'gunsmith' };
+  function trialClick(){
+    var out={};
+    var ids=Object.keys(PANEL_OF);
+    for(var i=0;i<ids.length;i++){
+      var id=ids[i], pid=PANEL_OF[id];
+      var btn=document.getElementById(id);
+      var panel=document.getElementById(pid);
+      if(!btn){ out[id]='NO_DOM'; continue; }
+      if(!panel){ out[id]='NO_PANEL'; continue; }
+      var before=panel.style.display||'';
+      var rec={ onclick: btn.onclick?'y':'n' };
+      try{
+        btn.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+      }catch(e){ out[id]='DISPATCH_ERR:'+e; continue; }
+      var after=panel.style.display||'';
+      try{ panel.style.display=before; }catch(e){}
+      rec.flip = (before!==after)?1:0;
+      rec.from = before;
+      rec.to   = after;
+      out[id]=rec;
+    }
+    return out;
+  }
   setTimeout(function(){
     if(!window.__moduleRan) return;
-    try{
-      var ids=['btnPlay','btnShop','btnStash','btnGunsmith',
-               'btnExport','btnImport','btnReset','btnBack','btnPickSave'];
-      var miss=[];
-      for(var i=0;i<ids.length;i++){
-        var el=document.getElementById(ids[i]);
-        if(!el){ miss.push(ids[i]+'(DOM缺失)'); continue; }
-        var hasOnclick = !!el.onclick;
-        var hasBound   = !!el.__jsBound;
-        if(!hasOnclick && !hasBound) miss.push(ids[i]);
-      }
-      if(miss.length){
-        show('这些按钮没有绑定事件（点了不会有反应）：\n'+miss.join('\n')
-          +'\n\n（其它按钮正常）');
-      }
-    }catch(e){}
+    var r=null, bad=[];
+    try{ r=trialClick(); }catch(e){ show('自检本身出错：'+e); return; }
+    window.__btnProbe=r;
+    var allok=true;
+    for(var id in r){
+      var v=r[id];
+      if(typeof v!=='object' || !v.flip){ allok=false; bad.push(id+' '+JSON.stringify(v)); }
+    }
+    window.__btnProbeAll = allok ? 'ALL_OK' : 'FAIL';
+    if(!allok){
+      show('按钮试跑失败（点了面板没打开）：\n'+bad.join('\n')
+        +'\n\n__menuDelegated='+window.__menuDelegated
+        +'  __uiReady='+window.__uiReady);
+    }
   }, 2500);
+  /* 5. 【真实点击监控】第 4 步是程序模拟点，这一步抓玩家的真点击。
+     同一个按钮连点 3 次都没反应，就把判据全打印出来 ——
+     这几项足以区分「没绑上」「委托没启用」「模块没跑」「事件被吞」四种情况。
+     用 click 而不是 touchstart：如果浏览器根本没合成 click，
+     那这条就永远不会进来 —— 这本身就是「touch-action:none 吃掉了 click」的铁证。 */
+  var taps={};
+  window.__menuTapLog={};
+  document.addEventListener('click', function(e){
+    var t=e.target;
+    while(t && t.nodeType===1 && !t.id) t=t.parentElement;
+    if(!t || !t.id) return;
+    var id=t.id;
+    if(!PANEL_OF.hasOwnProperty(id)) return;
+    var pid=PANEL_OF[id];
+    var panel=document.getElementById(pid);
+    var opened = panel && panel.style.display==='flex';
+    window.__menuTapLog[id]=(window.__menuTapLog[id]||0)+1;
+    if(opened){ taps[id]=0; return; }
+    taps[id]=(taps[id]||0)+1;
+    if(taps[id]<3) return;
+    taps[id]=0;
+    var lines=[];
+    lines.push('按钮 '+id+' 连点 3 次都没打开面板');
+    lines.push('target=<'+t.tagName+'#'+id+'>');
+    lines.push('panel#'+pid+' display='+(panel?JSON.stringify(panel.style.display):'(缺失)'));
+    lines.push('onclick='+(t.onclick?'有':'无')+'  __jsBound='+(!!t.__jsBound)+'  __boundAt='+(t.__boundAt||0));
+    lines.push('__menuDelegated='+window.__menuDelegated);
+    lines.push('__moduleRan='+window.__moduleRan+'  __uiReady='+window.__uiReady);
+    show(lines.join('\n'));
+  }, true);
 })();
 </script>
 <script type="module">

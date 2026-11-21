@@ -307,6 +307,13 @@ function bindUI(){
       const el=document.getElementById(id);
       if(!el) return false;
       el.onclick=fn;
+      /* 【必须打标记】__bindMenuFallback 的捕获阶段委托靠 el.__jsBound
+         判断「这个按钮已经有 onclick 了，别再跑一遍」，避免点一次触发两次。
+         之前这里漏了赋值，标记永远不出现，等于：
+           有点击时 —— onclick 跑一次、委托再跑一次（商店开→关，看起来没反应）
+           点击失效时 —— 只有委托，能救回来
+         这就是「三个按钮时灵时不灵」的一半原因。 */
+      try{ el.__jsBound=true; }catch(e){}
       return true;
     }catch(e){
       console.error('bindBtn failed: '+id, e);
@@ -337,12 +344,51 @@ function bindUI(){
   bindBtn('btnRespawn', ()=>{ location.reload(); });
   bindBtn('btnDeathMenu', ()=>{ location.reload(); });
 
-  /* ---- 商店 / 仓库 / 改枪台 ---- */
-  bindBtn('btnShop', ()=>{ try{ toggleShop(); }catch(e){ console.error('shop', e); } });
-  bindBtn('btnStash', ()=>{ try{ sfxUI(); }catch(e){} try{ toggleStash(); }catch(e){ console.error('stash', e); } });
+  /* ---- 商店 / 仓库 / 改枪台 ----
+     【为什么这三个要额外挂 touchstart】
+     bindBtn 只写 onclick，而「触摸 → 浏览器合成 click」这条路
+     在真机上并不可靠：
+       · 页面根节点 touch-action:none，部分 WebView 因此不再合成 click
+       · 只要路径上任何一层在 touchstart 里 preventDefault，click 就没了
+       · 手指微动（超过 slop）会被当成滑动，也不合成 click
+     btnPlay 一直能点、这三个不能——而现在三个按钮就紧挨着 btnPlay，
+     唯一的结构差异就是它们是「打开一个全屏浮层」。所以这里改用 tapAction：
+     touchstart 直接执行，click 兜底给鼠标/桌面，两者时间戳去重。
+     同一个 fn 对象只包一次，避免 touch 与 click 各包一层、去重失效。 */
+  const tapCache=new WeakMap();
+  const tapAction=(id, fn)=>{
+    const el=document.getElementById(id);
+    if(!el) return false;
+    let cached=tapCache.get(el);
+    if(cached && cached.fn===fn){ cached.apply(); return true; }
+    /* 先把 onoutput 语义保留下来：写 onclick 给桌面/键盘触发 */
+    el.onclick=fn; el.__jsBound=true;
+    let last=0;
+    const run=(ev)=>{
+      const now=Date.now();
+      if(now-last<400) return;
+      last=now;
+      /* 先把「执行过」的时间戳写上，再做事。
+         这样即使 fn 内部抛错（或被异步推迟），委托那边也已经知道
+         这次点击被接管了，不会再跑一遍造成开关抵消。 */
+      try{ el.__boundAt=now; }catch(e){}
+      if(ev){
+        if(ev.cancelable && ev.preventDefault) ev.preventDefault();
+        if(ev.stopPropagation) ev.stopPropagation();
+      }
+      try{ fn(ev); }catch(e){ console.error('tap failed: '+id, e); }
+      try{ window.__menuTapLog=(window.__menuTapLog||{})[id]=now; }catch(e){}
+    };
+    el.addEventListener('touchstart', run, {passive:false});
+    el.addEventListener('click', run);
+    tapCache.set(el, {fn:fn, apply:()=>{ el.onclick=fn; }});
+    return true;
+  };
+  tapAction('btnShop', ()=>{ try{ toggleShop(); }catch(e){ console.error('shop', e); } });
+  tapAction('btnStash', ()=>{ try{ sfxUI(); }catch(e){} try{ toggleStash(); }catch(e){ console.error('stash', e); } });
   /* 【改枪台入口】面板是互斥的：开改枪台前先把商店/仓库收起来，
      否则三层全屏浮层叠在一起，点哪都是最上面那个。 */
-  bindBtn('btnGunsmith', ()=>{
+  tapAction('btnGunsmith', ()=>{
     try{ sfxUI(); }catch(e){}
     try{ closeShop(); }catch(e){}
     try{ const st=document.getElementById('stash'); if(st) st.style.display='none'; }catch(e){}
@@ -916,13 +962,13 @@ const SHOP_ITEMS={
      主武器决定你拿的是步枪还是冲锋枪；手枪是副武器，主武器没子弹时切换用；
      小刀是最后的近战手段，不耗子弹。
      这三个 cat 分别对应 SLOTS 里的 primary / secondary / melee。 */
-  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26, fireMode:'auto', fireCd:0.086, mag:30, recoil:1.0, adsZ:0.62, adsY:0.013, sightY:0.092},
-  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18, fireMode:'auto', fireCd:0.070, mag:30, recoil:0.70, adsZ:0.50, adsY:0.012, sightY:0.095},
+  gun_rifle:  {cat:'gun',    get name(){ return T('突击步枪'); }, icon:'🔫', price:4500, get desc(){ return T('全自动 · 高伤害'); }, ammoType:'rifle',  dmg:26, fireMode:'auto', fireCd:0.086, mag:40, recoil:1.0, adsZ:0.62, adsY:0.013, sightY:0.092},
+  gun_smg:    {cat:'gun',    get name(){ return T('冲锋枪'); },   icon:'🔫', price:2800, get desc(){ return T('射速快 · 后坐力小'); }, ammoType:'pistol', dmg:18, fireMode:'auto', fireCd:0.070, mag:20, recoil:0.70, adsZ:0.50, adsY:0.012, sightY:0.095},
   gun_sniper: {cat:'gun',    get name(){ return T('狙击步枪'); }, icon:'🎯', price:8000, get desc(){ return T('栓动 · 极高伤害 · 开镜倍率高'); }, ammoType:'sniper', dmg:60, fireMode:'bolt', fireCd:1.30, mag:5, recoil:1.0, adsZ:0.46, adsY:0.020, sightY:0.125, adsFov:0.55},
-  gun_dmr:    {cat:'gun',    get name(){ return T('精确射手步枪'); }, icon:'🎯', price:6200, get desc(){ return T('半自动 · 高精度 · 中远距'); }, ammoType:'rifle', dmg:44, fireMode:'semi', fireCd:0.30, mag:20, recoil:1.0, adsZ:0.55, adsY:0.018, sightY:0.108, adsFov:0.72},
-  gun_m870:   {cat:'gun',    get name(){ return T('雷明顿 M870'); }, icon:'🔫', price:5200, get desc(){ return T('泵动 · 9 颗弹丸 · 近距一枪致命'); }, ammoType:'shot', dmg:14, fireMode:'pump', fireCd:0.20, mag:7, pumpTime:0.58, pellets:9, recoil:1.0, adsZ:0.60, adsY:0.014, sightY:0.090},
-  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('半自动 · 应急副武器'); }, ammoType:'pistol', dmg:14, fireMode:'semi', fireCd:0.17, mag:12, recoil:0.90, adsZ:0.40, adsY:0.012, sightY:0.093},
-  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('半自动 · 高伤副武器'); }, ammoType:'pistol', dmg:24, fireMode:'semi', fireCd:0.24, mag:8, recoil:0.75, adsZ:0.42, adsY:0.013, sightY:0.093},
+  gun_dmr:    {cat:'gun',    get name(){ return T('精确射手步枪'); }, icon:'🎯', price:6200, get desc(){ return T('半自动 · 高精度 · 中远距'); }, ammoType:'rifle', dmg:44, fireMode:'semi', fireCd:0.30, mag:30, recoil:1.0, adsZ:0.55, adsY:0.018, sightY:0.108, adsFov:0.72},
+  gun_m870:   {cat:'gun',    get name(){ return T('雷明顿 M870'); }, icon:'🔫', price:5200, get desc(){ return T('泵动 · 9 颗弹丸 · 近距一枪致命'); }, ammoType:'shot', dmg:14, fireMode:'pump', fireCd:0.20, mag:8, pumpTime:0.58, pellets:9, recoil:1.0, adsZ:0.60, adsY:0.014, sightY:0.090},
+  pis_default:{cat:'pistol', get name(){ return T('制式手枪'); }, icon:'🔫', price:600,  get desc(){ return T('半自动 · 应急副武器'); }, ammoType:'pistol', dmg:14, fireMode:'semi', fireCd:0.17, mag:20, recoil:0.90, adsZ:0.40, adsY:0.012, sightY:0.093},
+  pis_heavy:  {cat:'pistol', get name(){ return T('大口径手枪'); }, icon:'🔫', price:1800, get desc(){ return T('半自动 · 高伤副武器'); }, ammoType:'pistol', dmg:24, fireMode:'semi', fireCd:0.24, mag:20, recoil:0.75, adsZ:0.42, adsY:0.013, sightY:0.093},
   melee_knife:{cat:'melee', get name(){ return T('战术小刀'); }, icon:'🔪', price:200,  get desc(){ return T('近战 · 永不耗弹 · 出手快'); }, dmg:35, knife:'knife', meleeCd:0.42, meleeRange:2.6},
   melee_baton:{cat:'melee', get name(){ return T('防暴棍'); },   icon:'🏏', price:500,  get desc(){ return T('近战 · 攻击范围大'); }, dmg:28, knife:'machete', meleeCd:0.46, meleeRange:2.8},
   /* ---- 更多刀型：只改外观，伤害各有微调 ---- */
@@ -2499,7 +2545,10 @@ function drawMiniMap(now){
       else if(inRect(16,34,86,52))   zone='操场';
       else if(z>44)                  zone='北场地';
     }
-    const t='🗺 '+zone;
+    /* 【国际化】zone 保留中文原申作为 key（不要先翻再存），
+       每次渲染即时调 T()。这样切语言后不需要重建小地图，
+       下一帧就自动变成英文。 */
+    const t='🗺 '+T(zone);
     if(lb.textContent!==t) lb.textContent=t;
   }
 }
@@ -2609,6 +2658,10 @@ function __bindMenuFallback(){
      用户的实际现象是「按下有蓝圈（CSS :active）但没反应」，
      说明事件确实到达了按钮，只是没有 JS 处理 ——
      这层委托正是针对这个情况。 */
+  /* 委托只接管这几个按钮：其余元素（面板内部、摇杆、HUD pill）
+     各自有自己的触摸逻辑，不能让委托偷跑。 */
+  const MENU_DELEGATE_IDS=new Set(['btnPlay','btnShop','btnStash','btnGunsmith',
+    'btnExport','btnImport','btnReset','btnBack','btnPickSave']);
   const pick=(t)=>{
     let n=t;
     while(n && n.nodeType===1){
@@ -2625,8 +2678,20 @@ function __bindMenuFallback(){
        开两次面板、跳两次页面）。
        判断依据：元素上有 __jsBound 标记（绑定成功时打上）。
        没标记 = onclick 没绑上 = 正是委托要救的场景。 */
+    /* 【防双跑】如果这个按钮在最近 500ms 内已经被它自己的 onclick 执行过，
+       委托就不要再跑一次。
+       为什么要改基准：原来只判 el.__jsBound（标记存在 = 跳过），
+       但标记只能说明「当时绑上了」，不能说明「这次点击它真的执行了」——
+       如果 onclick 因为同步异常在 run 之前就抛了，或者被某层吞了，
+       标记依然存在，委托也会跳继，于是点击彻底失联。
+       tapAction 会在执行时写 el.__boundAt = Date.now()，这里用它当真实凭据；
+       没有 __boundAt（老式 bindBtn 绑的）时再退回 __jsBound 判据。 */
     const el=(e.target && e.target.closest)? e.target.closest('#'+id) : e.target;
-    if(el && el.__jsBound) return;
+    if(el){
+      const at=el.__boundAt||0;
+      if(at && Date.now()-at<500) return;
+      if(!at && el.__jsBound) return;
+    }
     try{
       switch(id){
         case 'btnPlay': {
@@ -2663,10 +2728,30 @@ function __bindMenuFallback(){
       }
     }catch(x){ console.error('menu delegate failed for '+id, x); }
   };
+  /* 【touchstart 也走一遍】
+     这层委托原本只挂 click。可这几个按钮失效的典型现场就是
+     「click 根本没被浏览器合成」（touch-action:none + 页面里有
+     preventDefault），而 touchstart 是一定会到的。
+     所以再挂一份 touchstart，并把「这次触摸已被处理」的凭据
+     （__boundAt）共享给 click 那份，保证一次点击只执行一次。 */
+  const touchHandler=(e)=>{
+    /* 只处理主菜单里这几个按钮，其它地方不干预，
+       否则会和面板内部的按钮、摇杆、摇杆等触摸逻辑冲突。 */
+    const id=pick(e.target);
+    if(!id) return;
+    if(!MENU_DELEGATE_IDS.has(id)) return;
+    const el=(e.target && e.target.closest)? e.target.closest('#'+id) : e.target;
+    if(el){
+      const at=el.__boundAt||0;
+      if(at && Date.now()-at<500) return;   // 它自己的 touchstart 已经处理了
+    }
+    handler(e);
+  };
   /* 幂等：只挂一次 */
   if(!window.__menuDelegated){
     window.__menuDelegated=true;
     document.addEventListener('click', handler, true);
+    try{ document.addEventListener('touchstart', touchHandler, {capture:true, passive:true}); }catch(e){}
   }
   /* 下面这些是为「明确绑定」留的，有 delegate 在就算没绑上也能用，
      但保留 onclick 可以让绑定的语义更清晰（也兼容旧逻辑）。 */

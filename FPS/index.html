@@ -4003,17 +4003,22 @@ function bindUI(){
      这正是「两个单独用没问题、一起用灵敏度爆炸」的放大器：
      真实设备上 DOMContentLoaded 与直接调用、或某些 WebView 重复派发，
      都可能触发二次执行。
-     用标志位保证只跑一次。 */
-if(window.__uiBound) return; window.__uiBound=true;
-  /* 【GM 面板的初始化不放在这里】
-     这个函数在 <script> 执行到 f_ui.js 时就会跑（文档已经 ready），
-     而 initGM 定义在后面的 x_ext.js 里 —— 那一刻它还不存在，
-     这里的 typeof 检查会静默跳过，导致面板永远绑不上按钮。
-     现在由 z_render.js 末尾的启动段负责调用 initGM()。 */
-  bindDoorHint();   // 门提示条点击交互（手机端没有键盘）
-  initInputModeDetect();   // 键盘/触摸自动切换触摸按键
+     【重要修改】标志位原来在函数第一行就置 true。
+     如果函数中途抛错（比如某个 xxx 还没定义），
+     标志位已经立住了 —— 第二次调用直接 return，
+     结果就是「所有按钮一个都没绑上，而且没有任何报错」。
+     现在改成：只在【完整跑完】之后才置 true，
+     并且每一步用 safe() 包住，单个失败不拖垮后面的绑定。
+     这就是用户报的「主界面所有按钮点不动、但按钮有按下反馈」的根因：
+     CSS 的 :active 是浏览器自己做的，不需要 JS；
+     而 onclick 需要 JS 绑 —— JS 中断了，按钮自然只剩视觉反馈。 */
+  if(window.__uiBound) return;
+  /* 单步容错执行器：失败只记日志，继续绑后面的 */
+  const safe=(label,fn)=>{ try{ fn(); }catch(e){ console.error('bindUI.'+label+' failed', e); } };
 
-  hideTouchUI();   // 一进页面就是主菜单，摇杆/操作按钮先收起来
+  safe('bindDoorHint', ()=>bindDoorHint());   // 门提示条点击交互（手机端没有键盘）
+  safe('initInputModeDetect', ()=>initInputModeDetect());   // 键盘/触摸自动切换触摸按键
+  safe('hideTouchUI', ()=>hideTouchUI());   // 一进页面就是主菜单，摇杆/操作按钮先收起来
 
   /* ===== 多指触控工具（bindUI 顶层，摇杆和视角层共用） =====
      【多指 bug 的核心修复】
@@ -4062,6 +4067,10 @@ if(window.__uiBound) return; window.__uiBound=true;
   window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
   window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
   relayout();
+  /* 【主菜单按钮】这一整块用 try 包住 —— 之前如果这里前面有任何一处
+     抛错，后面的按钮就全都不绑，表现正是「主界面所有按钮都点不动」。
+     现在每类绑定各自兜底，一个坏掉不影响其它。 */
+  try{
   const start=$('btnPlay'); if(start) start.onclick=()=>{
     /* 【开局前同步落盘一次】主菜单时期的所有改动（买东西、仓库整理、
        改枪、换皮肤）到这一刻必须已经写进 localStorage 了。
@@ -4144,6 +4153,7 @@ if(window.__uiBound) return; window.__uiBound=true;
     location.reload();
   };
   const backBtn=$('btnBack'); if(backBtn) backBtn.onclick=()=>{ location.href='../'; };
+  }catch(e){ console.error('bindUI.menuButtons failed', e); }
 
   /* ===== 键盘映射（按用户指定）=====
        W A S D    移动
@@ -6043,8 +6053,67 @@ function settleDeath(){
   return lost;
 }
 
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindUI);
-else bindUI();/* ============ 输入方式自适应 ============
+/* 【启动 bindUI】
+   以前是直接 bindUI()。问题在于：bindUI 内部任何一处抛错，
+   都会让「它后面的所有按钮绑定」全部跳过 —— 用户看到的就是
+   「主界面所有按钮都点不动，但按下有蓝圈」（蓝圈是 CSS :active，
+   不需要 JS，所以视觉有反馈但功能死了）。
+   现在：
+     1. 外面加 try/catch 并打印明确日志，不再静默失败；
+     2. 无论成功失败都设置 __uiBound，避免 DOMContentLoaded 再跑一遍
+        导致事件重复绑定（灵敏度翻倍的问题会回来）；
+     3. 即使 bindUI 崩了，下面的菜单按钮兜底绑定也会补上。 */
+function __startBindUI(){
+  let ok=false;
+  try{ bindUI(); ok=true; }
+  catch(e){ console.error('bindUI crashed', e); }
+  window.__uiBound=true;
+  /* 兜底：如果 bindUI 中途崩了，主菜单按钮很可能一个都没绑上。
+     这里再统一补一次（幂等：已经绑过的直接覆盖，不会重复）。
+     这是「按钮点不动」的最后一道保险。 */
+  try{ __bindMenuFallback(); }catch(e){ console.error('menu fallback failed', e); }
+  window.__uiReady=ok;
+}
+/* 主菜单按钮兜底绑定：只做最容易失效、也最要紧的那几个 */
+function __bindMenuFallback(){
+  const play=$('btnPlay');
+  if(play && !play.onclick) play.onclick=()=>{
+    try{ if(typeof autoSaveFlush==='function') autoSaveFlush(); }catch(e){}
+    const m=$('menu'); if(m) m.style.display='none';
+    try{ audioInit(); audioResume(); sfxUI(); }catch(e){}
+    window.__inGame=true;
+    if(typeof window.__orientEnter==='function'){ try{ window.__orientEnter(); }catch(e){} }
+    try{ init(); }catch(e){ console.error('init failed', e); }
+    try{ applyInputMode(inputMode, true); }catch(e){}
+  };
+  const shopBtn=$('btnShop');
+  if(shopBtn && !shopBtn.onclick) shopBtn.onclick=()=>{ try{ toggleShop(); }catch(e){ console.error(e); } };
+  const stashBtn=$('btnStash');
+  if(stashBtn && !stashBtn.onclick) stashBtn.onclick=()=>{ try{ sfxUI(); toggleStash(); }catch(e){ console.error(e); } };
+  const gsBtn=$('btnGunsmith');
+  if(gsBtn && !gsBtn.onclick) gsBtn.onclick=()=>{
+    try{ sfxUI(); closeShop(); const st=$('stash'); if(st) st.style.display='none'; toggleGunsmith(); }
+    catch(e){ console.error(e); }
+  };
+  const exportBtn=$('btnExport'); if(exportBtn && !exportBtn.onclick) exportBtn.onclick=exportSave;
+  const importBtn=$('btnImport');
+  if(importBtn && !importBtn.onclick) importBtn.onclick=()=>{
+    const row=$('saveRow'), f=$('saveFile');
+    if(row) row.style.display='flex';
+    if(f){ f.value=''; try{ f.click(); }catch(e){} }
+    importSave();
+  };
+  const resetBtn=$('btnReset');
+  if(resetBtn && !resetBtn.onclick) resetBtn.onclick=()=>{
+    if(!confirm('确认重置所有数据？')) return;
+    try{ if(typeof autoSaveClear==='function') autoSaveClear(); }catch(e){}
+    try{ localStorage.removeItem('efs_fps_save_v1'); }catch(e){}
+    location.reload();
+  };
+  const backBtn=$('btnBack'); if(backBtn && !backBtn.onclick) backBtn.onclick=()=>{ location.href='../'; };
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',__startBindUI);
+else __startBindUI();/* ============ 输入方式自适应 ============
    需求：
      · 检测到键盘 -> 隐藏触摸按键（摇杆 + 右侧按钮）
      · 检测到触摸  -> 重新显示

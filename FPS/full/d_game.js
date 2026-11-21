@@ -91,6 +91,15 @@ const MELEE_MAX=2;          // 一刀最多命中几个
 function meleeSwing(){
   if(!camera) return;
   const dmg=curDamage();
+  /* 【近战耐久】刀也是消耗品：每挥一刀都会磨。
+     耐久归零后伤害暴降（见上面的第 2 段），逼你换刀或去修。
+     斧头最耐用（300），爪刀最脆（140）。 */
+  {
+    const mid=slotItem(P.slot);
+    if(mid && typeof gunDurUse==='function' && MELEE_DUR_MAX[mid]){
+      gunDurUse(mid, 1);
+    }
+  }
   /* 每把刀的挥砍半径不同：太刀最长，斧头重但短 */
   const mit=(typeof curMeleeItem==='function')?curMeleeItem():null;
   const reach=(mit&&mit.meleeRange)||MELEE_RANGE;
@@ -147,6 +156,16 @@ function fire(){
   const t=curAmmoKey();             // melee 时为 null
   if(!melee && (P.ammo[t]|0)<=0){ sfxEmpty(); startReload(); return; }
   if(!melee) P.ammo[t]--;
+  /* 【武器耐久】每开一发都磨损机械部件。
+     不同枪型磨损率不同（SEE GUN_DUR_WEAR）：狙击一发扣 3、手枪一发 0.7。
+     扣到 0 会卡壳（射速腰斩、后坐翻倍、弹匣减半），要花钱去改枪台修。 */
+  if(!melee){
+    const wid=slotItem(P.slot);
+    if(wid && typeof gunDurUse==='function'){
+      const wear=(typeof GUN_DUR_WEAR==='object' && GUN_DUR_WEAR[wid]) || 1;
+      gunDurUse(wid, wear);
+    }
+  }
   const mode=curFireMode();
   P.shootCd=curFireCd();
   P.shooting=true;
@@ -218,7 +237,15 @@ function updReload(dt){
     const rk=curReserveKey();
     const id=slotItem(P.slot);
     const it=id&&SHOP_ITEMS[id];
-    const mag=(it&&it.mag)||(curIsPrimary()?30:12);
+    /* 【扩容弹匣/弹鼓】magMul 是加算比例，+0.5 = 多 50%，+1.0 = 翻倍。
+       没有配件时 magMul=0，完全保持原行为。 */
+    let mag=(it&&it.mag)||(curIsPrimary()?30:12);
+    try{
+      const mm=(typeof gunModEff==='function')?gunModEff(id,'magMul'):0;
+      if(mm>0) mag=Math.round(mag*(1+mm));
+    }catch(e){}
+    /* 【卡壳】耐久归零：弹匣只能装进一半，等于逼你去修 */
+    if(id && typeof gunFunctional==='function' && !gunFunctional(id)) mag=Math.max(1, Math.round(mag*0.5));
     /* 从后备弹里扣：有后备就用后备，没有就按旧逻辑白给满弹匣，
        避免新手手枪打空后彻底没法玩。 */
     const have=(P.ammo[rk]|0);

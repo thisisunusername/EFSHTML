@@ -163,7 +163,18 @@ function updP(dt){
   /* 开镜：按住开镜键时 FOV 收紧，松开还原。
      aimT 是平滑插值，避免瞬间跳变导致眩晕。 */
   const aimTarget = P.aiming && P.onGround ? 1 : 0;
-  P.aimT += (aimTarget - P.aimT) * Math.min(1, dt*12);
+  /* 【开镜速度】以前固定 dt*12，所有枪和瞄具一栋。
+     现在由配件决定：红点/折叠枪托/短握把开镜更快，
+     高倍镜和重型枪托更慢。倍率限制在 6~26 之间避免一瞬开镜或慢到没法玩。 */
+  let adsRate = 12;
+  try{
+    if(typeof gunModEff==='function'){
+      const gid = (typeof slotItem==='function' && typeof P!=='undefined') ? slotItem(P.slot) : null;
+      if(gid) adsRate = 12 * (1 + gunModEff(gid,'adsSpeed'));
+    }
+  }catch(e){ adsRate = 12; }
+  adsRate = Math.max(6, Math.min(26, adsRate));
+  P.aimT += (aimTarget - P.aimT) * Math.min(1, dt*adsRate);
   if(camera){
     const baseFov = P.sprinting ? 78 : 75;
     /* 各枪开镜倍率不同：狙击压到 0.55 倍视场（约 2.4 倍镜），
@@ -173,8 +184,17 @@ function updP(dt){
     try{
       const it=(typeof curItem==='function')?curItem():null;
       if(it && it.adsFov) adsK=it.adsFov;
+      /* 【瞄具倍率】zoom 是「额外收紧多少度视场」。
+         红点 .30 / 全息 .50 / 2x 1.0 / 4x 2.2 / 6x 3.6，
+         乘 7 转成度：6x 镜能把 75° 压到 75-28-25 ≈ 22°，接近真倍镜。
+         下限 12° 防止高倍镜在低 FOV 下穿模。 */
+      const gid=(typeof slotItem==='function')&&P?slotItem(P.slot):null;
+      if(gid && typeof gunModEff==='function'){
+        const z=gunModEff(gid,'zoom');
+        if(z>0) adsK = Math.max(0.28, adsK - z*0.16);
+      }
     }catch(e){ adsK=1; }
-    camera.fov = baseFov - 28*P.aimT*adsK;
+    camera.fov = Math.max(12, baseFov - 28*P.aimT*adsK);
     camera.updateProjectionMatrix();
   }
 

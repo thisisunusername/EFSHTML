@@ -490,11 +490,19 @@ function curDamage(){
      以前这里写死成 40，导致买更贵的刀伤害完全没变（花钱没效果）。 */
   if(curIsMelee()){
     const mit=curMeleeItem();
-    return (mit&&mit.dmg) || 40;
+    let d=(mit&&mit.dmg) || 40;
+    /* 【钝刀】耐久归零后砍不动东西：伤害打 35 折。
+       没有这个惩罚的话「耐久」就只是个数字，玩家永远不会去修。 */
+    const mid=slotItem(P.slot);
+    if(mid && !gunFunctional(mid)) d*=0.35;
+    return d;
   }
   const id=slotItem(P.slot);
   const it=id&&SHOP_ITEMS[id];
-  return (it&&it.dmg) || (curIsPrimary()?26:14);
+  const base=(it&&it.dmg) || (curIsPrimary()?26:14);
+  /* 配件伤害修正（消音器 -5%） */
+  const mod=gunModEff(id,'dmg');
+  return Math.max(1, base*(1+mod));
 }
 /* ---- 射击模式 ----
    auto = 全自动（按住持续开火）
@@ -535,8 +543,13 @@ function curFireCd(){
     return (mit&&mit.meleeCd) || 0.42;
   }
   const it=curItem();
-  if(it && it.fireCd) return it.fireCd;
-  return curIsPrimary() ? 0.12 : 0.18;
+  const id=slotItem(P.slot);
+  let cd = (it && it.fireCd) || (curIsPrimary() ? 0.12 : 0.18);
+  /* 扳机配件：负值=射速更快 */
+  cd *= (1 + gunModEff(id,'fireCdMul'));
+  /* 【卡壳惩罚】耐久归零不是摆设：射速直接腰斩 */
+  if(id && !gunFunctional(id)) cd *= 2;
+  return Math.max(0.03, cd);
 }
 /* 泵动/栓动要额外拉栓的时间（只对 pump 有意义） */
 function curPumpTime(){
@@ -553,8 +566,14 @@ function curPellets(){
 /* 后坐力系数：霰弹枪/栓动枪甩得厉害，冲锋枪最稳 */
 function curRecoilK(){
   const it=curItem();
-  const k=it&&it.recoil;
-  return (typeof k==='number' && k>0) ? k : 1;
+  const id=slotItem(P.slot);
+  let k=(typeof (it&&it.recoil)==='number' && it.recoil>0) ? it.recoil : 1;
+  /* 配件是「减少比例」：正数=更稳。总和封顶 0.7，避免堆配件变成无后坐。 */
+  const red=Math.min(0.7, Math.max(0, gunModEff(id,'recoil')));
+  k *= (1 - red);
+  /* 卡壳：后坐力翻倍 */
+  if(id && !gunFunctional(id)) k *= 2;
+  return Math.max(0.1, k);
 }
 /* 射击模式的 HUD 显示名（走 i18n） */
 function fireModeLabel(){

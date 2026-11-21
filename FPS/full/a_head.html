@@ -672,6 +672,7 @@ html[data-lang="en"] #bagBtn span{
       <button class="btn" id="btnPlay">▶ 开始（进入游戏）</button>
       <button class="btn ghost" id="btnShop">🛒 商店</button>
       <button class="btn ghost" id="btnStash">🏠 仓库</button>
+      <button class="btn ghost" id="btnGunsmith">🔧 改枪台</button>
     </div>
     <div class="row">
       <button class="btn ghost small" id="btnExport">⬇️ 加密导出</button>
@@ -685,6 +686,9 @@ html[data-lang="en"] #bagBtn span{
 <div id="shop" style="display:none"></div>
 <!-- 局外仓库 -->
 <div id="stash" style="display:none"></div>
+<!-- 改枪台：结构与 shop/stash 同构，靠 JS 动态填充。单独一个容器是因为
+     改枪和商店/仓库是三个互斥的全屏面板，复用一个容器会互相覆盖。 -->
+<div id="gunsmith" style="display:none"></div>
 <!-- 局内背包（Tab / B 打开） -->
 <div id="bag" style="display:none"></div>
 <!-- GM 隐藏面板：主菜单连续点 D 15 次显示 -->

@@ -165,6 +165,15 @@ if(window.__uiBound) return; window.__uiBound=true;
   const deathMenu=$('btnDeathMenu'); if(deathMenu) deathMenu.onclick=()=>{ location.reload(); };
   const shopBtn=$('btnShop'); if(shopBtn) shopBtn.onclick=()=>{ toggleShop(); };
   const stashBtn=$('btnStash'); if(stashBtn) stashBtn.onclick=()=>{ sfxUI(); toggleStash(); };
+  /* 【改枪台入口】面板是互斥的：开改枪台前先把商店/仓库收起来，
+     否则三层全屏浮层叠在一起，点哪都是最上面那个。 */
+  const gsBtn=$('btnGunsmith');
+  if(gsBtn) gsBtn.onclick=()=>{
+    sfxUI();
+    closeShop();
+    try{ const st=$('stash'); if(st) st.style.display='none'; }catch(e){}
+    toggleGunsmith();
+  };
   /* 【局内背包入口】HUD 右上角的「🎒 背包」可直接点开 */
   const bagBtn=$('bagBtn');
   if(bagBtn) bagBtn.onclick=(ev)=>{ ev.stopPropagation(); sfxUI(); toggleBag(); };
@@ -697,6 +706,8 @@ const SHOP_CATS=[
   {id:'pistol', get name(){ return T('手枪'); }},
   {id:'melee',  get name(){ return T('副武器'); }},
   {id:'skin',   get name(){ return T('武器皮肤'); }},
+  /* 配件放皮肤后面：玩家买枪 → 买配件改装，是自然的下一步 */
+  {id:'mod',    get name(){ return T('枪配件'); }},
   {id:'chest',  get name(){ return T('胸挂'); }},
   {id:'med',    get name(){ return T('医药'); }},
   {id:'tool',   get name(){ return T('道具'); }},
@@ -705,6 +716,147 @@ const SHOP_CATS=[
   {id:'helmet', get name(){ return T('头盔'); }},
   {id:'armor',  get name(){ return T('护甲'); }},
 ];
+/* ============ 武器耐久 + 改枪配件系统 ============
+
+ 【武器耐久】以前只有头甲有耐久，枪是永久武器 —— 这个不对称太明显：
+ 头盔打坏了会消失，几千块的步枪却永远不会退场。
+ 现在每把枪也有耐久，射击扣、近战挥砍也扣，扣光「卡壳」（可以修）。
+ 修枪要花钱，价格随损耗线性上升，所以好枪的长期使用成本更高。
+
+ 【改枪】每把枪有 6 个配件槽，装上的配件实时改属性：
+   瞄准属性、后坐力、射速、弹匣、开火模式、镜倍率、伤害
+ 属性不是存在武器上的，而是每次读 curXxx() 时现算（见 w_weapon.js），
+ 所以换配件立即生效，不需要重建模型或重开一局。
+
+ 【数据结构】P.gunMods = { 武器id: { slot: 配件id } }
+ 挂武器而不是挂槽位：手枪和主武器各存各的，换枪不串味。
+*/
+const GUN_DUR_MAX = {
+  gun_rifle: 320, gun_smg: 300, gun_sniper: 260, gun_dmr: 300, gun_m870: 280,
+  pis_default: 240, pis_heavy: 200
+};
+/* 每发射击扣多少耐久。栓动/霰弹一发的机械负担远大于自动步枪。 */
+const GUN_DUR_WEAR = {
+  gun_rifle: 1, gun_smg: 0.8, gun_sniper: 3, gun_dmr: 2, gun_m870: 2.5,
+  pis_default: 0.7, pis_heavy: 1.2
+};
+/* 近战武器耐久：刀是消耗品，斧头最耐用 */
+const MELEE_DUR_MAX = {
+  melee_knife: 180, melee_baton: 260, melee_karambit: 140,
+  melee_katana: 220, melee_axe: 300
+};
+/* 取某把武器的耐久上限 */
+function gunDurMax(id){
+  return GUN_DUR_MAX[id] || MELEE_DUR_MAX[id] || 200;
+}
+/* 取当前耐久（没有记录就当作满耐久，兼容老存档） */
+function gunDurOf(id){
+  if(!id) return 0;
+  if(typeof P.gunDur!=='object' || !P.gunDur) return gunDurMax(id);
+  const v = P.gunDur[id];
+  if(typeof v!=='number') return gunDurMax(id);
+  return v;
+}
+function gunDurPct(id){
+  const mx=gunDurMax(id);
+  return mx>0 ? Math.max(0, Math.min(1, gunDurOf(id)/mx)) : 1;
+}
+/* 掉耐久。返回是否「刚坏」。
+   坏了不销毁（几千块的枪直接消失太狠），而是进“卡壳”状态：
+   还能打但射速腰斩、后坐力翻倍，逼你去修。 */
+function gunDurUse(id, amt){
+  if(!id) return false;
+  if(typeof P.gunDur!=='object' || !P.gunDur) P.gunDur={};
+  const before = gunDurOf(id);
+  if(before<=0) return false;
+  const after = Math.max(0, before - (amt||0));
+  P.gunDur[id]=after;
+  if(before>0 && after<=0){
+    toast(T('武器卡壳了！去改枪台花加钱修理'));
+    saveTick();
+    return true;
+  }
+  return false;
+}
+/* 武器状态：1=完好 0=卡壳 */
+function gunFunctional(id){ return gunDurOf(id)>0; }
+
+/* ---------- 配件表 ----------
+   slot 是安装位置，同一把枪每个位置只能装一件。
+   eff 里每项都是「加算」修正值，读属性时统一叠加，
+   这样配件之间天然可以组合，不用写一堆 if 分支。 */
+const GUN_MODS={
+  /* ==== 瞄具（scope）==== */
+  mod_iron:   {cat:'mod', slot:'scope', get name(){return T('机械瞳准');},   icon:'🎯', price:0,    get desc(){return T('原厂瞄具 · 无额外效果');}, eff:{}},
+  mod_reddot: {cat:'mod', slot:'scope', get name(){return T('红点镜');},       icon:'🔴', price:700,  get desc(){return T('开镜更快 · 倍率 1.3x');}, eff:{adsSpeed:.25, zoom:.30, adsZ:-.03}},
+  mod_holo:   {cat:'mod', slot:'scope', get name(){return T('全息镜');},       icon:'🔵', price:1100, get desc(){return T('视野清晰 · 倍率 1.5x · 轻微稳定');}, eff:{adsSpeed:.18, zoom:.50, adsZ:-.05, recoil:-.05}},
+  mod_scope2: {cat:'mod', slot:'scope', get name(){return T('2x 战术镜');},    icon:'🔭', price:1800, get desc(){return T('中等倍率 · 远处点射利器');}, eff:{zoom:1.00, adsZ:-.08, adsSpeed:.10}},
+  mod_scope4: {cat:'mod', slot:'scope', get name(){return T('4x 精准镜');},    icon:'🔬', price:3600, get desc(){return T('高倍率 · 近战视野收缩');}, eff:{zoom:2.20, adsZ:-.12, adsSpeed:-.15}},
+  mod_scope6: {cat:'mod', slot:'scope', get name(){return T('6x 狙击镜');},    icon:'📡', price:6000, get desc(){return T('极高倍率 · 只适合栓动');}, eff:{zoom:3.60, adsZ:-.16, adsSpeed:-.25}},
+
+  /* ==== 前握把（frontgrip）—— 管后坐力与稳定性 ==== */
+  mod_grip_vert:{cat:'mod', slot:'frontgrip', get name(){return T('垂直握把');}, icon:'⬇️', price:500, get desc(){return T('大幅减少垂直后坐');}, eff:{recoil:.22}},
+  mod_grip_ang: {cat:'mod', slot:'frontgrip', get name(){return T('斜角握把');}, icon:'↘️', price:800, get desc(){return T('后坐力与开镜速度兼顾');}, eff:{recoil:.14, adsSpeed:.12}},
+  mod_grip_stub:{cat:'mod', slot:'frontgrip', get name(){return T('短握把');},   icon:'▪️', price:400, get desc(){return T('开镜最快 · 后坐力改善最少');}, eff:{adsSpeed:.30, recoil:.06}},
+  mod_bipod:    {cat:'mod', slot:'frontgrip', get name(){return T('两脚架');},   icon:'🦵', price:2400, get desc(){return T('趴下时后坐力几乎归零');}, eff:{recoil:.10, proneRecoil:1.6}},
+
+  /* ==== 枪托（stock）—— 管后坐力与瞄准速度 ==== */
+  mod_stock_light:{cat:'mod', slot:'stock', get name(){return T('轻型枪托');}, icon:'🪶', price:600, get desc(){return T('开镜更快 · 后坐力小幅改善');}, eff:{adsSpeed:.22, recoil:.08}},
+  mod_stock_heavy:{cat:'mod', slot:'stock', get name(){return T('重型枪托');}, icon:'🔩', price:1400, get desc(){return T('极稳 · 但开镜变慢');}, eff:{recoil:.28, adsSpeed:-.12}},
+  mod_stock_fold:{cat:'mod', slot:'stock', get name(){return T('折叠枪托');},   icon:'📎', price:1000, get desc(){return T('开镜最快 · 后坐力无改善');}, eff:{adsSpeed:.35}},
+
+  /* ==== 枪口（muzzle）==== */
+  mod_comp:   {cat:'mod', slot:'muzzle', get name(){return T('补偿器');},   icon:'🌀', price:900,  get desc(){return T('压制枪口上跳');}, eff:{recoil:.18}},
+  mod_supp:   {cat:'mod', slot:'muzzle', get name(){return T('消音器');},   icon:'🔇', price:2200, get desc(){return T('开火不惊动远处敌人 · 略降伤害');}, eff:{suppress:1, dmg:-.05, recoil:.08}},
+  mod_brake:  {cat:'mod', slot:'muzzle', get name(){return T('枪口制退器');}, icon:'💨', price:1300, get desc(){return T('制退最强 · 开镜略慢');}, eff:{recoil:.26, adsSpeed:-.06}},
+
+  /* ==== 弹匣（mag）==== */
+  mod_mag_ext:{cat:'mod', slot:'mag', get name(){return T('扩容弹匣');}, icon:'📦', price:700,  get desc(){return T('弹匣容量 +50%');}, eff:{magMul:.5}},
+  mod_mag_drum:{cat:'mod', slot:'mag', get name(){return T('弹鼓');},     icon:'🥁', price:1900, get desc(){return T('容量翻倍 · 换弹变慢');}, eff:{magMul:1.0, reloadMul:.35}},
+  mod_mag_quick:{cat:'mod', slot:'mag', get name(){return T('快拔弹匣');}, icon:'⚡', price:1100, get desc(){return T('换弹速度 +35%');}, eff:{reloadMul:-.35}},
+
+  /* ==== 扳机（trigger）==== */
+  mod_trigger: {cat:'mod', slot:'trigger', get name(){return T('竞赛扳机');}, icon:'🔧', price:1500, get desc(){return T('射速 +15%');}, eff:{fireCdMul:-.15}},
+  mod_trigger_heavy:{cat:'mod', slot:'trigger', get name(){return T('轻量化扳机组');}, icon:'🎚️', price:2600, get desc(){return T('射速 +25% · 后坐力略增');}, eff:{fireCdMul:-.25, recoil:-.08}},
+};
+
+/* 每把枪允许的配件槽（栓动枪不能装弹鼓，手枪装不了两脚架这种差异） */
+const GUN_SLOTS={
+  gun_rifle:  ['scope','frontgrip','stock','muzzle','mag','trigger'],
+  gun_smg:    ['scope','frontgrip','stock','muzzle','mag','trigger'],
+  gun_dmr:    ['scope','frontgrip','stock','muzzle','mag','trigger'],
+  gun_sniper: ['scope','frontgrip','stock','muzzle','mag'],
+  gun_m870:   ['scope','frontgrip','stock','muzzle'],
+  pis_default:['scope','muzzle','mag'],
+  pis_heavy:  ['scope','muzzle','mag'],
+};
+function gunSlotsOf(id){ return GUN_SLOTS[id] || ['scope']; }
+/* 该枪的配件表：{ slot: modId } */
+function gunModsOf(id){
+  if(!id) return {};
+  if(typeof P.gunMods!=='object' || !P.gunMods) P.gunMods={};
+  return P.gunMods[id] || (P.gunMods[id]={});
+}
+function gunModId(id, slot){
+  const m=gunModsOf(id);
+  const v=m[slot];
+  return (v && GUN_MODS[v]) ? v : null;
+}
+function gunModItem(id, slot){
+  const k=gunModId(id, slot);
+  return k ? GUN_MODS[k] : null;
+}
+/* 累加所有配件效果。key 不传时返回合并后的对象。 */
+function gunModEff(id, key){
+  const m=gunModsOf(id);
+  const out={};
+  for(const slot in m){
+    const md=GUN_MODS[m[slot]];
+    if(!md || !md.eff) continue;
+    for(const k in md.eff) out[k]=(out[k]||0)+md.eff[k];
+  }
+  return key ? (out[key]||0) : out;
+}
 let shopTab='gun';   // 当前商店标签页（默认停在主武器，对应仓库第一件事）
 let bagTab='all';    // 当前背包筛选
 
@@ -746,6 +898,232 @@ function stashAdd(id, cnt){
 }
 
 /* ---- 商店 ---- */
+/* ============ 改枪台 ============
+
+ 为什么单独做一个面板而不是塞进商店：
+ 配件是「装在某把已经拥有的枪上」的，有归属关系；商店是「付钱拿货」。
+ 混在一起会出现「在商店里给还没买的枪装瞄具」这种鬼状态。
+
+ 面板结构：
+   顶部：选枪（只列出你拥有的枪）
+   中间：耐久条 + 修理按钮（价格随损耗上升）
+   下面：该枪的每个配件槽，点开选配件（列出已拥有 + 可购买）
+*/
+
+/* 你拥有哪些枪/刀（装备栏里 + 仓库里，去重） */
+function ownedWeapons(){
+  const out=[];
+  const seen={};
+  const push=id=>{
+    if(!id || seen[id]) return;
+    const it=SHOP_ITEMS[id];
+    if(!it) return;
+    if(it.cat!=='gun' && it.cat!=='pistol' && it.cat!=='melee') return;
+    seen[id]=1; out.push(id);
+  };
+  if(P.equip) for(const k in P.equip) push(P.equip[k]);
+  for(const id in P.stash) if(P.stash[id]>0) push(id);
+  return out;
+}
+/* 修枪价格：按缺的耐久算，满修 = 武器售价的 35%。
+   越贵的枪修起来越贵，所以「好枪更贵」不只体现在买的时候。 */
+function gunRepairCost(id){
+  const it=SHOP_ITEMS[id]; if(!it) return 0;
+  const mx=gunDurMax(id);
+  const cur=gunDurOf(id);
+  if(mx<=0) return 0;
+  const miss=Math.max(0, mx-cur);
+  if(miss<=0) return 0;
+  const perUnit=(it.price||1000)*0.35/mx;
+  return Math.max(1, Math.round(miss*perUnit));
+}
+function gunRepair(id){
+  const cost=gunRepairCost(id);
+  if(cost<=0){ toast(T('这把武器耐久已满')); return; }
+  if((P.ammo.cash|0) < cost){ sfxDeny(); toast(T('货币不足，修理需要 ')+cost); return; }
+  P.ammo.cash-=cost;
+  if(typeof P.gunDur!=='object' || !P.gunDur) P.gunDur={};
+  P.gunDur[id]=gunDurMax(id);
+  sfxBuy();
+  toast(T('修理完成 · 花费 ')+cost);
+  saveTick();
+  buildGunsmith(); refreshHUD();
+}
+/* 装/卸配件 */
+function gunMount(gunId, slot, modId){
+  if(!gunId || !GUN_MODS[modId]) return;
+  const md=GUN_MODS[modId];
+  if(md.slot!==slot) return;
+  const cur=gunModId(gunId, slot);
+  if(cur===modId){ toast(T('已经装着了')); return; }
+  /* 配件要有货：仓库里有才装得上（mod_iron 是原厂自带，免费）。
+     装新配件时把旧的退回仓库，不吞玩家东西。 */
+  if(modId!=='mod_iron' && !(P.stash[modId]>0)){
+    if((P.ammo.cash|0) >= (md.price||0)){
+      P.ammo.cash-=md.price;
+      toast(T('买下并安装 ')+md.name+' · -'+md.price);
+    }else{
+      sfxDeny(); toast(T('货币不足')); return;
+    }
+  }else if(modId!=='mod_iron'){
+    P.stash[modId]--;
+    if(P.stash[modId]<=0) delete P.stash[modId];
+  }
+  if(cur && cur!=='mod_iron') stashAdd(cur,1);
+  const m=gunModsOf(gunId);
+  if(modId==='mod_iron') delete m[slot];
+  else m[slot]=modId;
+  sfxBuy();
+  saveTick();
+  gunRefreshModel();
+  buildGunsmith(); refreshHUD(); refreshHUD();
+}
+/* 卸下配件 → 回仓库 */
+function gunUnmount(gunId, slot){
+  const cur=gunModId(gunId, slot);
+  if(!cur) return;
+  if(cur!=='mod_iron') stashAdd(cur,1);
+  const m=gunModsOf(gunId);
+  delete m[slot];
+  toast(T('已卸下配件'));
+  saveTick(); gunRefreshModel(); buildGunsmith(); refreshHUD();
+}
+/* 改完配件要重建武器模型（瞄具会影响枪的贴图层次，握把/枪托影响视觉） */
+function gunRefreshModel(){
+  try{ if(typeof _modelCache==='object') _modelCache.key=null; }catch(e){}
+  try{ if(typeof initWeapon==='function') initWeapon(); }catch(e){}
+}
+
+let gunsmithGun=null;   // 当前改的哪把枪
+
+function toggleGunsmith(){
+  const s=$('gunsmith'); if(!s) return;
+  const opening = s.style.display!=='flex';
+  if(opening){
+    const list=ownedWeapons();
+    if(!gunsmithGun || list.indexOf(gunsmithGun)<0) gunsmithGun=list[0]||null;
+    buildGunsmith(); s.style.display='flex';
+  }else s.style.display='none';
+}
+function closeGunsmith(){ const s=$('gunsmith'); if(s) s.style.display='none'; }
+
+function buildGunsmith(){
+  const el=$('gunsmith'); if(!el) return;
+  const list=ownedWeapons();
+  let h='<div class="box" style="max-width:640px">';
+  h+='<div class="row" style="justify-content:space-between;align-items:center;margin:0 0 6px">'
+    +'<h1 style="margin:0">🔧 '+T('改枪台')+'</h1>'
+    +'<div style="color:#ffd54a;font-weight:700">¥'+P.ammo.cash+'</div></div>';
+
+  if(!list.length){
+    h+='<div class="d" style="text-align:center;padding:20px">'+T('你还没有任何武器，先去商店买一把')+'</div>';
+    h+='<div class="row" style="justify-content:center"><button class="btn ghost" id="gsClose">'+T('关闭')+'</button></div>';
+    h+='</div>'; el.innerHTML=h; bindGunsmith(); return;
+  }
+
+  /* 选枪标签 */
+  h+='<div class="tabs">';
+  for(const id of list){
+    const it=SHOP_ITEMS[id];
+    const pct=Math.round(gunDurPct(id)*100);
+    h+='<button class="tab'+(gunsmithGun===id?' on':'')+'" data-gun="'+id+'">'
+      +it.icon+' '+it.name+' <span style="opacity:.7;font-size:11px">'+pct+'%</span></button>';
+  }
+  h+='</div>';
+
+  const gid=gunsmithGun;
+  const git=SHOP_ITEMS[gid];
+  if(git){
+    /* ---- 耐久条 + 修理 ---- */
+    const mx=gunDurMax(gid), cur=gunDurOf(gid);
+    const pct=mx>0?Math.round(cur/mx*100):0;
+    const broken=cur<=0;
+    const cost=gunRepairCost(gid);
+    h+='<div style="margin:10px 0 4px;padding:11px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)">';
+    h+='<div class="row" style="justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:700;font-size:13.5px">'+git.icon+' '+git.name+'</div>'
+      +'<div style="font-size:12px;color:'+(broken?'#ff6b6b':(pct<35?'#ffb648':'#7ee8a0'))+';font-weight:800">'
+      +T('耐久')+' '+Math.round(cur)+'/'+mx+' ('+pct+'%)</div></div>';
+    /* 进度条 */
+    h+='<div style="height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin:8px 0 9px">'
+      +'<div style="height:100%;width:'+pct+'%;border-radius:4px;background:'
+      +(broken?'#ff4444':(pct<35?'linear-gradient(90deg,#ffb648,#ffd54a)':'linear-gradient(90deg,#4ade80,#7ee8a0)'))
+      +'"></div></div>';
+    if(git.dmg) h+='<div class="d">'+T('伤害')+' '+Math.round(git.dmg*(1+gunModEff(gid,'dmg')))
+      +(gunModEff(gid,'recoil')>0?(T(' · 后坐力 ')+'-'+Math.round(Math.min(0.7,gunModEff(gid,'recoil'))*100)+'%'):'')
+      +(gunModEff(gid,'zoom')>0?(T(' · 倍率 ')+'+'+(gunModEff(gid,'zoom')*0.5).toFixed(1)+'x'):'')
+      +(gunModEff(gid,'magMul')>0?(T(' · 弹匣 ')+'+'+Math.round(gunModEff(gid,'magMul')*100)+'%'):'')
+      +(gunModEff(gid,'fireCdMul')<0?(T(' · 射速 ')+'+'+Math.round(-gunModEff(gid,'fireCdMul')*100)+'%'):'')
+      +'</div>';
+    if(broken){
+      h+='<div class="d" style="color:#ff6b6b;margin-top:5px">'+T('⚠ 已卡壳：射速腰斩 · 后坐力翻倍 · 弹匣减半')+'</div>';
+    }
+    h+='<div class="row" style="margin-top:9px">'
+      +(cost>0
+        ? '<button class="btn sm" id="gsRepair" data-cost="'+cost+'">🔧 '+T('修理')+' ¥'+cost+'</button>'
+        : '<button class="btn sm ghost" disabled>'+T('耐久已满')+'</button>')
+      +'</div>';
+    h+='</div>';
+
+    /* ---- 配件槽 ---- */
+    const slots=gunSlotsOf(gid);
+    const SLOT_LABEL={scope:'瞄准镜',frontgrip:'前握把',stock:'枪托',muzzle:'枪口',mag:'弹匣',trigger:'扳机'};
+    h+='<div style="font-size:12px;font-weight:700;color:#9aa3b2;margin:12px 0 6px">'+T('配件槽')+'</div>';
+    for(const slot of slots){
+      const mid=gunModId(gid, slot);
+      const mit=mid?GUN_MODS[mid]:null;
+      h+='<div style="padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);margin-bottom:7px">';
+      h+='<div class="row" style="justify-content:space-between;align-items:center">'
+        +'<div style="font-size:12px;color:#9aa3b2;min-width:64px">'+T(SLOT_LABEL[slot]||slot)+'</div>'
+        +'<div style="flex:1;font-size:13px;font-weight:700;margin-left:8px">'
+        +(mit? (mit.icon+' '+mit.name) : ('<span style="opacity:.45">'+T('空')+'</span>'))+'</div>'
+        +(mid? '<button class="btn sm ghost" data-umount="'+slot+'">'+T('卸下')+'</button>' : '')
+        +'</div>';
+      if(mit) h+='<div class="d" style="margin-left:72px;margin-top:2px">'+mit.desc+'</div>';
+      /* 可选配件列表 */
+      h+='<div class="row" style="flex-wrap:wrap;gap:5px;margin-top:6px;margin-left:64px">';
+      for(const modId in GUN_MODS){
+        const md=GUN_MODS[modId];
+        if(md.slot!==slot) continue;
+        if(modId===mid) continue;
+        const owned=(P.stash[modId]>0);
+        const free=(modId==='mod_iron');
+        const canPay=free||owned||((P.ammo.cash|0)>=(md.price||0));
+        h+='<button class="btn sm'+(canPay?'':' ghost')+'" data-mount="'+slot+':'+modId+'" '
+          +(canPay?'':'disabled')+' style="font-size:11px;padding:4px 8px">'
+          +md.icon+' '+md.name+(free?'':(owned?' ✓':' ¥'+md.price))+'</button>';
+      }
+      h+='</div></div>';
+    }
+  }
+
+  h+='<div class="row" style="margin-top:10px;align-items:center;justify-content:space-between">'
+    +'<div class="d">'+T('装上的配件立即生效 · 换枪各存各的')+'</div>'
+    +'<button class="btn ghost" id="gsClose">'+T('关闭')+'</button></div>';
+  h+='</div>';
+  el.innerHTML=h;
+  bindGunsmith();
+}
+
+function bindGunsmith(){
+  const el=$('gunsmith'); if(!el) return;
+  el.querySelectorAll('[data-gun]').forEach(b=>{
+    b.onclick=()=>{ gunsmithGun=b.getAttribute('data-gun'); sfxUI(); buildGunsmith(); };
+  });
+  const rb=$('gsRepair');
+  if(rb) rb.onclick=()=>gunRepair(gunsmithGun);
+  el.querySelectorAll('[data-umount]').forEach(b=>{
+    b.onclick=()=>gunUnmount(gunsmithGun, b.getAttribute('data-umount'));
+  });
+  el.querySelectorAll('[data-mount]').forEach(b=>{
+    b.onclick=()=>{
+      const v=b.getAttribute('data-mount').split(':');
+      gunMount(gunsmithGun, v[0], v[1]);
+    };
+  });
+  const cb=$('gsClose'); if(cb) cb.onclick=()=>{ sfxUI(); closeGunsmith(); };
+}
+
 function toggleShop(){
   const s=$('shop'); if(!s) return;
   const opening = s.style.display!=='flex';
@@ -872,6 +1250,15 @@ function buyItem(id){
     sfxBuy();
     toast('皮肤已应用 '+(SHOP_ITEMS[target]?SHOP_ITEMS[target].name:'')+' · '+it.name);
     refreshHUD(); buildShop(); saveTick(); return;
+  }
+  /* 【枪配件】进仓库，之后到「改枪台」装到具体的枪上。
+     不在商店里直接装：配件有归属（装哪把枪），商店里没有「哪把枪」这个概念。 */
+  if(cat==='mod'){
+    P.ammo.cash-=it.price;
+    stashAdd(id,1);
+    sfxBuy(); toast(T('买下 ')+it.name+T(' → 仓库，去改枪台装上'));
+    toast(T('去主菜单「改枪台」安装配件'));
+    saveTick(); return;
   }
   /* 消耗品/子弹：全部进仓库，仓库容量无限 */
   P.ammo.cash-=it.price;

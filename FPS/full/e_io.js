@@ -107,7 +107,12 @@ function autoSaveSnapshot(){
     skins: P.skins || {},
     bagCap: P.bagCap|0,
     helmetDur: P.helmetDur|0,
-    vestDur: P.vestDur|0
+    vestDur: P.vestDur|0,
+    /* 【武器耐久 + 改枪配件】不存的话一刷新就全没了：
+       花几千块买的瞄具凭空消失，打完的枪又变满耐久，
+       等于「耐久」和「改枪」两个系统都变成摆设。 */
+    gunDur: P.gunDur || {},
+    gunMods: P.gunMods || {}
   };
 }
 
@@ -211,6 +216,47 @@ function autoSaveApply(o){
     if(typeof o.bagCap==='number' && o.bagCap>0) P.bagCap = o.bagCap|0;
     if(typeof o.helmetDur==='number') P.helmetDur = Math.max(0, o.helmetDur|0);
     if(typeof o.vestDur==='number')   P.vestDur   = Math.max(0, o.vestDur|0);
+    /* 【武器耐久】按武器 id 逐个校验并夹到 [0, 上限]。
+       上限取 gunDurMax，所以以后调整数值平衡时旧档会自动跟着缩放，
+       不会出现「存档里 320/260」这种超过上限的怪值。 */
+    if(o.gunDur && typeof o.gunDur==='object'){
+      const clean={};
+      for(const id in o.gunDur){
+        if(!Object.prototype.hasOwnProperty.call(o.gunDur, id)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[id]) continue;
+        const mx=(typeof gunDurMax==='function')?gunDurMax(id):200;
+        const v=Number(o.gunDur[id]);
+        if(!isFinite(v)) continue;
+        clean[id]=Math.max(0, Math.min(mx, v));
+      }
+      P.gunDur=clean;
+    } else if(typeof P.gunDur!=='object'){
+      P.gunDur={};
+    }
+    /* 【改枪配件】两层校验：武器 id 合法 + 配件 id 合法 + 槽位得匹配。
+       不校验的话，旧存档里的脏数据会让 gunModEff 读到 undefined 而崩掉，
+       或者把瞄具装到枪托槽上，属性直接乱套。 */
+    if(o.gunMods && typeof o.gunMods==='object'){
+      const clean={};
+      for(const gid in o.gunMods){
+        if(!Object.prototype.hasOwnProperty.call(o.gunMods, gid)) continue;
+        if(typeof SHOP_ITEMS!=='undefined' && !SHOP_ITEMS[gid]) continue;
+        const src=o.gunMods[gid];
+        if(!src || typeof src!=='object') continue;
+        const dst={};
+        for(const slot in src){
+          const mid=src[slot];
+          if(typeof GUN_MODS==='undefined' || !GUN_MODS[mid]) continue;
+          if(GUN_MODS[mid].slot!==slot) continue;   // 槽位不匹配 → 丢
+          if(typeof gunSlotsOf==='function' && gunSlotsOf(gid).indexOf(slot)<0) continue;
+          dst[slot]=mid;
+        }
+        if(Object.keys(dst).length) clean[gid]=dst;
+      }
+      P.gunMods=clean;
+    } else if(typeof P.gunMods!=='object'){
+      P.gunMods={};
+    }
     return true;
   }catch(e){ return false; }
 }

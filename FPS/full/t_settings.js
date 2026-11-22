@@ -338,6 +338,22 @@ function bindSettings(){
     try{ sfxUI(); }catch(e){}
     buildSettings();
   };
+  /* 键位导出 / 导入 */
+  const tlx = document.getElementById('tlExport');
+  if(tlx) tlx.onclick = () => {
+    try{ if(typeof tlayExport==='function') tlayExport(); }catch(e){}
+  };
+  const tli = document.getElementById('tlImport');
+  if(tli) tli.onclick = () => {
+    try{ if(typeof tlayImport==='function') tlayImport(); }catch(e){}
+  };
+  /* 选文件导入：手机上贴长串 JSON 很痛苦，能挑文件最省事。
+     file input 每次 buildSettings 都会重建，所以绑定要放在这里一起重做。 */
+  const tlp = document.getElementById('tlPick');
+  if(tlp) tlp.onclick = () => {
+    try{ if(typeof tlayPickFile==='function') tlayPickFile(); }catch(e){}
+  };
+  try{ if(typeof tlayBindFile==='function') tlayBindFile(); }catch(e){}
   /* 跑分：先关设置，再开测。不关设置的话遮罩会挡住渲染画面，
      测出来是「页面上盖了一层半透明黑」的成绩，不真实。 */
   const bsb = document.getElementById('benchStartBtn');

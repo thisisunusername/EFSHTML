@@ -233,6 +233,36 @@ try{ if(typeof fontWarmup==='function') fontWarmup(); }catch(e){}
         txt+=id+' -> '+(hit? (hit.id||hit.className||hit.tagName) : 'null')+'\n';
       }catch(e){ txt+=id+' 探测失败\n'; }
     }
+    /* 【触屏控件命中测试】
+       玩家反馈「某个键点不动」时，看这里最快：
+       每个键取中心点做 elementFromPoint，命中的元素 id 必须是它自己。
+       命中到 joyZone / wpnBar / 别的键 → 就是被谁盖住了。
+       另外把摇杆的命中圆和锁状态也打出来。 */
+    txt+='--- 触屏控件 ---\n';
+    const jz=get('joyZone');
+    if(jz){
+      const r=jz.getBoundingClientRect();
+      const csj=cs(jz);
+      txt+='joyZone z='+(csj?csj.zIndex:'?')+' clip='+((csj&&csj.clipPath)||'无')+'\n';
+      txt+='  rect='+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+'\n';
+    }
+    try{
+      txt+='tlEditing='+(typeof tlayEditing!=='undefined'?tlayEditing:'?')+
+           ' joyLocked='+((typeof joyLocked==='function')?joyLocked():'?')+'\n';
+    }catch(e){ txt+='锁状态取值失败\n'; }
+    const btnIds=['btnFire','btnAim','btnInspect','btnInteract','btnSprint','btnJump','btnReload','btnProne'];
+    for(const id of btnIds){
+      const el=get(id); if(!el){ txt+=id+': 不存在\n'; continue; }
+      const r=el.getBoundingClientRect();
+      const cx=Math.round((r.left+r.right)/2), cy=Math.round((r.top+r.bottom)/2);
+      let hitName='?';
+      try{
+        const hit=document.elementFromPoint(cx,cy);
+        hitName=hit? (hit.id||hit.className||hit.tagName) : 'null';
+      }catch(e){ hitName='探测失败'; }
+      const okMark=(hitName===id)?'✓':'✗';
+      txt+=okMark+' '+id+' @'+cx+','+cy+' -> '+hitName+'\n';
+    }
     const d=document.createElement('div');
     d.style.cssText='position:fixed;left:6px;top:6px;right:6px;max-height:80vh;overflow:auto;z-index:999999;'
       +'background:rgba(0,0,0,.92);color:#7CFC9E;font:11px/1.5 ui-monospace,monospace;'

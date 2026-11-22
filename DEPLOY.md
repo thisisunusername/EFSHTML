@@ -4,7 +4,7 @@
 
 ## 一、网页发布（内置单文件）
 
-产物：`FPS/index_single.html`（约 2.01 MB）
+产物：`FPS/index_single.html`（约 1.93 MB）
 
 Three.js 已经内联进 HTML，**没有任何外部依赖**，直接传一个文件就能用。
 
@@ -21,7 +21,7 @@ Three.js 已经内联进 HTML，**没有任何外部依赖**，直接传一个�
 产物：
 
 ```
-FPS/index.html          735 KB
+FPS/index.html          756 KB
 FPS/three.module.js     1.27 MB
 fonts/                  字体（可选）
 ```
@@ -64,7 +64,7 @@ bash build_single.sh   # 内联 three -> index_single.html（网页版）
 
 | 产物 | 大小 | md5 |
 |---|---|---|
-| 网页版 index_single.html | 2007815 | 4b7f12b1d2e5151bdff53628c17000ee |
-| 本地版 index.html | 735193 | 929b323a8ccf8f4710c10b3796383ef0 |
+| 网页版 index_single.html | 2029026 | b2bcbf1c22fb460dad8c3a6d637df8ee |
+| 本地版 index.html | 756404 | 5215f0e47800c69e0323ea611443ccea |
 | three.module.js | 1272972 | a762b8588c6abf23cb87624360d014c4 |
 | 2D 版 index.html | 292705 | 770a605bd0da86d63979362a70577846 |

@@ -149,6 +149,24 @@ function tlayPin(el, x, y){
   el.style.margin = '0';
 }
 
+/* 摇杆区的图形裁剪（见 tlayApply 里的注释）。
+   编辑态直接取消，让 210x210 的方块整块可拖。 */
+function tlayClipJoy(el){
+  if(!el) return;
+  if(tlayEditing){
+    el.style.clipPath = '';
+    el.style.webkitClipPath = '';
+    return;
+  }
+  const o = tlayLoad();
+  const s = tlayScale();
+  const cx = Math.round(o.joyBase.x), cy = Math.round(o.joyBase.y);
+  const r  = Math.round(76 * s);
+  const v  = 'circle(' + r + 'px at ' + cx + 'px ' + cy + 'px)';
+  /* 老 WebView 只认 -webkit- 前缀；两个都写，不认的会自动忽略 */
+  el.style.clipPath = v;
+  try{ el.style.webkitClipPath = v; }catch(e){}
+}
 /* 摇杆底板：从「left:110px / top:calc(100%-110px) + translate(-50%,-50%)」
    改成「容器内绝对坐标 + margin 自居中」。
    之所以用 margin 而不用 transform，是因为 #joyStick 要靠
@@ -207,6 +225,17 @@ function tlayApply(){
     el.style.gridRow = 'auto';
     tlayPin(el, p.x, p.y);
   }
+  /* 【摇杆区的命中范围要剪成圆】
+     #joyZone 本体是 210x210 的透明方块（含触摸余量），它的右上角会和
+     「奔跑」键叠 ~38x54。方块形状下，两个键在同一块区域竞争：
+       - 摇杆在上面 → 奔跑键那片区域永远点不动；
+       - 按钮在上面 → 按摇杆偏右上会误触奔跑。
+     两种都不行。所以用 clip-path 把命中区剪成「底盘外扩一圈」的圆：
+     圆半径 76*s（底盘半径 55*s + 21px 容差），以底板圆心为中心。
+     实测 390x844 下奔跑键离圆心最近角距离 84px > 76px，正好错开。
+     clip-path 会同时裁剪绘制与命中测试，所以这既是视觉也是交互边界。
+     编辑态下不裁剪（否则方块形状没法拖），恢复时再贴。 */
+  if(jz) tlayClipJoy(jz);
   /* 3) 容器必须只在编辑模式下才吃掉整层事件，平时不能挡视角 */
   const az = document.getElementById('actZone');
   if(az){
@@ -232,6 +261,9 @@ function tlayKillGrid(){
 }
 
 /* ---------- 编辑模式 ---------- */
+/* 【编辑态进来时记下菜单/暂停原本的样子，退出时原样还回去】
+   这两个值必须是模块级，因为 tlaySetEditing 是成对调用的。 */
+let tlayMenuPrev = null, tlayPauseWasOn = false, tlayPauseAdded = false;
 function tlaySetEditing(on){
   tlayEditing = !!on;
   tlayKillGrid();
@@ -243,8 +275,34 @@ function tlaySetEditing(on){
     document.body.classList.add('tl-editing');
     if(wrap) wrap.style.display = 'block';
     tlayApply();
+    try{ tlayClipJoy(document.getElementById('joyZone')); }catch(e){}
     tlayDrawMarks();
-    try{ pauseGame('touchlayout'); }catch(e){}
+    /* 【局内：先暂停，但立刻把暂停面板藏起来】
+       暂停面板 #pause 是 z-index:60 的全屏遮罩，比摇杆(34)/按键(35) 都高。
+       不藏的话，进编辑后玩家看到的是一张「已暂停」卡片压在控件上，
+       根本看不清摇杆和按键在哪、拖动时也像是点在卡片上。
+       这里用 hidePauseOverlay(true) —— 保留 paused=true，
+       只把 DOM 藏掉，等退出编辑再 resumeGame()。 */
+    /* 【弄清「暂停是我开的还是本来就有的」】
+       两种情况退场处理完全不同：
+         A. 局内直接暂停 → 设置 → 触屏 → 编辑：本来就 paused，
+            退出编辑应该**回到暂停界面**，不能把人直接扔回对局（会挨打）。
+         B. 局内照常玩着 → 暂停 → 设置 → 触屏 → 编辑：pauseGame 返回 true，
+            这个暂停是我开的，退出时必须 resumeGame，否则人卡住。（这是真 bug）
+       所以用 pauseGame() 的返回值区分，而不是看 window.__paused。 */
+    tlayPauseAdded = false;
+    try{ if(typeof pauseGame === 'function') tlayPauseAdded = !!pauseGame('touchlayout'); }catch(e){}
+    tlayPauseWasOn = !!(window.__paused);
+    try{ if(tlayPauseWasOn && typeof hidePauseOverlay === 'function') hidePauseOverlay(true); }catch(e){}
+    /* 【非局内：主菜单 #menu 是 z-index:100，同样会盖住控件】
+       从设置里点「进入拖动编辑」时多半还没开局，菜单一直挂着，
+       于是编辑层被菜单挡得干干净净。这里临时把菜单收起来，退出时还原。 */
+    const menu = document.getElementById('menu');
+    if(menu && !tlayMenuPrev){
+      const cs = window.getComputedStyle ? window.getComputedStyle(menu) : null;
+      const vis = cs ? (cs.display !== 'none') : (menu.style.display !== 'none');
+      if(vis){ tlayMenuPrev = menu.style.display || ''; menu.style.display = 'none'; }
+    }
   } else {
     document.body.classList.remove('tl-editing');
     if(wrap) wrap.style.display = 'none';
@@ -252,6 +310,33 @@ function tlaySetEditing(on){
     tlayHideMarks();
     tlaySave();
     tlayApply();
+    try{ tlayClipJoy(document.getElementById('joyZone')); }catch(e){}
+    /* 【退出编辑必须把局面还回去】
+       进编辑时调了 pauseGame，之前漏了对应 resumeGame，
+       于是玩家拖完点「完成」，人还卡在 paused 状态，
+       只是暂停面板被藏了 —— 看起来就是「画面不动、按钮全没反应」，
+       必须再点一次暂停才能动。这是真 bug，现在补上。
+       但只把自己开的暂停收回去；本来就处于暂停的，要把暂停卡片还回来。 */
+    if(tlayPauseAdded){
+      try{ if(typeof resumeGame === 'function') resumeGame(); }catch(e){}
+    } else if(tlayPauseWasOn){
+      try{
+        const pz = document.getElementById('pause');
+        if(pz){ if(typeof renderPauseOverlay==='function') renderPauseOverlay(); pz.style.display='flex'; }
+        window.__pauseHiddenForPanel = false;
+      }catch(e){}
+    }
+    tlayPauseWasOn = false; tlayPauseAdded = false;
+    /* 不在局内（从主菜单进编辑的）：退出后把触屏控件收起来，
+       否则八个按钮会一直挂在菜单底下（看不见，但会抢触摸）。 */
+    if(!window.__inGame){
+      try{ if(typeof hideTouchUI === 'function') hideTouchUI(); }catch(e){}
+    }
+    if(tlayMenuPrev !== null){
+      const menu = document.getElementById('menu');
+      if(menu) menu.style.display = tlayMenuPrev;
+      tlayMenuPrev = null;
+    }
   }
   window.__tlEditing = tlayEditing;
   try{ if(typeof sfxUI === 'function') sfxUI(); }catch(e){}
@@ -311,10 +396,15 @@ function tlayBind(){
   document.addEventListener('touchstart', e => {
     if(!tlayEditing) return;
     for(const t of e.changedTouches){
-      /* 从上往下的优先级：摇杆容器 > 按钮（开火键最大，放最后判） */
+      /* 【命中顺序：按钮优先，摇杆最后】
+         摇杆区是一块 210x210 的透明方域，它的右上角会和
+         「奔跑」键、底部武器条叠在一起。如果先把摇杆当命中目标，
+         叠住的那半个按钮就永远拖不动（玩家会说「这个键抓不住」）。
+         所以从小到大判：先看按钮（开火键最大，放最前），
+         所有按钮都不命中时才当成拖摇杆。 */
       let hit = null;
-      const order = ['joyZone','btnFire','btnAim','btnInspect','btnInteract',
-                     'btnSprint','btnJump','btnReload','btnProne'];
+      const order = ['btnFire','btnAim','btnInspect','btnInteract',
+                     'btnSprint','btnJump','btnReload','btnProne','joyZone'];
       for(const id of order){
         if(inside(t.clientX, t.clientY, document.getElementById(id))){ hit = id; break; }
       }
@@ -356,8 +446,8 @@ function tlayBind(){
   /* 桌面调试：鼠标也能拖 */
   document.addEventListener('mousedown', e => {
     if(!tlayEditing) return;
-    const order = ['joyZone','btnFire','btnAim','btnInspect','btnInteract',
-                   'btnSprint','btnJump','btnReload','btnProne'];
+    const order = ['btnFire','btnAim','btnInspect','btnInteract',
+                   'btnSprint','btnJump','btnReload','btnProne','joyZone'];
     for(const id of order){
       const el = document.getElementById(id);
       if(inside(e.clientX, e.clientY, el)){
@@ -437,6 +527,21 @@ function tlayTabHtml(){
     +  '<button class="btn small" id="tlStart">进入拖动编辑</button>'
     +  '<button class="btn ghost small" id="tlReset">恢复默认布局</button>'
     + '</div>';
+  /* 【键位导出/导入】单独一套，不跟存档混在一起：
+     存档里有加密（crypto.subtle + 内置密钥），键位是纯明文 JSON，
+     方便直接看、直接改、发给同学。
+     也不用 saveDownload —— 那个函数在 e_io.js，这里是纯布局层，
+     自己写一份免得耦合。 */
+  h += '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">'
+    +  '<button class="btn ghost small" id="tlExport">导出键位</button>'
+    +  '<button class="btn ghost small" id="tlImport">导入键位</button>'
+    +  '<button class="btn ghost small" id="tlPick">选文件导入</button>'
+    + '</div>';
+  /* 文件选择：手机上贴一长串 JSON 很痛苦，能直接挑文件最省事。
+     不用存档那个 #saveFile —— 那是加密存档专用的，这里是独立一套。 */
+  h += '<input type="file" id="tlFile" accept="application/json,.json,.txt" style="display:none">';
+  h += '<textarea id="tlIoBox" class="setlog" style="display:none;margin-top:8px;width:100%;height:110px;box-sizing:border-box;font-family:monospace;font-size:11px"></textarea>';
+  h += '<div class="d" style="margin-top:6px" id="tlIoHint"></div>';
   h += '<div class="d" style="margin:12px 0 6px">当前各控件位置（像素）</div>';
   const o = tlayLoad();
   for(const it of TLAYOUT_ITEMS){
@@ -554,3 +659,264 @@ function tlayOnResize(){
 }
 /* 首次记录基准尺寸 */
 try{ tlayLastW = window.innerWidth||390; tlayLastH = window.innerHeight||844; }catch(e){}
+
+/* ============================================================
+   键位导出 / 导入（纯明文，不加密，独立于存档）
+
+   【为什么要单独一套】
+   存档导出走 e_io.js 的 exportSave()，它用内置密钥做了 AES-GCM 加密。
+   键位这种东西没必要加密 —— 它的价值就是「发给别人 / 备份一下」，
+   加密反而让人打不开、改不了、出问题也查不了。
+   所以这里自己写一份明白的 JSON，不碰 crypto，不碰存档格式。
+
+   【格式】版本号写在外面，以后加字段能识别旧文件：
+   { "kind": "efs-touchlayout", "v": 1, "screen": "390x844",
+     "joyBase": {x,y}, "items": { btnFire:{x,y}, ... } }
+
+   【导入要宽容】玩家可能拿到的文件：
+     1) 本游戏导出的（带 kind）；
+     2) 手改过的（缺字段 / 多字段 / 坐标是数字字符串）；
+     3) 直接把旧版 localStorage 的字符串复制过来的（没有 kind）；
+   三种都得能吃，缺的补默认、多的忽略、坐标做数字校验并夹进屏幕。
+   宁可导入一个能用的近似布局，也不要弹一句「格式错误」白点一次。
+   ============================================================ */
+/* 选文件导入：手机上从聊天/下载目录挑一个 json 最省事。
+   读取用 FileReader，不用 file.text()（老 WebView 没有）。 */
+function tlayPickFile(){
+  const f = document.getElementById('tlFile');
+  if(!f){ tlayIoHint('文件选择器未找到', true); return; }
+  /* 每次都要清 value，否则选同一个文件第二次不触发 change */
+  try{ f.value = ''; }catch(e){}
+  try{ f.click(); }catch(e){ tlayIoHint('这个浏览器不支持选文件，请手动粘贴', true); }
+}
+function tlayBindFile(){
+  const f = document.getElementById('tlFile');
+  if(!f || f.__b) return;
+  f.__b = true;
+  f.addEventListener('change', () => {
+    const file = f.files && f.files[0];
+    if(!file) return;
+    if(typeof FileReader !== 'function'){
+      tlayIoHint('这个浏览器读不了文件，请手动粘贴内容', true); return;
+    }
+    tlayIoHint('正在读取 ' + (file.name || '文件') + ' …');
+    const rd = new FileReader();
+    rd.onload = () => {
+      const box = tlayIoBox();
+      if(box) box.value = String(rd.result || '');
+      tlayImport();
+    };
+    rd.onerror = () => tlayIoHint('读取失败：' + (rd.error && rd.error.message || '未知错误'), true);
+    try{ rd.readAsText(file, 'utf-8'); }catch(e){ tlayIoHint('读取失败：' + e.message, true); }
+  });
+}
+const TLAYOUT_FILE_KIND = 'efs-touchlayout';
+
+function tlayExportText(){
+  const o = tlayLoad();
+  const out = {
+    kind: TLAYOUT_FILE_KIND,
+    v: 1,
+    /* 记录导出时的屏幕尺寸，导入时用得上：不同尺寸的设备
+       坐标要按比例换算，否则在大屏上拖开的键装到小屏上会跑出去 */
+    screen: (window.innerWidth||390) + 'x' + (window.innerHeight||844),
+    exportedAt: new Date().toISOString(),
+    joyBase: { x: Math.round(o.joyBase.x), y: Math.round(o.joyBase.y) },
+    items: {}
+  };
+  for(const it of TLAYOUT_ITEMS){
+    const p = o.items[it.id];
+    if(!p) continue;
+    out.items[it.id] = { x: Math.round(p.x), y: Math.round(p.y) };
+  }
+  return JSON.stringify(out, null, 2);
+}
+
+/* 下载：和 e_io.js 的 saveDownload 同原理，但独立实现。
+   返回 false 表示这个浏览器不给下载，调用方改成「显示文本框手动复制」。 */
+function tlayDownload(filename, text){
+  try{
+    const blob = new Blob([text], {type:'application/json;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{
+      try{ document.body.removeChild(a); }catch(e){}
+      try{ URL.revokeObjectURL(url); }catch(e){}
+    }, 400);
+    return true;
+  }catch(e){ return false; }
+}
+
+function tlayIoHint(msg, bad){
+  const el = document.getElementById('tlIoHint');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.style.color = bad ? '#ff8a6a' : '#7ee8a0';
+}
+function tlayIoBox(){
+  const el = document.getElementById('tlIoBox');
+  if(!el) return null;
+  el.style.display = 'block';
+  return el;
+}
+
+/* 导出按钮：优先下载文件；下载不了就把内容放进文本框让玩家自己复制 */
+function tlayExport(){
+  let text;
+  try{ text = tlayExportText(); }
+  catch(e){ tlayIoHint('导出失败：' + e.message, true); return; }
+  const fn = 'efs-keymap-' + Date.now() + '.json';
+  if(tlayDownload(fn, text)){
+    tlayIoHint('已导出 ' + fn + '（明文 JSON，可直接改）');
+    try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  }else{
+    /* 老 WebView 不给下载：把内容摊在文本框里 */
+    const box = tlayIoBox();
+    if(box){
+      box.value = text;
+      box.readOnly = false;
+      try{ box.select(); }catch(e){}
+      tlayIoHint('这个浏览器不支持直接下载，内容已放在上面的框里，长按全选复制', true);
+    }else{
+      tlayIoHint('导出失败：浏览器不支持文件下载', true);
+    }
+  }
+}
+
+/* 把任意一种输入（导出的 JSON / 手改的 / 旧 localStorage 串）
+   解析成标准布局。失败抛错，由调用方提示。 */
+function tlayParseImport(raw){
+  let obj;
+  if(raw && typeof raw === 'object') obj = raw;
+  else{
+    const t = String(raw || '').trim();
+    if(!t) throw new Error('内容为空');
+    try{ obj = JSON.parse(t); }
+    catch(e){ throw new Error('不是合法的 JSON'); }
+  }
+  if(!obj || typeof obj !== 'object') throw new Error('内容不是对象');
+  /* 认一下是不是别人的东西（存档 / 2D 的档）
+     不是必须，但报错能说得更清楚 */
+  if(obj.kind && obj.kind !== TLAYOUT_FILE_KIND){
+    throw new Error('这不是键位文件（kind=' + obj.kind + '）');
+  }
+  const srcItems = obj.items || obj;
+  const def = tlayDefaults();
+  const s = tlayScale();
+  const W = window.innerWidth || 390;
+  const H = window.innerHeight || 844;
+
+  /* 跨尺寸换算：导出设备和自己不一样大时，按比例缩放坐标。
+     只在导出的 screen 字段存在且能解析时做；否则当作同尺寸。 */
+  let kx = 1, ky = 1;
+  if(typeof obj.screen === 'string'){
+    const m = obj.screen.match(/^(\d+)\s*[x*]\s*(\d+)$/i);
+    if(m){
+      const sw = parseInt(m[1], 10), sh = parseInt(m[2], 10);
+      if(sw > 0 && sh > 0){
+        kx = W / sw; ky = H / sh;
+        /* 缩放别做太猛：限制在 0.5~2 倍，否则极端的屏幕差会把键堆到一角 */
+        kx = Math.max(0.5, Math.min(2, kx));
+        ky = Math.max(0.5, Math.min(2, ky));
+      }
+    }
+  }
+
+  const num = (v, d) => {
+    const n = (typeof v === 'number') ? v : parseFloat(v);
+    return isFinite(n) ? n : d;
+  };
+
+  const out = { joyBase:{ x:def.joyBase.x, y:def.joyBase.y }, items:{} };
+  let got = 0;      /* 真正解析成功的控件数 */
+  let seen = 0, bad = 0;   /* 文件里出现过的控件数 / 其中坐标坏掉的数 */
+  for(const it of TLAYOUT_ITEMS){
+    const p = srcItems ? srcItems[it.id] : null;
+    if(p && (typeof p === 'object')){
+      seen++;
+      const w = (it.id === 'joyZone' ? 210 : 58*(it.id==='btnFire'?1.42:1)) * s;
+      let x = num(p.x, NaN) * kx;
+      let y = num(p.y, NaN) * ky;
+      if(!isFinite(x) || !isFinite(y)){
+        /* 这一个控件的坐标坏了：只跳它，用默认值，不整个导入失败。
+           注意也要计入 seen —— 文件里确实有这个键，只是值坏了，
+           不能因为「文件里只有一个键且它坏了」就报「没找到任何坐标」。 */
+        bad++;
+        out.items[it.id] = { x: def.items[it.id].x, y: def.items[it.id].y };
+        continue;
+      }
+      x = Math.max(0, Math.min(W - w, x));
+      y = Math.max(0, Math.min(H - w, y));
+      out.items[it.id] = { x: Math.round(x), y: Math.round(y) };
+      got++;
+    }else{
+      out.items[it.id] = { x: def.items[it.id].x, y: def.items[it.id].y };
+    }
+  }
+  /* 摇杆底盘：也是「容器内相对坐标」，同样做数字校验 */
+  if(obj.joyBase && typeof obj.joyBase === 'object'){
+    const bw = (window.innerWidth ? 210*s : 210*s);
+    const bx = num(obj.joyBase.x, def.joyBase.x) * kx;
+    const by = num(obj.joyBase.y, def.joyBase.y) * ky;
+    out.joyBase = { x: Math.round(Math.max(0, Math.min(bw, bx))),
+                    y: Math.round(Math.max(0, Math.min(bw, by))) };
+  }
+  /* 【只有「一个键都没见到」才算不是键位文件】
+     见到了但坐标全坏的情况不抛错 —— 按「脏值只回退它自己」的总原则，
+     照样把默认布局应用上去，并在提示里说清楚有几个坐标读不懂。
+     否则玩家手改错一个字符，整个文件就被拒，比不处理还困惑。 */
+  if(seen === 0) throw new Error('没有找到任何按键坐标');
+  return { layout: out, count: got, bad: bad, scaled: (kx !== 1 || ky !== 1) };
+}
+
+/* 导入按钮：先让框可见。框里有内容就立即导入；没有就提示粘贴。 */
+function tlayImport(){
+  const box = tlayIoBox();
+  if(!box){ tlayIoHint('导入框未找到', true); return; }
+  const txt = (box.value || '').trim();
+  if(!txt){
+    /* 【空框时先自己读剪贴板】手机上从聊天窗口复制了 JSON 过来，
+       还要长按粘贴进文本框很麻烦。navigator.clipboard.readText() 在
+       部分 WebView 里需要用户手势或用权限，失败就不弹错，退回手贴。 */
+    const afterRead = (t) => {
+      const s2 = (t || '').trim();
+      if(!s2){ tlayIoHint('把键位 JSON 粘到上面的框里，或点「选文件」导入')
+               ;try{ box.focus(); }catch(e){} return; }
+      box.value = s2;
+      tlayImport();
+    };
+    try{
+      if(navigator.clipboard && navigator.clipboard.readText){
+        navigator.clipboard.readText().then(afterRead).catch(()=>afterRead(''));
+        return;
+      }
+    }catch(e){}
+    afterRead('');
+    return;
+  }
+  let res;
+  try{ res = tlayParseImport(txt); }
+  catch(e){ tlayIoHint('导入失败：' + e.message, true); return; }
+  tlay = res.layout;
+  tlaySave();
+  tlayApply();
+  tlayDrawMarks();
+  if(box) box.value = '';
+  /* 全坏的时候也照样应用（全是默认值），只把语气变告警色。 */
+  tlayIoHint(res.count
+             ? ('已导入 ' + res.count + ' 个控件位置' +
+                (res.bad ? ('，' + res.bad + ' 个坐标损坏已用默认值') : '') +
+                (res.scaled ? '（已按屏幕尺寸换算）' : ''))
+             : ('没有可用的坐标（' + res.bad + ' 个都读不懂），已恢复默认布局'),
+             !res.count);
+  try{ if(typeof sfxUI==='function') sfxUI(); }catch(e){}
+  /* 导入后重建面板，让上面那串坐标读数跟着刷新 */
+  try{
+    if(typeof setTab === 'string' && setTab === 'touch' && typeof buildSettings === 'function'){
+      setTimeout(buildSettings, 0);
+    }
+  }catch(e){}
+}

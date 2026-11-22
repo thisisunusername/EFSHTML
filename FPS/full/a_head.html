@@ -191,7 +191,15 @@
       视觉上就像「摇杆穿模到交互按钮里」。
        现在改成：摇杆区域 = 摇杆本体 + 一圈触摸余量的小方块，
        尺寸随 #joyBase 走，位置固定在左下角，绝不外溢到按钮区。 */
-  #joyZone{ position:fixed; left:0; bottom:0; width:210px; height:210px; display:none; pointer-events:auto; z-index:60; touch-action:none; background:transparent; }
+  /* 【z-index 必须是 34，不是 60 —— 这是「按钮点不动」的真正死因】
+     #actZone 是 35、#wpnBar 是 36、#topbar 是 30，而摇杆区原来取 60。
+     摇杆区是一块 210x210 的透明方块（含触摸余量），默认位置在左下角，
+     它的右边缘会压到「奔跑」键左下角、并且整块盖住底部中间武器条的左半边。
+     因为 z-index 更高，手指按下去事件先被 #joyZone 吃掉，
+     按钮收不到 touchstart —— 表现就是「这个键怎么点都没反应」。
+     现在把摇杆区降到按钮之下：按钮永远优先，摇杆只在没被按钮/武器条
+     盖住的那部分响应。编辑态另有 tlay z-index:80 规则，拖动照旧不受影响。 */
+  #joyZone{ position:fixed; left:0; bottom:0; width:210px; height:210px; display:none; pointer-events:auto; z-index:34; touch-action:none; background:transparent; }
   #joyBase{ position:absolute; left:110px; top:calc(100% - 110px); width:110px; height:110px; margin:0; border-radius:50%; background:rgba(255,255,255,.12); border:2px solid rgba(124,92,255,.5); box-shadow:0 0 0 6px rgba(124,92,255,.08); touch-action:none; transform:translate(-50%,-50%); pointer-events:none; }
   #joyStick{ position:absolute; left:50%; top:50%; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35); transform:translate(-50%,-50%); }
   /* 右侧操作区（移动端） */
@@ -1197,7 +1205,13 @@ background:rgba(90,220,255,.03); cursor:default; }
   /* ===== 触屏控件自定义布局（编辑态）=====
      平时靠 JS 写入的 left/top 像素定位，这里只管「编辑时看起来像能拖」。
      关键点：加虚线框的是子元素本身，不额外包一层，避免拖拽命中区域错位。 */
-  body.tl-editing #joyZone{ outline:2px dashed rgba(124,92,255,.85); outline-offset:2px; border-radius:14px; z-index:80; }
+  /* 编辑态摇杆区的 z 反而要降到 33：
+     #actZone 是 z-index:35，它自己形成层叠上下文，
+     里面 8 个键即使写了 z-index:80 也只会在 35 这一层里排，
+     所以摇杆区只要 >35 就会把「奔跑」键的虚线框盖住。
+     降到 33 后按键框完整可见。（拖动走的是 document 上的几何命中，
+     和层叠无关，所以不影响拖摇杆。） */
+  body.tl-editing #joyZone{ outline:2px dashed rgba(124,92,255,.85); outline-offset:2px; border-radius:14px; z-index:33; }
   body.tl-editing .actbtn{ outline:2px dashed rgba(255,170,60,.85); outline-offset:2px; z-index:80; }
   /* 编辑态下所有控件都要能被手指碰到（平常 #joyZone 是 auto，
      但开火键在 actZone 里，pointer-events 必须显式打开） */

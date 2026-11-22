@@ -76,6 +76,12 @@ function animate(){
   /* 心跳统计：如果 frames 不涨，说明 animate 根本没在跑
      （WebView 后台、异常中断、或 ready 一直为 false），
      这是「怎么拖都不动」的另一种可能原因，直接显示出来好判断。 */
+  /* 【跑分模式】必须在 paused 判断之后、所有 updXxx 之前跑：
+     1) 它自己写 P.pos / P.yaw / P.pitch；
+     2) 它一旦启动就会把 paused 置为 true，所以下面的 updXxx 一律被跳过，
+        测到的就是纯渲染帧率，不会因为敌人 AI / 物理随机波动；
+     3) 用 rawDt 而不是 dt —— dt 在暂停期间是 0，测出来会是无穷大。 */
+  try{ if(benchOn) benchUpdate(rawDt); }catch(e){ console.error('bench', e); }
   window.__frames=(window.__frames||0)+1;
   window.__lastDt=rawDt;
   window.__fps=Math.round(1/Math.max(rawDt,0.001));

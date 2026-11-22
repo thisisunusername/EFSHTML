@@ -56,6 +56,8 @@ function buildSettings(){
     {id:'color', get n(){ return T('主题色'); }},
     {id:'sound', get n(){ return T('声音'); }},
     {id:'lang',  get n(){ return T('语言'); }},
+    {id:'touch', get n(){ return T('触屏'); }},
+    {id:'bench', get n(){ return T('跑分'); }},
     {id:'debug', get n(){ return T('调试'); }}
   ];
   h+='<div class="tabs">';
@@ -173,6 +175,31 @@ function buildSettings(){
     }
   }
 
+  /* ---------- 触屏布局 ---------- */
+  if(setTab==='touch'){
+    h += (typeof tlayTabHtml==='function' ? tlayTabHtml()
+      : '<div class="d">触屏布局模块未加载</div>');
+  }
+  /* ---------- 跑分 ---------- */
+  if(setTab==='bench'){
+    h += '<div class="d" style="margin:10px 0 6px">'
+      + '自动沿预设路线走一遍整个校园（含五层楼），每段测一次平均帧率，'
+      + '结束时给出总分、平均 FPS 和每一段的坐标。测试期间不能操作，大约 40 秒。'
+      + '</div>';
+    h += '<div class="setrow" style="cursor:default">'
+      + '<div class="setinfo"><div class="setn">测试路线</div>'
+      + '<div class="setd">操场 → 教学楼五层 → 篮球场 → 体育馆 → 东楼 → 校门</div></div>'
+      + '<div class="setval">' + (typeof BENCH_ROUTE!=='undefined' ? BENCH_ROUTE.length : 0) + ' 段</div>'
+      + '</div>';
+    h += '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">'
+      + '<button class="btn small" id="benchStartBtn">开始性能测试</button>'
+      + '<button class="btn ghost small" id="benchLastBtn">查看上次结果</button>'
+      + '</div>';
+    h += '<div class="d" style="margin-top:10px">'
+      + '提示：跑分时会暂停游戏逻辑（不刷怪、不倒计时），只测渲染性能，'
+      + '所以成绩可以跨设备直接对比。'
+      + '</div>';
+  }
   /* ---------- 调试 ---------- */
   if(setTab==='debug'){
     const on = (typeof logOn!=='undefined') && logOn;
@@ -300,6 +327,29 @@ function bindSettings(){
       buildSettings();
     };
   }
+  /* 触屏布局：进入拖动编辑 / 恢复默认 */
+  const tls = document.getElementById('tlStart');
+  if(tls) tls.onclick = () => {
+    try{ if(typeof tlayEnterFromSettings==='function') tlayEnterFromSettings(); }catch(e){}
+  };
+  const tlr = document.getElementById('tlReset');
+  if(tlr) tlr.onclick = () => {
+    try{ if(typeof tlayReset==='function'){ tlayReset(); } }catch(e){}
+    try{ sfxUI(); }catch(e){}
+    buildSettings();
+  };
+  /* 跑分：先关设置，再开测。不关设置的话遮罩会挡住渲染画面，
+     测出来是「页面上盖了一层半透明黑」的成绩，不真实。 */
+  const bsb = document.getElementById('benchStartBtn');
+  if(bsb) bsb.onclick = () => {
+    try{ closeSettings(); }catch(e){}
+    try{ if(typeof benchStart==='function') setTimeout(benchStart, 60); }catch(e){}
+  };
+  const blb = document.getElementById('benchLastBtn');
+  if(blb) blb.onclick = () => {
+    try{ closeSettings(); }catch(e){}
+    try{ if(typeof benchShowResult==='function') setTimeout(benchShowResult, 60); }catch(e){}
+  };
   /* 调试日志开关 */
   const lg=el.querySelector('[data-log-toggle]');
   if(lg){

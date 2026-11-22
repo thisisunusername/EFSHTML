@@ -38,6 +38,12 @@ cat full/u_i18n.js;    printf '\n'
   cat full/s_theme.js;   printf '\n'
   # 设置面板 UI：依赖 s_theme 的 themeSet / accentSet / masterVolSet
   cat full/t_settings.js; printf '\n'
+  # 触屏控件自定义布局 + 跑分模式：
+  #   t_layout 要改 joyZone/actZone/#joyBase/#actBtn 的 style，且被 f_ui 的
+  #   摇杆逻辑通过 joyLocked() 查询，必须在 f_ui 之后、z_render 之前。
+  #   t_bench 的 benchUpdate 由 z_render 的 animate 每帧调用，同样要排在它之前。
+  cat full/t_layout.js;  printf '\n'
+  cat full/t_bench.js;   printf '\n'
   cat full/z_render.js
   printf '\n</script>\n'
   printf '</body>\n'

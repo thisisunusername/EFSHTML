@@ -1193,6 +1193,71 @@ background:rgba(90,220,255,.03); cursor:default; }
       #joyStick{ width:52px; height:52px; }
     }
   }
+
+  /* ===== 触屏控件自定义布局（编辑态）=====
+     平时靠 JS 写入的 left/top 像素定位，这里只管「编辑时看起来像能拖」。
+     关键点：加虚线框的是子元素本身，不额外包一层，避免拖拽命中区域错位。 */
+  body.tl-editing #joyZone{ outline:2px dashed rgba(124,92,255,.85); outline-offset:2px; border-radius:14px; z-index:80; }
+  body.tl-editing .actbtn{ outline:2px dashed rgba(255,170,60,.85); outline-offset:2px; z-index:80; }
+  /* 编辑态下所有控件都要能被手指碰到（平常 #joyZone 是 auto，
+     但开火键在 actZone 里，pointer-events 必须显式打开） */
+  body.tl-editing .actbtn{ pointer-events:auto !important; }
+  #tlEdit{ position:fixed; inset:0; z-index:9000; display:none; pointer-events:none; }
+  #tlMarks{ position:absolute; inset:0; pointer-events:none; }
+  #tlMarks .tlmk{ position:absolute; border:2px solid rgba(255,255,255,.25); border-radius:10px;
+                  box-sizing:border-box; pointer-events:none; }
+  #tlMarks .tlmk.sel{ border-color:#4be08a; box-shadow:0 0 0 2px rgba(75,224,138,.35); }
+  #tlTop{ position:absolute; left:50%; top:10px; transform:translateX(-50%);
+          background:rgba(10,14,22,.95); border:1px solid rgba(124,92,255,.6);
+          border-radius:14px; padding:10px 14px; max-width:min(94%,560px);
+          color:#e8ecf5; font-size:13px; line-height:1.55; text-align:center;
+          pointer-events:auto; box-shadow:0 10px 30px rgba(0,0,0,.55); }
+  #tlTop b{ color:#9b8aff; }
+  #tlTop .tlb-row{ display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
+  #tlTop .tlb{ background:rgba(124,92,255,.22); border:1px solid rgba(124,92,255,.6);
+               color:#e8ecf5; border-radius:10px; padding:7px 14px; font-size:13px; font-weight:600; }
+  #tlTop .tlb.ok{ background:rgba(75,224,138,.22); border-color:rgba(75,224,138,.7); }
+  #tlName{ font-size:12px; color:#7ee8a0; margin-top:6px; min-height:16px; }
+
+  /* ===== 跑分 HUD ===== */
+  #benchHud{ position:fixed; left:12px; top:12px; z-index:9000; display:none;
+             background:rgba(8,12,20,.9); border:1px solid rgba(124,92,255,.55);
+             border-radius:12px; padding:10px 12px; min-width:210px;
+             color:#e8ecf5; font-size:12px; line-height:1.55; pointer-events:none;
+             font-variant-numeric:tabular-nums; }
+  #benchHud .bh-t{ font-size:11px; color:#9b8aff; font-weight:700; letter-spacing:.5px; }
+  #benchHud .bh-fps{ font-size:30px; font-weight:800; color:#7ee8a0; line-height:1.1; }
+  #benchHud .bh-fps small{ font-size:12px; color:#8a93a6; font-weight:500; }
+  #benchHud .bh-row{ font-size:11.5px; color:#c8d0de; }
+  #benchHud .bh-dim{ color:#8a93a6; }
+  #benchHud .bh-bar{ height:4px; border-radius:3px; background:rgba(255,255,255,.14); margin-top:6px; overflow:hidden; }
+  #benchHud .bh-bar i{ display:block; height:100%; background:linear-gradient(90deg,#7c5cff,#7ee8a0); }
+
+  /* ===== 跑分结果面板 ===== */
+  #benchPanel{ position:fixed; inset:0; z-index:9200; display:none;
+               background:rgba(6,9,15,.86); padding:18px 14px;
+               align-items:flex-start; justify-content:center; overflow:auto; }
+  #benchPanel .box{ background:rgba(16,20,30,.98); border:1px solid rgba(124,92,255,.5);
+                    border-radius:16px; padding:18px 20px; }
+  #benchPanel .bh-sum{ display:flex; gap:16px; align-items:center;
+                       background:rgba(124,92,255,.1); border:1px solid rgba(124,92,255,.3);
+                       border-radius:14px; padding:12px 14px; }
+  #benchPanel .bh-big{ font-size:44px; font-weight:800; color:#7ee8a0; line-height:1; }
+  #benchPanel .bh-k{ font-size:13px; color:#e8ecf5; }
+  #benchPanel .bh-dim{ color:#8a93a6; font-size:12px; }
+  #benchPanel .bh-tb{ margin-top:12px; border:1px solid rgba(255,255,255,.12); border-radius:12px; overflow:hidden; }
+  #benchPanel .bh-th, #benchPanel .bh-tr{ display:grid; grid-template-columns:1.5fr .7fr 1.1fr;
+                                         gap:8px; padding:7px 12px; font-size:12.5px; }
+  #benchPanel .bh-th{ background:rgba(255,255,255,.07); color:#9b8aff; font-weight:700; }
+  #benchPanel .bh-tr:nth-child(odd){ background:rgba(255,255,255,.025); }
+  #benchPanel .bh-tr span:first-child{ color:#e8ecf5; }
+  #benchPanel .bh-tr span.bad{ color:#ff8a6a; font-weight:700; }
+  #benchPanel .bh-tr span{ color:#7ee8a0; font-variant-numeric:tabular-nums; }
+  #benchPanel .bh-mono{ color:#c8d0de !important; font-size:11.5px; }
+  @media (max-width:420px){
+    #benchPanel .bh-th, #benchPanel .bh-tr{ grid-template-columns:1.4fr .65fr 1.05fr; font-size:11px; padding:6px 9px; }
+    #benchPanel .bh-big{ font-size:36px; }
+  }
 </style>
 </head>
 <body>
@@ -1317,6 +1382,20 @@ background:rgba(90,220,255,.03); cursor:default; }
 
 <div id="loaderr"></div>
 <div id="fpscount"></div>
+<div id="tlEdit">
+  <div id="tlMarks"></div>
+  <div id="tlTop">
+    <div><b>拖动编辑</b>：按住屏幕上的摇杆或任意按键，拖到顺手的位置就行。</div>
+    <div class="tlb-row">
+      <button class="tlb" id="tlResetBtn">恢复默认</button>
+      <button class="tlb ok" id="tlDoneBtn">完成</button>
+    </div>
+    <div id="tlName"></div>
+  </div>
+</div>
+<div id="benchHud"></div>
+<div id="benchPanel"></div>
+
 <!-- 主菜单 -->
 <div id="menu">
   <div class="box">

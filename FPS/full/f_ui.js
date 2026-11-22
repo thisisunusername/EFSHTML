@@ -322,6 +322,9 @@ function renderPauseOverlay(){
 function showTouchUI(){
   const jz=$('joyZone'); if(jz) jz.style.display='block';
   const az=$('actZone'); if(az) az.style.display='block';
+  /* 【自定义布局】每次显示触屏控件时重新贴一次玩家存的位置。
+     这里只在「显示」这一刻写 style，不是每帧，所以控件是静态的。 */
+  try{ if(typeof tlayApply==='function') tlayApply(); }catch(e){}
   window.__joyEnabled=true;   // 允许 document 兜底监听接管左半屏
   buildWpnBar();
   setWpnBarVisible(true);
@@ -405,6 +408,12 @@ function bindUI(){
   const relayout=()=>{
     if(window.__relayout) window.__relayout();
     if(typeof applyPixelBudget==='function' && ready) { try{ applyPixelBudget(); }catch(e){} }
+    /* 【自定义布局必须跟着重算】控件位置是写死的像素（这是「静态」的代价），
+       转屏/窗口尺寸一变，原来的像素值就会落在屏外。
+       这里只在「尺寸真的变了」时按新尺寸重算一次，平时不跑，
+       所以不会出现「控件自己在动」。
+       editing 时不重算：玩家正在拖，尺寸一变就打乱手感。 */
+    try{ if(typeof tlayOnResize==='function') tlayOnResize(); }catch(e){}
   };
   window.addEventListener('resize',()=>{ relayout(); setTimeout(relayout,120); });
   window.addEventListener('orientationchange',()=>{ setTimeout(relayout,180); setTimeout(relayout,420); });
@@ -856,6 +865,13 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
        修法：只有「当前没有活动触点」时才记录起点，
        已经在拖时再收到 touchstart 一律忽略。 */
     const startJoy=(cx,cy)=>{
+      /* 【自定义布局】编辑模式下控件正在被拖动，这时绝不能启动摇杆，
+         否则拖一下摇杆底板，人就在场上跑起来了。
+         另外菜单/设置/暂停浮层打开时也不接管（以前会出现
+         「主菜单上拖一下屏幕，开局后人就一直在往前走」）。
+         joyLocked() 定义在 t_layout.js，本文件在 t_layout 之前拼接，
+         所以运行时才存在，用 typeof 兜底。 */
+      try{ if(typeof joyLocked==='function' && joyLocked()) return; }catch(e){}
       if(activeId!==null){          // 已经在拖了，绝不重置起点
         window.__evtStart=(window.__evtStart||0)+1;
         return;
@@ -965,6 +981,7 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     document.addEventListener('touchstart',e=>{
       if(joyTid!==null) return;
       if(!window.__joyEnabled) return;    // 还没进游戏（菜单界面）不接管
+      try{ if(typeof joyLocked==='function' && joyLocked()) return; }catch(e){}
       for(const t of e.changedTouches){
         if(joyTid!==null) break;
         if(t.clientX > window.innerWidth*(window.__joyZoneRatio||0.42)) continue;
@@ -1008,6 +1025,8 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   const fireBtn=$('btnFire');
   if(fireBtn){
     fireBtn.addEventListener('touchstart',e=>{
+      /* 拖动编辑时不能误触开火 */
+      try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){}
       if(ready){ P.firing=true; fire(); }
       e.preventDefault();
     },{passive:false});
@@ -1018,19 +1037,19 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
     fireBtn.addEventListener('mousedown',e=>{ if(ready){ P.firing=true; fire(); } e.preventDefault(); });
     fireBtn.addEventListener('mouseup',()=>{ P.firing=false; });
   }
-  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ if(ready) doJump(); e.preventDefault(); }); }
-  const reloadBtn=$('btnReload'); if(reloadBtn){ reloadBtn.addEventListener('touchstart',e=>{ startReload(); e.preventDefault(); }); }
+  const jumpBtn=$('btnJump'); if(jumpBtn){ jumpBtn.addEventListener('touchstart',e=>{ e.preventDefault(); try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){} if(ready) doJump(); }); }
+  const reloadBtn=$('btnReload'); if(reloadBtn){ reloadBtn.addEventListener('touchstart',e=>{ e.preventDefault(); try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){} startReload(); }); }
   const sprintBtn=$('btnSprint'); if(sprintBtn){
-    sprintBtn.addEventListener('touchstart',e=>{ P.sprinting=true; e.preventDefault(); });
+    sprintBtn.addEventListener('touchstart',e=>{ e.preventDefault(); try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){} P.sprinting=true; });
     sprintBtn.addEventListener('touchend',()=>{ P.sprinting=false; });
   }
   /* 趴下：点一下切换（不是按住），和跳跃一样是瞬时动作 */
   const proneBtn=$('btnProne'); if(proneBtn){
-    const tap=(e)=>{ e.preventDefault(); e.stopPropagation(); toggleProne(); };
+    const tap=(e)=>{ e.preventDefault(); e.stopPropagation(); try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){} toggleProne(); };
     proneBtn.addEventListener('touchstart',tap,{passive:false});
     proneBtn.addEventListener('click',tap);
   }
-  const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ interact(); e.preventDefault(); }); }
+  const interactBtn=$('btnInteract'); if(interactBtn){ interactBtn.addEventListener('touchstart',e=>{ e.preventDefault(); try{ if(typeof tlayEditing!=='undefined' && tlayEditing) return; }catch(x){} interact(); }); }
 /* 开镜：改成「切换」模式。
      以前是按住生效，手机上一个手指要一直压着开镜键，
      根本没法同时用摇杆移动、也没法开火 —— 手感完全不可用。
@@ -1048,6 +1067,8 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
   };
   if(aimBtn){
     const toggle=(e)=>{
+      /* 拖动编辑时不能误切开镜 */
+      try{ if(typeof tlayEditing!=='undefined' && tlayEditing){ if(e&&e.preventDefault)e.preventDefault(); return; } }catch(x){}
       setAim(!P.aiming);
       if(e&&e.preventDefault) e.preventDefault();
       if(e&&e.stopPropagation) e.stopPropagation();
@@ -1063,7 +1084,7 @@ const joyZone=$('joyZone'), joyBase=$('joyBase'), joyStick=$('joyStick');
      触发后面的 mousedown 造成双重调用。 */
   const inspectBtn=$('btnInspect');
   if(inspectBtn){
-    const doIns=(e)=>{ if(typeof startInspect==='function') startInspect();
+    const doIns=(e)=>{ try{ if(typeof tlayEditing!=='undefined' && tlayEditing){ if(e&&e.preventDefault)e.preventDefault(); return; } }catch(x){} if(typeof startInspect==='function') startInspect();
       if(e&&e.preventDefault) e.preventDefault();
       if(e&&e.stopPropagation) e.stopPropagation(); };
     inspectBtn.addEventListener('touchstart',doIns,{passive:false});

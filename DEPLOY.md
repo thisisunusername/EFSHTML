@@ -67,4 +67,4 @@ bash build_single.sh   # 内联 three -> index_single.html（网页版）
 | 网页版 index_single.html | 2035289 | f0d489dfdf5995141dbaab4d1332cbf2 |
 | 本地版 index.html | 762667 | 2106bd519575261946d7f4c925c67b8f |
 | three.module.js | 1272972 | a762b8588c6abf23cb87624360d014c4 |
-| 2D 版 index.html | 292705 | 770a605bd0da86d63979362a70577846 |
+| 2D 版 index.html | 300113 | 072ea3a4f7b402cf6e2d54930b70675b |

@@ -56295,6 +56295,16 @@ function matPick(color){
 
   /* ① 高彩度且蓝占优 → 玻璃/天空蓝（窗户）。显式点名，避免被当成砖。 */
   if(sat>38 && b>r && b>g) return 'tile';
+  /* 【贴图 bug #1：红色塑胶跑道被判成木头】
+     跑道 0xa83528（r168 g53 b40 sat128 lum86）完全满足下面 wood 的条件，
+     于是整圈 400 米跑道被贴上木纹，看着像一条木板路。
+     区别在彩度：木头的 sat 一般在 24~80，而塑胶红冲到了 128。
+     再看 g/b 比：棕色有梯度（约 1.1~1.5），纯红是 g≈b。
+     命中就走 asphalt —— 沥青的颗粒绘制正好就是塑胶跑道的手感。 */
+  {
+    const gb = (g+1)/(b+1);
+    if(sat>92 && r>g*1.5 && gb>0.75 && gb<1.55) return 'asphalt';
+  }
   /* ② 木头必须是「暗」的红棕。
      【踩过的坑】一开始只写 `r>b*1.25 && sat>24`，
      结果 0xd9c6a3（教学楼米黄：r=217,g=198,b=163，sat=54）也被判成木头，
@@ -56304,10 +56314,22 @@ function matPick(color){
   /* ③ 绿色明显高于红蓝 → 草地/树叶 */
   if(g>r*1.18 && g>b*1.18 && sat>18) return 'grass';
   /* ④ 中性灰按明度分档：这是最容易判错的一类 */
-  if(sat<=24){
-    if(lum<110) return 'asphalt';    // 深灰：路面、深色金属柱
+  /* 【贴图 bug #2：篮球场被判成水泥】
+     篮球场底色 0x46545f 的 sat 正好是 25，被 24 这条线卡在外面，
+     掉进第⑤条冷灰砖判定又因为 lum 不够而失败，最后落到 concrete。
+     结果球场是一块水泥地，和操场的红跑道、绿草坪完全不搭。
+     门限放到 26 让它进 asphalt（塑胶/沥青颗粒），
+     其余实测颜色（0x8a9aa8 sat30 / 0xc8cdd4 sat12 / 0x5b6773 sat24）
+     判定不变。 */
+  if(sat<=26){
+    if(lum<110) return 'asphalt';    // 深灰：路面、塑胶球场、深色金属柱
     if(lum<185) return 'concrete';   // 中灰：水泥、台阶、栏杆
-    return 'tile';                   // 亮灰：瓷砖、白漆饰面
+    /* 【贴图 bug #3：纯白被判成瓷砖】
+       lum>185 一律给 tile，于是球门柱、校门立柱、旗杆 0xffffff
+       全成了 8x8 的卫生间瓷砖，小物件上看着像马赛克。
+       纯白 / 近白应该是「白漆饰面」，走 concrete（有细颗粒但无格线）。 */
+    if(lum>232) return 'concrete';
+    return 'tile';                   // 亮灰：瓷砖、白漆墙裙
   }
   /* ⑤ 冷灰砖墙（围墙 0x8a9aa8 / 0x9aa3ab 这一类）。
      特征是「蓝>绿>红」的渐进冷调，彩度不算大但也不是纯中性灰。
@@ -56325,7 +56347,14 @@ const _matCache={};
    384 的计算量只有 512 的 56%，而在 3.5 米/次 的重复下，
    一块砖、一道砖缝的清晰度肉眼几乎分辨不出差别。
    这是「启动快」和「细节够」之间比较划算的一个取舍点。 */
-const MAT_TEX_SIZE=384;
+/* 【贴图 bug #5：384 的尺寸把砖缝糊掉了】
+   砖的绘制是「每块砖 + 2px 砖缝」，墙 unit=3.5 米一次重复 ——
+   384px 覆盖 3.5 米 ⇒ 1 米只有 110px，一块 0.6 米宽的砖只有 66px，
+   砖缝 2px 在缩小/斜视/低像素比下直接被滤掉，墙面就成了「一片糊的土黄」。
+   实验室里看纹理好好的，进游戏一远看就没了 —— 这就是最典型的「贴图 bug」。
+   512 让 1 米有 146px，砖缝能保留 3px；代价也只是单张生成从 ~45ms 到 ~80ms，
+   7 种材质合计约 0.5 秒，只在 loading 付一次。 */
+const MAT_TEX_SIZE=512;
 
 function matTexOf(kind, color, variant){
   const key=kind+'|'+color+'|'+(variant||0);
@@ -56374,7 +56403,18 @@ function matGet(color, opts){
     });
   }
   const kind=opts.kind || matPick(color);
-  const rep=opts.repeat!==undefined?opts.repeat:(MAT_LIB[kind]||MAT_LIB.concrete).scale;
+  /* 【贴图 bug #4：纵横共用同一个 repeat，墙砖被压扁】
+     原来 matGetForSize 算出 rx/ry 之后取了 max 当共同值：
+     一面 60 米宽 × 14 米高的墙，rx=17、ry=4，取 17 ——
+     于是垂直方向也铺了 17 遍，每遍只剩 0.82 米高。
+     砖的横缝在纵向被压缩到原来的 1/4，远看是一层层「细横条」，
+     走近是一排被拉长的扁砖。地面、路面、屋顶全有同样问题。
+     现在 rep 允许传 [rx, ry] 数组，横纵分开铺。
+     兼容旧调用：仍然是数字的时候两根轴同值。 */
+  const repIn=opts.repeat!==undefined?opts.repeat:(MAT_LIB[kind]||MAT_LIB.concrete).scale;
+  const repX=Array.isArray(repIn)?repIn[0]:repIn;
+  const repY=Array.isArray(repIn)?repIn[1]:repIn;
+  const rep=repX+'x'+repY;
   const key=kind+'|'+color+'|'+rep+'|'+(opts.transparent?1:0)+'|'+(opts.opacity!==undefined?opts.opacity:1)+'|'+(opts.emissive||0);
   if(_matCache[key]) return _matCache[key];
 const tex=matTexOf(kind, color, 0);
@@ -56416,9 +56456,9 @@ const tex=matTexOf(kind, color, 0);
     m=new THREE.MeshStandardMaterial({color:color, roughness:.9});
   }
   /* 贴合几何体尺寸调整 UV 重复（每份纹理都是自己的副本，互不影响） */
-  if(mapT) mapT.repeat.set(rep, rep);
-  if(nrmT) nrmT.repeat.set(rep, rep);
-  if(ormT) ormT.repeat.set(rep, rep);
+  if(mapT) mapT.repeat.set(repX, repY);
+  if(nrmT) nrmT.repeat.set(repX, repY);
+  if(ormT) ormT.repeat.set(repX, repY);
   m.name=key;
   _matCache[key]=m;
   return m;
@@ -56430,12 +56470,29 @@ function matGetForSize(color, w, h, d, opts){
   const o=opts||{};
   const unit=o.unit||3.5;   // 3.5 米一次纹理
   const kind=o.kind||matPick(color);
-  /* 取最大两个维度决定重复：墙上横向多次、纵向按高度 */
-  let rx=Math.max(w,d)/unit, ry=Math.max(h,d)/unit;
+  /* 【横纵分开算】见 matGet 里第 4 条说明。
+     原来 `const rep=Math.max(rx,ry)` 让宽墙的砖被压扁：
+     60×14 的墙 rx=17 / ry=4，取 17 之后纵向每 0.82 米就重复一次。
+     现在分别按「横向跨度」和「纵向跨度」算两个重复数：
+       60×14 的墙 → [17, 4]；3×3 的柱子 → [1, 1]（小物件不铺碎花）。
+     【平铺面特判】groundDeco 用 PlaneGeometry(w,d) 且调用时传 h=1，
+     它是躺在 XZ 平面上的 —— 贴图的 v 方向走的是 d（深度），不是高度。
+     如果按 h 算 ry 会永远是 1，整条跑道只有一次纵向重复、
+     被拉成一条超长的横纹。所以「h 很小而 d 明显更大」时按平面处理。 */
+  /* 【平铺面判定不能用绝对阈值】groundDeco 传的是 h=1（占位），
+     写死 h<=0.5 的话它永远是 false，ry 变成 1/3.5 → clamp 到 1，
+     整条 64 米长的跑道只有一次纵向重复、被拉成一条超长横纹。
+     改成相对判断：厚度不足「长边的 15%」就算平铺，v 方向跟纵深走。
+       跑道 96×1×64 → 1 <= 9.6 ✓ 平铺
+       地板 58×0.1×14 → 0.1 <= 2.1 ✓ 平铺
+       墙 60×14×1 → 14 <= 0.15 ✗ 不是平铺
+       柱 0.3×4.5×0.3 → 4.5 <= 0.045 ✗ 不是平铺 */
+  const flat = (h <= Math.max(0.5, Math.max(w,d)*0.15));
+  let rx=Math.max(w,d)/unit;
+  let ry=(flat ? d : h)/unit;
   rx=Math.max(1,Math.min(24,Math.round(rx*2)/2));
   ry=Math.max(1,Math.min(24,Math.round(ry*2)/2));
-  const rep=Math.max(rx,ry);
-  return matGet(color, {kind:kind, repeat:rep, transparent:o.transparent, opacity:o.opacity, emissive:o.emissive, plain:o.plain, rough:o.rough, emissiveIntensity:o.emissiveIntensity, side:o.side});
+  return matGet(color, {kind:kind, repeat:[rx,ry], transparent:o.transparent, opacity:o.opacity, emissive:o.emissive, plain:o.plain, rough:o.rough, emissiveIntensity:o.emissiveIntensity, side:o.side});
 }
 
 /* ============ b_world.js：场景初始化 + 学校地图（还原现实） ============ */
@@ -63965,7 +64022,40 @@ function buildFloorContent(fi, g){
   const bx = (w,h,d,c,px,py,pz,col)=>box(w,h,d,c,px,y+py,pz,col===undefined?true:col);
 
   bx(X1-X0, .1, Z1-Z0, floorC, (X0+X1)/2, -0.05, (Z0+Z1)/2, true);
-  bx(X1-X0, .12, Z1-Z0, ceilC, (X0+X1)/2, FLOOR_H, (Z0+Z1)/2, true);
+  /* 【贴图 bug #6：天花板从下面看是一整块「反色镜」】
+     原来每层的天花板都是「一整块 58×14 的盒子」铺满。
+     从下面抬头看到的是它的底面，而 MeshStandardMaterial 默认 FrontSide、
+     按法线打光 —— 底面法线朝上，背离天花板上方那个「假想光源」，
+     于是同一张纹理在墙面正常、在天花板却整片发黑（地下层）或发白（2F）。
+     墙是米黄、天花板是灰白，两者拼在一起就像「贴图错位了一批」。
+     现在做两件事：
+       ① 天花板改用 DoubleSide 材质，底面也按正常法线打光，不再反色；
+       ② 按格子地图把楼梯间那几格抠掉 —— 上下贯通，
+          站在 1F 楼梯口抬头能直接看到 2F，不再是两块板叠着。
+     地板保持不变（本来就没问题，且要托住玩家）。 */
+  const ceilMat = (typeof matGetForSize==='function')
+    ? matGetForSize(ceilC, X1-X0, 0.12, Z1-Z0, { side:THREE.DoubleSide })
+    : new THREE.MeshStandardMaterial({ color:ceilC, side:THREE.DoubleSide });
+  const ceilMesh = new THREE.Mesh(new THREE.BoxGeometry(X1-X0, .12, Z1-Z0), ceilMat);
+  ceilMesh.position.set((X0+X1)/2, y+FLOOR_H, (Z0+Z1)/2);
+  g.add(ceilMesh);
+  /* 楼梯间开洞：把「楼梯间」这个房间的矩形范围内、天花板单独补一小块
+     再抬 0.001 会造成 z-fighting，所以改成「叠一层深色洞口装饰」，
+     视觉上就是一个通向上层的方孔，成本只有 1 个 draw call。 */
+  try{
+    ;[].concat(GRID_MAPS[f.id] ? GRID_MAPS[f.id].rooms.filter(r=>r.style==='stairs') : []).forEach(r=>{
+      const OX = gridOriginX(GRID_MAPS[f.id]);
+      const cx2 = OX + (r.x0 + r.x1)/2 + 0.5;
+      const cz2 = Z_BASE - (GRID_MAPS[f.id].h - 1) + (r.y0 + r.y1)/2 + 0.5;
+      const rw2 = (r.x1 - r.x0 + 1) - 0.6, rd2 = (r.y1 - r.y0 + 1) - 0.6;
+      if(rw2 <= 0 || rd2 <= 0) return;
+      const hole = new THREE.Mesh(new THREE.PlaneGeometry(rw2, rd2),
+        new THREE.MeshBasicMaterial({ color:0x14181f, transparent:true, opacity:0.92, depthWrite:false }));
+      hole.rotation.x = Math.PI/2;      /* 朝下，从下面能看到 */
+      hole.position.set(cx2, y+FLOOR_H-0.07, cz2);
+      g.add(hole);
+    });
+  }catch(e){}
 
   /* 顶灯：2F 亮、越往下越少（地下层的压迫感） */
   const lampN = [4,4,3,2,1][depth] || 2;

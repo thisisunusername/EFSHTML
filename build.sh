@@ -20,6 +20,11 @@ OUT=index.html
   # 国际化接入层：要读 startScr/HUD 等节点，放在渲染之后、尾部之前
   cat full/_i18n2d.js;   printf '\n'
   cat full/e_render.js
+  # 【IIFE 收尾】开头 printf 了 '(function(){'，必须有对应的 '})();'。
+  # 这一行原来藏在 e_render.js 文件末尾，删它尾部的多余括号时被一并删掉了，
+  # 导致整包 SyntaxError: Unexpected end of input（所有 JS 一行不执行）。
+  # 放在构建脚本里更稳：分块文件只负责自己那段，配对括号由拼装方保证。
+  printf '})();\n'
   printf '</script>\n'
   printf '</body>\n'
   printf '</html>\n'

@@ -268,12 +268,45 @@ function drawObj(o){
     ctx.save();
     if(camOn){
       /* 监控视野锥 */
-      ctx.fillStyle='rgba(255,70,90,.10)';
+      /* 【视野锥的半径要跟真实判定一致】
+         cameraSees() 判的是 dist>cam.range 就看不见，
+         而这里原来画的是 range*scale —— scale 已经是「每格多少像素」，
+         两者一致，但 `o.range||5` 在 range 合法为 4 时也是 4，没问题。
+         真正不一致的是颜色和粗细：原来 0.10 透明 + 1px 线，
+         在红色塑胶跑道/深色地板上几乎看不见范围边界，
+         玩家根本不知道「哪块区域不能进」，也就谈不上走位。
+         现在把底色调到 0.16、边界描成 2px 半透明实线，
+         并且按模式区分：回合制画「固定覆盖区」（边界清晰、可预判），
+         经典模式画「正在转的扇形」（略淡，重点是动态感）。 */
+      var turnMode = (S.mode2!=='classic');
+      /* 【看得见的范围 = 正在看你的范围】
+         window.__camWatching 由 updateSeeHUD 每帧写入（camWatchingList()），
+         里面是「当前真的判定看见玩家」的监控。
+         命中时整块变亮黄 + 加粗，玩家能立刻知道「我被这只盯着」。 */
+      var watched = !!(window.__camWatching && window.__camWatching.indexOf(o)>=0);
+      var baseA = watched ? 0.30 : (turnMode ? 0.16 : 0.10);
+      ctx.fillStyle = 'rgba(255,70,90,'+baseA.toFixed(2)+')';
       ctx.beginPath();
       ctx.moveTo(x,y);
       ctx.arc(x, y, Math.round((o.range||5)*scale), o.dir-(o.cone||0.5), o.dir+(o.cone||0.5));
       ctx.closePath(); ctx.fill();
-      ctx.strokeStyle='rgba(255,90,110,.35)'; ctx.lineWidth=1; ctx.stroke();
+      ctx.strokeStyle = watched ? 'rgba(255,214,92,.95)'
+                              : (turnMode ? 'rgba(255,90,110,.62)' : 'rgba(255,90,110,.34)');
+      ctx.lineWidth = watched ? 2.5 : (turnMode ? 2 : 1);
+      ctx.stroke();
+      /* 回合制额外画出圆心到边界的两条虚线，
+         让「锥形两条边」在复杂地砖上看得出角度。 */
+      if(turnMode){
+        ctx.save();
+        ctx.setLineDash([4,4]);
+        ctx.strokeStyle = watched ? 'rgba(255,214,92,.75)' : 'rgba(255,90,110,.4)';
+        ctx.lineWidth=1;
+        var rr=(o.range||5)*scale, ca=o.dir-(o.cone||0.5), cb=o.dir+(o.cone||0.5);
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(ca)*rr, y+Math.sin(ca)*rr);
+        ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(cb)*rr, y+Math.sin(cb)*rr);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
     ctx.restore();
     ctx.fillStyle=ccol; ctx.shadowColor=ccol; ctx.shadowBlur=camOn?12:0;
@@ -484,4 +517,3 @@ refreshEndingList();/* 结局列表：通关过才显示 ⑥ 的真容 */
 try{ if(typeof i18n2dInit==='function') i18n2dInit(); }catch(e){}
 S.mode='menu';
 requestAnimationFrame(loop);
-})();

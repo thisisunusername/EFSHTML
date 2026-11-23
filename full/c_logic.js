@@ -420,6 +420,17 @@ function updateHUD(){
 
 /* 被发现进度条：只要有人看着你，就把 3 秒倒计时显示出来 */
 function updateSeeHUD(){
+  /* 【给渲染层提供「谁在盯着我」】
+     渲染（e_render.js 的监控视野锥）要判断某只监控此刻是不是真的
+     看见了玩家，用来做高亮。原来渲染层没有这个信息，
+     只能画一层静态半透明，玩家被抓住了也不知道是哪只看丢的。
+     这里每帧算一次，结果挂在 window 上 —— 
+     c_logic 和 e_render 是两个独立的 <script>，
+     用 window 传值最直接，也不用给 e_render 加依赖。 */
+  try{
+    if(S.mode==='play') window.__camWatching = camWatchingList();
+    else window.__camWatching = [];
+  }catch(e){ window.__camWatching = []; }
   var wrap=document.getElementById('seeWrap');
   var bar=document.getElementById('seeBar');
   var txt=document.getElementById('seeTxt');
@@ -830,6 +841,37 @@ function moveNpc(n,dt){
      走不满一格时这回合就不动，攒够了再走——速度差才能如实体现。
      注意：绝不能在这里给「不足一格」做概率补偿，那会把 0.2 格/回合
      补偿成 0.4 格/回合，难度档位又会被抹平。 */
+  /* 【经典模式：连续移动，不分格】
+     原来 moveNpc 里那套「预算攒够 1 格才动」是给回合制写的。
+     经典模式下每帧的 dt≈0.016，speed 1.7~2.55 时
+     budget = speed*0.016 ≈ 0.027~0.041，永远小于 1 ——
+     于是 carry 一直往上加、攒到 1 才走一跳：≈ 25~37 帧 = 0.4~0.6 秒，
+     然后瞬间平移一整格（1 米）。表现出来就是 NPC 一卡一卡地「跳格子」，
+     而不是平滑地走。
+     现在按模式分流：经典模式直接按 speed*dt 连续推进（可以走零点几格），
+     回合制才走预算累积那套。 */
+  if(S.mode2==='classic'){
+    var spC = (n.speed||1.4) * dt;
+    var guardC=0;
+    while(spC>0 && n.path && n.path.length>0 && guardC<16){
+      guardC++;
+      var tC=n.path[0];
+      var gxC=tC.x+0.5, gyC=tC.y+0.5;
+      var dxC=gxC-n.x, dyC=gyC-n.y;
+      var dC=Math.sqrt(dxC*dxC+dyC*dyC);
+      if(dC<0.0005){ n.path.shift(); continue; }
+      if(spC>=dC){
+        n.x=gxC; n.y=gyC; n.dir=Math.atan2(dyC,dxC);
+        spC-=dC; n.path.shift();
+      } else {
+        n.x+=dxC/dC*spC; n.y+=dyC/dC*spC;
+        n.dir=Math.atan2(dyC,dxC);
+        spC=0;
+      }
+    }
+    n.budget=0; n.budgetCarry=0;
+    return;
+  }
   n.budget = (n.budgetCarry||0) + n.speed * dt;
   n.budgetCarry = 0;
   if(n.budget < 1){
@@ -965,7 +1007,9 @@ function updateNpcs(dt){
         n.pathT-=dt;
         if(!n.path || !n.path.length || n.pathT<=0){
           setPath(n, W[n.floor], goal.x, goal.y);
-          n.pathT=1.0;
+          /* 经典模式每 0.35 秒重算一次路径，追人时才跟得紧；
+             回合制保持 1 秒（玩家一步一格，没必要更频繁）。 */
+          n.pathT = (S.mode2==='classic') ? 0.35 : 1.0;
           if(!n.path || !n.path.length) n.idleT+=dt;
         }
       } else {
@@ -1142,7 +1186,24 @@ function cameraSees(cam){
   if(angDiff(ang, cam.dir) > (cam.cone||0.5)) return false;
   return losClear(fl(), cam.x, cam.y, S.px, S.py);
 }
+/* 【实时视野扫描 —— 给「看得见的范围」用】
+   回合制里监控是静止的锥形区，玩家需要一眼看出「这块现在被看着」，
+   否则站在锥里等被抓也不知道是怎么被抓的。
+   这个函数每帧被 updateSeeHUD 调用，只做几何判断（每个监控一次 LOS），
+   5 个监控 × 30 次采样，手机上也几乎不耗时。 */
+function camWatchingList(){
+  var out=[];
+  if(S.camsOff || S.stealthT>0) return out;
+  var f=fl(); if(!f) return out;
+  for(var i=0;i<f.objs.length;i++){
+    var c=f.objs[i];
+    if(c.t!=='camera') continue;
+    if(cameraSees(c)) out.push(c);
+  }
+  return out;
+}
 function camerasWatcher(){
+
   if(S.camsOff) return null;
   var f=fl(); if(!f) return null;
   for(var i=0;i<f.objs.length;i++){
@@ -1152,29 +1213,56 @@ function camerasWatcher(){
   }
   return null;
 }
-/* 监控会缓慢转向玩家（跟踪），这样"有监控的路"确实有压力 */
+/* ============ 监控：两种模式，两套行为 ============
+   【为什么必须分开】原来不管什么模式，监控都在「跟踪玩家 + 左右扫动」。
+   后果是：
+     · 回合制（turn）里，玩家踩格子慢慢挪，监控却一直在转头，
+       刚躲开的角度一帧就追回来，玩家完全无从预判 → 只能硬吃抓。
+       回合制的手感应该是「看清固定覆盖区，算好路线穿过去」。
+     · 摇杆/经典（classic）里，玩家连续移动、可以边跑边绕，
+       监控如果只盯死一个方向就太好躲了，转起来才有压迫感。
+   所以现在按模式分流：
+     turn    → 监控【固定朝向】，锥形覆盖区不动，玩家可以靠走位绕开；
+     classic → 监控【旋转】，没人时左右扫（±0.42 rad），
+               有人靠近就缓慢转向玩家（角速度 1.35 rad/s 上限，
+               转得比人跑得慢，跑得快就能甩开）。
+   共同点：c.dir 初始化时都用 baseDir 记账，读档/换层不会乱转。 */
+var CAM_TURN_SPEED = 1.35;      /* 经典模式：监控最大角速度（弧度/秒） */
+var CAM_SWEEP_AMP  = 0.42;      /* 经典模式：无目标时左右扫的幅度 */
 function updateCameras(dt){
   if(S.camsOff) return;
   var f=fl(); if(!f) return;
+  var classic = (S.mode2==='classic');
   for(var i=0;i<f.objs.length;i++){
     var c=f.objs[i];
     if(c.t!=='camera') continue;
-    c.sweep=(c.sweep||0)+dt;
-    /* baseDir：监控的初始朝向，作为没人时左右扫动的中心 */
+    /* baseDir 是「安装朝向」，第一次进来记下来 */
     if(c.baseDir===undefined) c.baseDir=c.dir;
+    if(!classic){
+      /* ---------- 回合制：钉死不动 ---------- */
+      c.dir = c.baseDir;
+      c.sweep = 0;
+      c.seesPlayer = false;
+      continue;
+    }
+    /* ---------- 经典模式：旋转 ---------- */
+    c.sweep=(c.sweep||0)+dt;
     var base=c.baseDir;
     var dx=S.px-c.x, dy=S.py-c.y;
     var dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist<c.range*1.2){
-      /* 玩家进入监控附近 → 缓慢转到玩家方向 */
+    if(dist<c.range*1.2 && !S.camsOff && S.stealthT<=0){
+      /* 有人靠近：朝玩家方向转，但每帧最多转 CAM_TURN_SPEED*dt */
       var want=Math.atan2(dy,dx);
       var diff=want-c.dir;
       while(diff>Math.PI) diff-=Math.PI*2;
       while(diff<-Math.PI) diff+=Math.PI*2;
-      c.dir += diff*0.55*dt;        /* 慢慢转：太快像抽搐，看不清也没法躲 */
+      var maxStep=CAM_TURN_SPEED*dt;
+      if(diff>maxStep) diff=maxStep;
+      else if(diff<-maxStep) diff=-maxStep;
+      c.dir += diff;
     } else {
-      /* 没人就慢慢左右扫（以 baseDir 为中心，±0.5 弧度摆动） */
-      c.dir = base + Math.sin(c.sweep*0.35)*0.5;
+      /* 没人：以安装朝向为中心左右扫 */
+      c.dir = base + Math.sin(c.sweep*0.35)*CAM_SWEEP_AMP;
     }
   }
 }

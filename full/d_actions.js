@@ -488,6 +488,22 @@ function bindInput(){
         for(var k=0;k<ms.length;k++) ms[k].classList.remove('on');
         d.classList.add('on');
         S.mode2=d.getAttribute('data-mode');
+        /* 【切模式要重置「回合锁」】
+           回合制里玩家走完一格会置 stepLocked=true / turnBusy=true，
+           必须松开按键 + 敌人演完才会解除。
+           如果玩家在回合制里按下方向还没松手就点了「摇杆+全地图」，
+           这两个锁会留着 —— 而 movePlayer 的经典分支前面有一句
+           `if(S.mode2!=='classic' && S.turnBusy)`，虽然不会误锁，
+           但 stepT>0 时 movePlayer 会优先走「滑向目标格」那段，
+           摇杆输入直接被忽略，玩家会觉得「切到摇杆后要等一下才动」。
+           这里把回合相关的中间状态清干净，切过去立刻能走。 */
+        S.stepT=0; S.stepLocked=false; S.stepKey='';
+        S.needEnemyTurn=false; S.turnBusy=false;
+        S.enemyAnimT=0; S.enemyFrom=null;
+        for(var ni=0; ni<S.npcs.length; ni++){
+          S.npcs[ni].budget=0; S.npcs[ni].budgetCarry=0;
+        }
+        input.up=input.down=input.left=input.right=false;
         if(typeof refreshPadMode==='function') refreshPadMode();
       });
     })(ms[q]);

@@ -516,7 +516,40 @@ function buildFloorContent(fi, g){
   const bx = (w,h,d,c,px,py,pz,col)=>box(w,h,d,c,px,y+py,pz,col===undefined?true:col);
 
   bx(X1-X0, .1, Z1-Z0, floorC, (X0+X1)/2, -0.05, (Z0+Z1)/2, true);
-  bx(X1-X0, .12, Z1-Z0, ceilC, (X0+X1)/2, FLOOR_H, (Z0+Z1)/2, true);
+  /* 【贴图 bug #6：天花板从下面看是一整块「反色镜」】
+     原来每层的天花板都是「一整块 58×14 的盒子」铺满。
+     从下面抬头看到的是它的底面，而 MeshStandardMaterial 默认 FrontSide、
+     按法线打光 —— 底面法线朝上，背离天花板上方那个「假想光源」，
+     于是同一张纹理在墙面正常、在天花板却整片发黑（地下层）或发白（2F）。
+     墙是米黄、天花板是灰白，两者拼在一起就像「贴图错位了一批」。
+     现在做两件事：
+       ① 天花板改用 DoubleSide 材质，底面也按正常法线打光，不再反色；
+       ② 按格子地图把楼梯间那几格抠掉 —— 上下贯通，
+          站在 1F 楼梯口抬头能直接看到 2F，不再是两块板叠着。
+     地板保持不变（本来就没问题，且要托住玩家）。 */
+  const ceilMat = (typeof matGetForSize==='function')
+    ? matGetForSize(ceilC, X1-X0, 0.12, Z1-Z0, { side:THREE.DoubleSide })
+    : new THREE.MeshStandardMaterial({ color:ceilC, side:THREE.DoubleSide });
+  const ceilMesh = new THREE.Mesh(new THREE.BoxGeometry(X1-X0, .12, Z1-Z0), ceilMat);
+  ceilMesh.position.set((X0+X1)/2, y+FLOOR_H, (Z0+Z1)/2);
+  g.add(ceilMesh);
+  /* 楼梯间开洞：把「楼梯间」这个房间的矩形范围内、天花板单独补一小块
+     再抬 0.001 会造成 z-fighting，所以改成「叠一层深色洞口装饰」，
+     视觉上就是一个通向上层的方孔，成本只有 1 个 draw call。 */
+  try{
+    ;[].concat(GRID_MAPS[f.id] ? GRID_MAPS[f.id].rooms.filter(r=>r.style==='stairs') : []).forEach(r=>{
+      const OX = gridOriginX(GRID_MAPS[f.id]);
+      const cx2 = OX + (r.x0 + r.x1)/2 + 0.5;
+      const cz2 = Z_BASE - (GRID_MAPS[f.id].h - 1) + (r.y0 + r.y1)/2 + 0.5;
+      const rw2 = (r.x1 - r.x0 + 1) - 0.6, rd2 = (r.y1 - r.y0 + 1) - 0.6;
+      if(rw2 <= 0 || rd2 <= 0) return;
+      const hole = new THREE.Mesh(new THREE.PlaneGeometry(rw2, rd2),
+        new THREE.MeshBasicMaterial({ color:0x14181f, transparent:true, opacity:0.92, depthWrite:false }));
+      hole.rotation.x = Math.PI/2;      /* 朝下，从下面能看到 */
+      hole.position.set(cx2, y+FLOOR_H-0.07, cz2);
+      g.add(hole);
+    });
+  }catch(e){}
 
   /* 顶灯：2F 亮、越往下越少（地下层的压迫感） */
   const lampN = [4,4,3,2,1][depth] || 2;

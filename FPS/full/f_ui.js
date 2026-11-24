@@ -2790,7 +2790,15 @@ const MM_BUILDINGS=[
   {x:34,  z:2,   w:16, d:32, n:'东楼'},      // box(16,14,32, 34,2)
   {x:0,   z:26,  w:34, d:15, n:'行政楼'},    // box(34,11,15, 0,26)
   {x:16,  z:34,  w:86, d:52, n:'操场'},      // groundDeco(86,52, 16,34)
-  {x:58,  z:18,  w:26, d:22, n:'体育馆'}     // 体育馆在操场东侧
+  {x:58,  z:18,  w:26, d:22, n:'体育馆'},    // 体育馆在操场东侧
+  /* ---- 校园扩建（x_campus.js）：小地图上也要能看出来 ---- */
+  {x:-50, z:-35, w:10, d:18, n:'宿舍A'},
+  {x:-50, z:-6,  w:10, d:18, n:'宿舍B'},
+  {x:-50, z:46,  w:16, d:20, n:'食堂'},
+  {x:70,  z:-20, w:12, d:26, n:'图书馆'},
+  {x:8,   z:-43, w:4.4,d:4.4,n:'传达室'},
+  {x:-30, z:-38, w:24, d:12, n:'停车场'},
+  {x:46,  z:-38, w:12, d:10, n:'车棚'}
 ];
 let mmCtx=null, mmLast=0;
 
@@ -2926,6 +2934,14 @@ function drawMiniMap(now){
       else if(inRect(34,2,16,32))    zone='东楼';
       else if(inRect(0,26,34,15))    zone='行政楼';
       else if(inRect(58,18,26,22))   zone='体育馆';
+      /* 校园扩建：新建筑要有自己的区域名，否则 HUD 上一直显示「操场」 */
+      else if(inRect(-50,-35,10,18)) zone='宿舍A';
+      else if(inRect(-50,-6,10,18))  zone='宿舍B';
+      else if(inRect(-50,46,16,20))  zone='食堂';
+      else if(inRect(70,-20,12,26))  zone='图书馆';
+      else if(inRect(8,-43,4.4,4.4)) zone='传达室';
+      else if(inRect(-30,-38,24,12)) zone='停车场';
+      else if(inRect(46,-38,12,10))  zone='车棚';
       else if(z<-40)                 zone='校门口';
       else if(inRect(16,34,86,52))   zone='操场';
       else if(z>44)                  zone='北场地';

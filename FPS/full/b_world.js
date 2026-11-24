@@ -220,6 +220,15 @@ function init(){
      所以：主楼部分交给 buildFloors()，buildInterior 只保留东西楼与行政楼。 */
   if(typeof buildInterior==='function') buildInterior();
   if(typeof buildFloors==='function') buildFloors();
+  /* 【校园扩建】宿舍 / 食堂 / 图书馆 / 传达室 / 停车场 / 车棚 /
+     宣传栏 / 花坛 / 主干道 / 垃圾站（见 x_campus.js 的 buildCampus）。
+     放在 buildFloors 之后、setupWorld 之前：
+       · 必须在 setupWorld 之前 —— 它后面会 buildContainers()/刷敌人，
+         容器点位要能在新建筑里落住；
+       · 必须在 buildSportsZone 之后 —— 主干道/停车场会盖在操场地皮上，
+         反过来会被操场的大块 groundDeco 盖到下面去（y 更低）。
+     包 try/catch：某一块建崩了也不把整局拖黑，控制台能看到具体错。 */
+  try{ if(typeof buildCampus==='function') buildCampus(); }catch(e){ console.error('campus build failed', e); }
   if(typeof buildFloorTransports==='function') buildFloorTransports();
   setupWorld();
   ready=true;
@@ -457,6 +466,15 @@ function setupWorld(){
      重点修了两个卡墙的：
        (-14,56) 原来卡在看台台阶里 -> 挪到看台前方 (-14,50)
        (-30,10) 原来在东教学楼里   -> 挪到楼间空地 (-18,14) */
+  /* 校园扩建后的新物资点位（全部在新建筑的空地上，不卡墙）：
+     宿舍 A/B 走廊、食堂售饭台前、图书馆阅览区、传达室旁边、车棚里。 */
+  loots.push(
+    spawnLoot(-46,-35,'ammo'),  spawnLoot(-46,-10,'med'),
+    spawnLoot(-46,40,'cash'),   spawnLoot(-46,50,'med'),
+    spawnLoot(66,-28,'cash'),   spawnLoot(66,-8,'gun'),
+    spawnLoot(14,-44,'ammo'),   spawnLoot(44,-40,'cash'),
+    spawnLoot(-32,-38,'med'),   spawnLoot(-24,-40,'cash')
+  );
   loots.push(
     spawnLoot(-10,10,'ammo'),  spawnLoot(10,10,'ammo'),
     spawnLoot(-14,50,'med'),   spawnLoot(30,54,'med'),

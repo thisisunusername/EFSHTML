@@ -128,7 +128,12 @@ function diffApply(){
 const EXFIL_SPOTS = [
   { x:0,   z:-36, name:'校门',       indoor:false },
   { x:52,  z:20,  name:'体育馆侧门', indoor:true  },
-  { x:-46, z:-6,  name:'西楼后门',   indoor:false }
+  { x:-46, z:-6,  name:'西楼后门',   indoor:false },
+  /* 校园扩建后的新撤离点：
+     图书馆东侧围墙边（要从东楼后面绕过去，路线长且开阔）、
+     食堂后门通垃圾站（室内出发，适合拿了东西就跑）。 */
+  { x:74,  z:-36, name:'图书馆后院', indoor:true  },
+  { x:-44, z:52,  name:'食堂后门',   indoor:true  }
 ];
 const exfilList = [];       // 本局实际启用的撤离点
 

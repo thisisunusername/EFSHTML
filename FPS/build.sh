@@ -20,7 +20,12 @@ OUT=index.html
   cat full/e_io.js;      printf '\n'
   cat full/f_ui.js;      printf '\n'
   # x_ext 提供门/新操场/交互入口，必须在 b_world 之后、z_render 之前
-  cat full/x_ext.js;     printf '\n'
+  cat full/x_ext.js;  printf '\n'
+  # 校园扩建（宿舍/食堂/图书馆/传达室/停车场/车棚/宣传栏/花坛/主干道）：
+  # 只提供 buildCampus()，必须在 x_ext 之后（复用它的 mkDoor），
+  # 并在 z_render 的 init 链里调用。
+  cat full/x_campus.js;  printf '\n'
+     printf '\n'
   # 难度系统：diffGet/diffApply/exfilBuild 被 b_world 的 setupWorld 调用，
   # 而 setupWorld 是运行时调用（不是加载时），所以放这里足够早；
   # 但 exfilNear 被 d_game 的 checkExfil 用，也必须在这个位置之前定义。
